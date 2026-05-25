@@ -43,6 +43,11 @@ export async function POST(req: Request) {
   const body = parsed.data;
   const supabase = await createClient();
 
+  // Cheque payments start as "pending" (awaiting clearance); every other mode
+  // is "paid" (done) on the spot. The receipt page can later flip a pending
+  // cheque to done — but never the other way round.
+  const isCheque = body.payment_mode === "cheque";
+
   // Insert invoice
   const { data: invoice, error: invErr } = await supabase
     .from("invoices")
@@ -55,7 +60,7 @@ export async function POST(req: Request) {
       total: body.total,
       amount_paid: body.total,
       balance: 0,
-      payment_status: "paid",
+      payment_status: isCheque ? "pending" : "paid",
       payment_mode: body.payment_mode,
       payment_ref: body.payment_ref ?? null,
       late_fee_waived: body.late_fee_waived,

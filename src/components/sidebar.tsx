@@ -3,16 +3,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import type { NavItem } from "@/lib/access";
 
-const nav = [
-  { href: "/", label: "Dashboard" },
-  { href: "/fees/structures", label: "Fee Structures" },
-  { href: "/fees/collect", label: "Collect Fee" },
-  { href: "/receipts", label: "Receipts" },
-  { href: "/settings/late-fee", label: "Settings" },
-];
+export type NavGroup = { label?: string; items: NavItem[] };
 
-export default function Sidebar() {
+export default function Sidebar({ groups }: { groups: NavGroup[] }) {
   const path = usePathname();
   return (
     <aside className="w-60 shrink-0 border-r border-[color:var(--border)] bg-[color:var(--card)] px-4 py-6">
@@ -23,24 +18,34 @@ export default function Sidebar() {
           <div className="text-xs text-stone-500 leading-tight">Adeshwar Public School</div>
         </div>
       </Link>
-      <nav className="flex flex-col gap-1">
-        {nav.map((n) => {
-          const active = path === n.href || (n.href !== "/" && path.startsWith(n.href));
-          return (
-            <Link
-              key={n.href}
-              href={n.href}
-              className={cn(
-                "px-3 py-2 rounded-lg text-sm transition",
-                active
-                  ? "bg-stone-900 text-stone-50"
-                  : "text-stone-700 hover:bg-stone-100"
-              )}
-            >
-              {n.label}
-            </Link>
-          );
-        })}
+      <nav className="flex flex-col gap-4">
+        {groups.map((group, gi) => (
+          <div key={group.label ?? gi} className="flex flex-col gap-1">
+            {group.label && (
+              <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-stone-400">
+                {group.label}
+              </div>
+            )}
+            {group.items.map((n) => {
+              const active =
+                path === n.href || (n.href !== "/" && path.startsWith(n.href));
+              return (
+                <Link
+                  key={n.href}
+                  href={n.href}
+                  className={cn(
+                    "px-3 py-2 rounded-lg text-sm transition",
+                    active
+                      ? "bg-stone-900 text-stone-50"
+                      : "text-stone-700 hover:bg-stone-100"
+                  )}
+                >
+                  {n.label}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
     </aside>
   );

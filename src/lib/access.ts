@@ -1,0 +1,61 @@
+// Roles (the three login "layers") and departments, plus the nav each
+// department exposes. Shared by the sidebar, topbar, DAL and admin screens so
+// there is a single source of truth for who can see/switch what.
+
+export type Role = "admin" | "manager" | "staff";
+export type Department = "fees" | "library" | "results";
+
+export const ROLE_LABELS: Record<Role, string> = {
+  admin: "Admin (Layer 1)",
+  manager: "Manager (Layer 2)",
+  staff: "Staff (Layer 3)",
+};
+
+export const DEPARTMENTS: { id: Department; label: string }[] = [
+  { id: "fees", label: "Fees" },
+  { id: "library", label: "Library" },
+  { id: "results", label: "Results" },
+];
+
+export const DEPARTMENT_LABELS: Record<Department, string> = {
+  fees: "Fees",
+  library: "Library",
+  results: "Results",
+};
+
+export type NavItem = { href: string; label: string };
+
+// Department-scoped navigation. Fees is the fully built module; library and
+// results are scaffolded landing pages for now.
+export const DEPARTMENT_NAV: Record<Department, NavItem[]> = {
+  fees: [
+    { href: "/", label: "Dashboard" },
+    { href: "/fees/structures", label: "Fee Structures" },
+    { href: "/fees/collect", label: "Collect Fee" },
+    { href: "/receipts", label: "Receipts" },
+    { href: "/settings/late-fee", label: "Settings" },
+  ],
+  library: [{ href: "/library", label: "Library" }],
+  results: [{ href: "/results", label: "Results" }],
+};
+
+// Cross-department academic administration, available to admin + manager.
+export const ACADEMICS_NAV: NavItem[] = [
+  { href: "/academics/students", label: "Students" },
+  { href: "/academics/classes", label: "Classes & Sections" },
+  { href: "/academics/subjects", label: "Subjects" },
+];
+
+export const COOKIE_DEPARTMENT = "erp_dept";
+
+export function isDepartment(value: string | null | undefined): value is Department {
+  return value === "fees" || value === "library" || value === "results";
+}
+
+// Which departments a profile may switch between.
+export function allowedDepartments(role: Role, department: Department | null): Department[] {
+  if (role === "admin" || role === "manager") {
+    return DEPARTMENTS.map((d) => d.id);
+  }
+  return department ? [department] : [];
+}

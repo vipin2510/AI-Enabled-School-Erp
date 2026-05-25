@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { inr } from "@/lib/utils";
+import { requireProfile } from "@/lib/auth";
+import { inr, monthName, ACADEMIC_MONTHS } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,13 @@ type RecentInvoice = {
 };
 
 export default async function Dashboard() {
+  // The home dashboard is the Fees overview. Staff pinned to another department
+  // land on their own workspace instead.
+  const profile = await requireProfile();
+  if (profile.role === "staff" && profile.department && profile.department !== "fees") {
+    redirect(`/${profile.department}`);
+  }
+
   const supabase = await createClient();
 
   const now = new Date();
@@ -87,6 +96,38 @@ export default async function Dashboard() {
         <Card title={`Students Unpaid · ${monthLabel}`} value={unpaidCount} />
         <Card title={`Outstanding · ${monthLabel}`} value={inr(outstanding)} />
       </div>
+
+      <section className="mt-8">
+        <div className="card p-5">
+          <h2 className="text-lg font-medium">Export Pending Fees</h2>
+          <p className="text-stone-500 text-sm mb-3">
+            Download a class-wise list of students who haven&apos;t paid a given month&apos;s
+            fee — with name and mobile number.
+          </p>
+          {/* Plain GET form: the route replies with a CSV attachment, so the
+              browser downloads it without any client-side JavaScript. */}
+          <form
+            action="/api/exports/pending"
+            method="GET"
+            className="flex flex-wrap items-center gap-3"
+          >
+            <select
+              name="month"
+              defaultValue={monthIndex}
+              className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm"
+            >
+              {ACADEMIC_MONTHS.map((m) => (
+                <option key={m} value={m}>
+                  {monthName(m)}
+                </option>
+              ))}
+            </select>
+            <button className="rounded-lg bg-stone-900 px-4 py-2 text-sm text-stone-50">
+              Download CSV
+            </button>
+          </form>
+        </div>
+      </section>
 
       <section className="mt-10">
         <div className="flex items-center justify-between mb-3">

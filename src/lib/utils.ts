@@ -30,3 +30,16 @@ export function daysBetween(a: Date, b: Date) {
   const ms = b.getTime() - a.getTime();
   return Math.floor(ms / (1000 * 60 * 60 * 24));
 }
+
+// Monthly fee components use period_index = calendar month (1..12). The school
+// session runs Apr → Mar, so present months in that order for pickers.
+export const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+export const ACADEMIC_MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+
+export function monthName(index: number) {
+  return MONTH_NAMES[index - 1] ?? "";
+}

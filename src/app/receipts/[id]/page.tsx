@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { inr, formatDate } from "@/lib/utils";
+import ReceiptStatus from "./receipt-status";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,12 @@ export default async function ReceiptPage({
         <Link href="/receipts" className="text-sm text-stone-600 hover:underline">
           ← Back
         </Link>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
+          <ReceiptStatus
+            invoiceId={invoice.id}
+            status={invoice.payment_status}
+            paymentMode={invoice.payment_mode}
+          />
           <a
             href={`/api/receipts/${invoice.id}/pdf`}
             className="rounded-lg bg-stone-900 px-4 py-2 text-sm text-stone-50"
