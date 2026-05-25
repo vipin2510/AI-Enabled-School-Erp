@@ -4,7 +4,7 @@ import { addSubject, removeSubject } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-type SubjectRow = { id: string; class_id: string; name: string };
+type SubjectRow = { id: string; class_id: string; name: string; category: string };
 
 export default async function SubjectsPage() {
   await requireRole("admin", "manager");
@@ -12,7 +12,7 @@ export default async function SubjectsPage() {
 
   const [{ data: classes }, { data: subjects }] = await Promise.all([
     supabase.from("classes").select("id, display_name, ordinal").order("ordinal"),
-    supabase.from("subjects").select("id, class_id, name").order("name"),
+    supabase.from("subjects").select("id, class_id, name, category").order("name"),
   ]);
 
   const byClass = new Map<string, SubjectRow[]>();
@@ -26,13 +26,16 @@ export default async function SubjectsPage() {
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Subjects</h1>
         <p className="text-stone-500 text-sm">
-          Add or remove the subjects offered in each class.
+          Add or remove the subjects offered in each class. Scholastic subjects are
+          marked numerically; co-curricular subjects get a single A–E grade.
         </p>
       </header>
 
       <div className="space-y-3">
         {(classes ?? []).map((c) => {
           const list = byClass.get(c.id) ?? [];
+          const scholastic = list.filter((s) => s.category !== "co_curricular");
+          const coCurricular = list.filter((s) => s.category === "co_curricular");
           return (
             <div key={c.id} className="card p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -45,37 +48,76 @@ export default async function SubjectsPage() {
                     required
                     className="w-56 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm"
                   />
+                  <select
+                    name="category"
+                    defaultValue="scholastic"
+                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm"
+                    aria-label="Subject type"
+                  >
+                    <option value="scholastic">Scholastic</option>
+                    <option value="co_curricular">Co-curricular</option>
+                  </select>
                   <button className="rounded-lg bg-stone-900 px-3 py-1.5 text-sm text-stone-50">
                     Add
                   </button>
                 </form>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                {list.length === 0 && (
-                  <span className="text-sm text-stone-400">No subjects yet.</span>
-                )}
-                {list.map((s) => (
-                  <span
-                    key={s.id}
-                    className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-sm"
-                  >
-                    {s.name}
-                    <form action={removeSubject}>
-                      <input type="hidden" name="id" value={s.id} />
-                      <button
-                        className="text-stone-400 hover:text-red-600"
-                        aria-label={`Remove subject ${s.name}`}
-                      >
-                        ✕
-                      </button>
-                    </form>
-                  </span>
-                ))}
-              </div>
+              <SubjectGroup label="Scholastic" list={scholastic} emptyText="No subjects yet." />
+              <SubjectGroup
+                label="Co-curricular"
+                list={coCurricular}
+                emptyText="No co-curricular subjects."
+                accent
+              />
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function SubjectGroup({
+  label,
+  list,
+  emptyText,
+  accent,
+}: {
+  label: string;
+  list: SubjectRow[];
+  emptyText: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="mt-3">
+      <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-stone-400">
+        {label}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {list.length === 0 && <span className="text-sm text-stone-400">{emptyText}</span>}
+        {list.map((s) => (
+          <span
+            key={s.id}
+            className={
+              "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm " +
+              (accent
+                ? "border-amber-200 bg-amber-50 text-amber-900"
+                : "border-stone-200 bg-stone-50")
+            }
+          >
+            {s.name}
+            <form action={removeSubject}>
+              <input type="hidden" name="id" value={s.id} />
+              <button
+                className="text-stone-400 hover:text-red-600"
+                aria-label={`Remove subject ${s.name}`}
+              >
+                ✕
+              </button>
+            </form>
+          </span>
+        ))}
       </div>
     </div>
   );

@@ -29,10 +29,12 @@ export async function addSubject(formData: FormData) {
   await requireRole("admin", "manager");
   const class_id = String(formData.get("class_id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
+  const categoryRaw = String(formData.get("category") ?? "scholastic");
+  const category = categoryRaw === "co_curricular" ? "co_curricular" : "scholastic";
   if (!class_id || !name) return;
 
   const supabase = await createClient();
-  await supabase.from("subjects").insert({ class_id, name });
+  await supabase.from("subjects").insert({ class_id, name, category });
   revalidatePath("/academics/subjects");
 }
 

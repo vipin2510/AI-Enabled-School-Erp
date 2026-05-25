@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { loadClassesAndSections } from "../../../shared";
-import { updateStudent, type StudentState } from "../../actions";
+import { updateStudent } from "../../actions";
 import StudentForm from "../../student-form";
 
 export const dynamic = "force-dynamic";
@@ -30,9 +30,9 @@ export default async function EditStudentPage({
   const { classes, sectionsByClass } = await loadClassesAndSections();
 
   // Bind the student id into the update action so the form signature stays
-  // (prevState, formData).
-  const action = (prev: StudentState, formData: FormData) =>
-    updateStudent(id, prev, formData);
+  // (prevState, formData). `.bind` keeps it a real Server Action, which is
+  // required to pass it across into the client <StudentForm>.
+  const action = updateStudent.bind(null, id);
 
   return (
     <div className="max-w-3xl">

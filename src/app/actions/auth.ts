@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { COOKIE_DEPARTMENT, isDepartment, allowedDepartments } from "@/lib/access";
+import {
+  COOKIE_DEPARTMENT,
+  isDepartment,
+  allowedDepartments,
+  DEPARTMENT_NAV,
+} from "@/lib/access";
 import { getProfile } from "@/lib/auth";
 
 export type LoginState = { error?: string } | undefined;
@@ -56,5 +61,8 @@ export async function setDepartment(formData: FormData) {
       maxAge: 60 * 60 * 24 * 365,
     });
     revalidatePath("/", "layout");
+    // Land on the new department's first screen so the main content follows
+    // the switch instead of leaving the user stranded on the old page.
+    redirect(DEPARTMENT_NAV[dept][0]?.href ?? "/");
   }
 }
