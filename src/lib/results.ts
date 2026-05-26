@@ -31,6 +31,15 @@ export function isCoCurricularGrade(v: string): v is CoCurricularGrade {
 
 export const EXAM_KEYS = EXAMS.map((e) => e.key);
 
+// Result packs can be downloaded per term. Term 1 covers the first half of the
+// session; "overall" is the full scheme.
+export const TERM1_EXAM_KEYS: ExamKey[] = ["ut1", "ut2", "terminal"];
+
+export function examsForTerm(term: string | null | undefined): Exam[] {
+  if (term === "1") return EXAMS.filter((e) => TERM1_EXAM_KEYS.includes(e.key));
+  return EXAMS;
+}
+
 export function isExamKey(v: string): v is ExamKey {
   return EXAM_KEYS.includes(v as ExamKey);
 }
@@ -90,9 +99,12 @@ export type SubjectResult = {
 };
 
 // Compute a student's per-subject and overall result from a marks map.
+// Pass `exams` to score only a subset (e.g. a single term); defaults to the
+// full scheme.
 export function computeResult(
   subjects: { id: string; name: string }[],
-  marks: MarksMap
+  marks: MarksMap,
+  exams: Exam[] = EXAMS
 ): { subjects: SubjectResult[]; total: number; max: number; percent: number; grade: string } {
   let grandTotal = 0;
   let grandMax = 0;
@@ -101,7 +113,7 @@ export function computeResult(
     const obtained = {} as Record<ExamKey, number | null>;
     let total = 0;
     let max = 0;
-    for (const exam of EXAMS) {
+    for (const exam of exams) {
       const v = marks[markKey(s.id, exam.key)];
       obtained[exam.key] = v ?? null;
       if (v !== null && v !== undefined) {

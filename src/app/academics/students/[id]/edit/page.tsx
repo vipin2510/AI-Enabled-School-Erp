@@ -20,7 +20,7 @@ export default async function EditStudentPage({
   const { data: student } = await supabase
     .from("students")
     .select(
-      "id, full_name, admission_no, class_id, section, gender, father_name, mother_name, contact_number, address, is_hosteller, is_new_admission, status"
+      "id, full_name, admission_no, class_id, section, gender, father_name, mother_name, contact_number, address, is_hosteller, is_new_admission, status, student_photo_url, parent_photo_url"
     )
     .eq("id", id)
     .single();
@@ -61,6 +61,8 @@ export default async function EditStudentPage({
             is_hosteller: student.is_hosteller ?? false,
             is_new_admission: student.is_new_admission ?? false,
             status: student.status ?? "active",
+            student_photo_url: student.student_photo_url ?? "",
+            parent_photo_url: student.parent_photo_url ?? "",
           }}
         />
       </div>

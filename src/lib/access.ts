@@ -35,7 +35,12 @@ export const DEPARTMENT_NAV: Record<Department, NavItem[]> = {
     { href: "/receipts", label: "Receipts" },
     { href: "/settings/late-fee", label: "Settings" },
   ],
-  library: [{ href: "/library", label: "Library" }],
+  library: [
+    { href: "/library", label: "Issue / Return" },
+    { href: "/library/books", label: "Catalog" },
+    { href: "/library/barcodes", label: "Print Labels" },
+    { href: "/library/settings", label: "Settings" },
+  ],
   results: [{ href: "/results", label: "Results" }],
 };
 
@@ -44,6 +49,7 @@ export const ACADEMICS_NAV: NavItem[] = [
   { href: "/academics/students", label: "Students" },
   { href: "/academics/classes", label: "Classes & Sections" },
   { href: "/academics/subjects", label: "Subjects" },
+  { href: "/academics/id-cards", label: "ID Cards" },
 ];
 
 export const COOKIE_DEPARTMENT = "erp_dept";

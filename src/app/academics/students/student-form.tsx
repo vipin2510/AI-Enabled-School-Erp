@@ -17,6 +17,8 @@ export type StudentValues = {
   is_hosteller: boolean;
   is_new_admission: boolean;
   status: string;
+  student_photo_url: string;
+  parent_photo_url: string;
 };
 
 type Props = {
@@ -41,7 +43,7 @@ export default function StudentForm({
   const sections = sectionsByClass[classId] ?? [];
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} encType="multipart/form-data" className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Full name *">
           <input name="full_name" required defaultValue={initial?.full_name ?? ""} className={inputCls} />
@@ -133,6 +135,14 @@ export default function StudentForm({
         </label>
       </div>
 
+      <div>
+        <div className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">Photos</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <PhotoField name="student_photo" label="Student photo" current={initial?.student_photo_url} />
+          <PhotoField name="parent_photo" label="Parent photo" current={initial?.parent_photo_url} />
+        </div>
+      </div>
+
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
 
       <div className="flex gap-2">
@@ -151,6 +161,47 @@ export default function StudentForm({
         </Link>
       </div>
     </form>
+  );
+}
+
+function PhotoField({
+  name,
+  label,
+  current,
+}: {
+  name: string;
+  label: string;
+  current?: string;
+}) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const src = preview ?? current ?? null;
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-stone-200 p-3">
+      <div className="h-20 w-16 shrink-0 overflow-hidden rounded-md border border-stone-200 bg-stone-50">
+        {src ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src} alt={label} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-[10px] text-stone-400">
+            No photo
+          </div>
+        )}
+      </div>
+      <div className="min-w-0">
+        <div className="text-xs font-medium text-stone-600">{label}</div>
+        <input
+          type="file"
+          name={name}
+          accept="image/*"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            setPreview(f ? URL.createObjectURL(f) : null);
+          }}
+          className="mt-1 w-full text-xs file:mr-2 file:rounded-md file:border-0 file:bg-stone-900 file:px-2 file:py-1 file:text-xs file:text-white"
+        />
+        {current && !preview && <p className="mt-1 text-[10px] text-stone-400">Current photo shown.</p>}
+      </div>
+    </div>
   );
 }
 

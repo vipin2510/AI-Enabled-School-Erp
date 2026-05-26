@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { deleteStudent } from "./actions";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function StudentsAdminPage({
     .select("id, full_name, section, father_name, contact_number, status, classes(display_name, ordinal)")
     .order("full_name", { ascending: true })
     .limit(1000);
-  if (q) query = query.ilike("full_name", `%${q}%`);
+  if (q) query = query.or(`full_name.ilike.%${q}%,admission_no.ilike.%${q}%`);
   if (classFilter) query = query.eq("class_id", classFilter);
 
   const { data: students } = await query;
@@ -47,7 +48,7 @@ export default async function StudentsAdminPage({
         <input
           name="q"
           defaultValue={q ?? ""}
-          placeholder="Search by name…"
+          placeholder="Search by name or admission no.…"
           className="w-72 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm"
         />
         <select
@@ -82,7 +83,11 @@ export default async function StudentsAdminPage({
               const klass = (s as unknown as { classes: { display_name?: string } | null }).classes;
               return (
                 <tr key={s.id} className="border-t border-stone-100">
-                  <td className="px-4 py-2 font-medium">{s.full_name}</td>
+                  <td className="px-4 py-2 font-medium">
+                    <Link href={`/academics/students/${s.id}`} className="text-stone-900 hover:text-accent hover:underline">
+                      {s.full_name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-2">
                     {klass?.display_name ?? "—"}
                     {s.section ? ` · ${s.section}` : ""}
@@ -98,10 +103,13 @@ export default async function StudentsAdminPage({
                       >
                         Edit
                       </Link>
-                      <form action={deleteStudent}>
-                        <input type="hidden" name="id" value={s.id} />
-                        <button className="text-red-600 hover:underline">Remove</button>
-                      </form>
+                      <ConfirmButton
+                        action={deleteStudent}
+                        fields={{ id: s.id }}
+                        label="Remove"
+                        title="Remove student"
+                        message={`Remove ${s.full_name}? This cannot be undone.`}
+                      />
                     </div>
                   </td>
                 </tr>

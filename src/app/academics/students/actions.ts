@@ -5,6 +5,17 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { uploadStudentPhoto } from "@/lib/storage";
+
+// Pull the optional photo files out of the form (added by the student form).
+function photoFiles(formData: FormData) {
+  const student = formData.get("student_photo");
+  const parent = formData.get("parent_photo");
+  return {
+    student: student instanceof File && student.size > 0 ? student : null,
+    parent: parent instanceof File && parent.size > 0 ? parent : null,
+  };
+}
 
 const StudentSchema = z.object({
   full_name: z.string().trim().min(1, "Name is required."),
@@ -50,8 +61,24 @@ export async function createStudent(_prev: StudentState, formData: FormData): Pr
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("students").insert(parsed.data);
-  if (error) return { error: error.message };
+  const { data: inserted, error } = await supabase
+    .from("students")
+    .insert(parsed.data)
+    .select("id")
+    .single();
+  if (error || !inserted) return { error: error?.message ?? "Could not create student." };
+
+  const files = photoFiles(formData);
+  if (files.student || files.parent) {
+    const [studentUrl, parentUrl] = await Promise.all([
+      uploadStudentPhoto(inserted.id, "student", files.student),
+      uploadStudentPhoto(inserted.id, "parent", files.parent),
+    ]);
+    const patch: Record<string, string> = {};
+    if (studentUrl) patch.student_photo_url = studentUrl;
+    if (parentUrl) patch.parent_photo_url = parentUrl;
+    if (Object.keys(patch).length) await supabase.from("students").update(patch).eq("id", inserted.id);
+  }
 
   revalidatePath("/academics/students");
   redirect("/academics/students");
@@ -67,14 +94,25 @@ export async function updateStudent(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("students")
-    .update({ ...parsed.data, updated_at: new Date().toISOString() })
-    .eq("id", id);
+  const files = photoFiles(formData);
+  const [studentUrl, parentUrl] = await Promise.all([
+    uploadStudentPhoto(id, "student", files.student),
+    uploadStudentPhoto(id, "parent", files.parent),
+  ]);
+
+  const update: Record<string, unknown> = {
+    ...parsed.data,
+    updated_at: new Date().toISOString(),
+  };
+  if (studentUrl) update.student_photo_url = studentUrl;
+  if (parentUrl) update.parent_photo_url = parentUrl;
+
+  const { error } = await supabase.from("students").update(update).eq("id", id);
   if (error) return { error: error.message };
 
   revalidatePath("/academics/students");
-  redirect("/academics/students");
+  revalidatePath(`/academics/students/${id}`);
+  redirect(`/academics/students/${id}`);
 }
 
 export async function deleteStudent(formData: FormData) {

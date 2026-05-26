@@ -4,7 +4,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { createClient } from "@/lib/supabase/server";
 import { requireDepartment } from "@/lib/auth";
-import { currentAcademicYear, computeResult } from "@/lib/results";
+import { currentAcademicYear, computeResult, examsForTerm } from "@/lib/results";
 import { loadClassSection, loadMarksByStudent, loadGradesByStudent } from "@/app/results/shared";
 import { ResultCardPdf } from "@/components/result-card-pdf";
 import { createZip, type ZipEntry } from "@/lib/zip";
@@ -20,9 +20,12 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const classId = url.searchParams.get("classId") ?? "";
   const section = url.searchParams.get("section") ?? "";
+  const term = url.searchParams.get("term"); // "1" → Term 1 only; else overall
   if (!classId || !section) {
     return NextResponse.json({ error: "Missing classId or section" }, { status: 400 });
   }
+  const exams = examsForTerm(term);
+  const termLabel = term === "1" ? "Term 1" : undefined;
 
   const { klass, subjects, coCurricular, students } = await loadClassSection(classId, section);
   if (!klass) return NextResponse.json({ error: "Class not found" }, { status: 404 });
@@ -53,7 +56,7 @@ export async function GET(req: Request) {
   const used = new Set<string>();
 
   for (const s of students) {
-    const result = computeResult(subjects, marksByStudent[s.id] ?? {});
+    const result = computeResult(subjects, marksByStudent[s.id] ?? {}, exams);
     const grades = gradesByStudent[s.id] ?? {};
     const buf = await renderToBuffer(
       ResultCardPdf({
@@ -67,6 +70,8 @@ export async function GET(req: Request) {
           className: klass.display_name,
           section,
           academicYear,
+          exams,
+          termLabel,
           subjects: result.subjects,
           coCurricular: coCurricular.map((c) => ({ name: c.name, grade: grades[c.id] ?? null })),
           total: result.total,
@@ -86,7 +91,8 @@ export async function GET(req: Request) {
   }
 
   const zip = createZip(entries);
-  const filename = `result-cards-${safe(klass.display_name)}-${safe(section)}-${academicYear}.zip`;
+  const termPart = term === "1" ? "term1-" : "";
+  const filename = `result-cards-${termPart}${safe(klass.display_name)}-${safe(section)}-${academicYear}.zip`;
 
   return new NextResponse(zip as unknown as BodyInit, {
     headers: {

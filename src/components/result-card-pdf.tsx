@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/alt-text */
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
-import { EXAMS, gradeFor, passMark, type ExamKey, type SubjectResult } from "@/lib/results";
+import { gradeFor, passMark, type Exam, type ExamKey, type SubjectResult } from "@/lib/results";
 
 export type ResultCardData = {
   student: {
@@ -12,6 +12,8 @@ export type ResultCardData = {
   className: string;
   section: string;
   academicYear: string;
+  exams: Exam[];
+  termLabel?: string;
   subjects: SubjectResult[];
   coCurricular: { name: string; grade: string | null }[];
   total: number;
@@ -118,7 +120,9 @@ export function ResultCardPdf({ data, logoDataUrl }: { data: ResultCardData; log
           </View>
         </View>
 
-        <Text style={styles.title}>REPORT CARD · {data.academicYear}</Text>
+        <Text style={styles.title}>
+          REPORT CARD{data.termLabel ? ` · ${data.termLabel}` : ""} · {data.academicYear}
+        </Text>
 
         <View style={styles.grid}>
           <Field label="Student Name" value={data.student.full_name} />
@@ -131,19 +135,19 @@ export function ResultCardPdf({ data, logoDataUrl }: { data: ResultCardData; log
         <View style={styles.table}>
           <View style={styles.thead}>
             <Text style={[styles.th, styles.subjectCell]}>Subject</Text>
-            {EXAMS.map((e) => (
+            {data.exams.map((e) => (
               <Text key={e.key} style={[styles.th, styles.examCell]}>
                 {e.short}{"\n"}({e.max})
               </Text>
             ))}
-            <Text style={[styles.th, styles.totalCell]}>Total{"\n"}(/{sum()})</Text>
+            <Text style={[styles.th, styles.totalCell]}>Total{"\n"}(/{schemeMax(data.exams)})</Text>
             <Text style={[styles.th, styles.gradeCell]}>Grade</Text>
           </View>
 
           {data.subjects.map((s, i) => (
             <View key={s.subjectId} style={[styles.tr, i % 2 ? styles.trAlt : {}]}>
               <Text style={[styles.td, styles.subjectCell]}>{s.name}</Text>
-              {EXAMS.map((e) => (
+              {data.exams.map((e) => (
                 <Text key={e.key} style={[styles.td, styles.examCell]}>
                   {fmt(s.obtained[e.key])}
                 </Text>
@@ -159,7 +163,7 @@ export function ResultCardPdf({ data, logoDataUrl }: { data: ResultCardData; log
 
           <View style={styles.footRow}>
             <Text style={styles.footLabel}>Grand Total</Text>
-            {EXAMS.map((e) => (
+            {data.exams.map((e) => (
               <Text key={e.key} style={[styles.td, styles.examCell, { fontWeight: 700 }]}>
                 {fmt(examColumnTotal(data.subjects, e.key))}
               </Text>
@@ -212,8 +216,8 @@ export function ResultCardPdf({ data, logoDataUrl }: { data: ResultCardData; log
   );
 }
 
-function sum(): number {
-  return EXAMS.reduce((a, e) => a + e.max, 0);
+function schemeMax(exams: Exam[]): number {
+  return exams.reduce((a, e) => a + e.max, 0);
 }
 
 function examColumnTotal(subjects: SubjectResult[], key: ExamKey) {

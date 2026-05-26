@@ -20,7 +20,8 @@ export default function ResultsToolbar({ classId, section, subjects, hasStudents
   const fileRef = useRef<HTMLInputElement>(null);
 
   const templateHref = `/api/results/template?${qs({ classId, section, subjectId })}`;
-  const zipHref = `/api/results/zip?${qs({ classId, section })}`;
+  const zipTerm1Href = `/api/results/zip?${qs({ classId, section, term: "1" })}`;
+  const zipOverallHref = `/api/results/zip?${qs({ classId, section })}`;
   const selectCls =
     "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:border-stone-900 focus:ring-1 focus:ring-stone-900";
   const btn =
@@ -89,16 +90,26 @@ export default function ResultsToolbar({ classId, section, subjects, hasStudents
         <div className="lg:border-l lg:border-stone-100 lg:pl-5">
           <h2 className="text-sm font-semibold text-stone-800">Report cards</h2>
           <p className="mt-1 text-xs text-stone-500">
-            Generate a printable report card PDF for every student in this section, bundled as a ZIP.
+            Printable report-card PDFs for every student, bundled as a ZIP.
           </p>
-          <a
-            href={zipHref}
-            className={`${btn} mt-3 bg-stone-900 text-white hover:bg-stone-800 ${
-              hasStudents ? "" : "pointer-events-none opacity-50"
-            }`}
-          >
-            ⤓ Download class result ZIP
-          </a>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a
+              href={zipTerm1Href}
+              className={`${btn} border border-stone-200 bg-stone-100 text-stone-900 hover:bg-stone-200 ${
+                hasStudents ? "" : "pointer-events-none opacity-50"
+              }`}
+            >
+              ⤓ Term 1 (UT I, UT II, Terminal I)
+            </a>
+            <a
+              href={zipOverallHref}
+              className={`${btn} bg-stone-900 text-white hover:bg-stone-800 ${
+                hasStudents ? "" : "pointer-events-none opacity-50"
+              }`}
+            >
+              ⤓ Overall result
+            </a>
+          </div>
         </div>
       </div>
     </div>
