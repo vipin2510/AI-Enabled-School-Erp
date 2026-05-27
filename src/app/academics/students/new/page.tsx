@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireRole } from "@/lib/auth";
+import { requireDepartment } from "@/lib/auth";
 import { loadClassesAndSections } from "../../shared";
 import { createStudent } from "../actions";
 import StudentForm from "../student-form";
@@ -7,7 +7,7 @@ import StudentForm from "../student-form";
 export const dynamic = "force-dynamic";
 
 export default async function NewStudentPage() {
-  await requireRole("admin", "manager");
+  await requireDepartment("academics");
   const { classes, sectionsByClass } = await loadClassesAndSections();
 
   return (

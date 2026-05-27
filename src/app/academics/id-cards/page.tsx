@@ -1,4 +1,4 @@
-import { requireRole } from "@/lib/auth";
+import { requireDepartment } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import IdCardForm from "./id-card-form";
 
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 type SectionRow = { class_id: string; name: string };
 
 export default async function IdCardsPage() {
-  await requireRole("admin", "manager");
+  await requireDepartment("academics");
   const supabase = await createClient();
 
   const [{ data: classes }, { data: sections }] = await Promise.all([

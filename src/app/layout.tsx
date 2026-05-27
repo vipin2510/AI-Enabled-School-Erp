@@ -4,7 +4,14 @@ import "./globals.css";
 import Sidebar, { type NavGroup } from "@/components/sidebar";
 import Topbar from "@/components/topbar";
 import { getProfile, getCurrentDepartment } from "@/lib/auth";
-import { DEPARTMENT_NAV, ACADEMICS_NAV, DEPARTMENT_LABELS, allowedDepartments } from "@/lib/access";
+import { createClient } from "@/lib/supabase/server";
+import { todayStr } from "@/lib/attendance";
+import {
+  DEPARTMENT_NAV,
+  DEPARTMENT_LABELS,
+  allowedDepartments,
+  marksOwnAttendance,
+} from "@/lib/access";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -43,25 +50,44 @@ async function AppShell({
 }) {
   const department = await getCurrentDepartment(profile);
   const allowed = allowedDepartments(profile.role, profile.department);
+  const isLeader = profile.role === "admin" || profile.role === "manager";
 
-  // Build the sidebar from the active department, plus the admin/manager-only
-  // groups (academics, user management, requests).
-  const groups: NavGroup[] = [
-    { label: DEPARTMENT_LABELS[department], items: DEPARTMENT_NAV[department] },
-  ];
+  // Build the sidebar: an Overview (leaders), the active department's nav, the
+  // admin-only Administration block, and Change Requests — which every login
+  // can reach. Academics is one of the switchable departments now.
+  const groups: NavGroup[] = [];
 
-  if (profile.role === "admin" || profile.role === "manager") {
-    groups.push({ label: "Academics", items: ACADEMICS_NAV });
+  if (isLeader) {
+    groups.push({ items: [{ href: "/", label: "Overview" }] });
   }
 
-  const adminGroup: NavGroup = { label: "Administration", items: [] };
+  groups.push({ label: DEPARTMENT_LABELS[department], items: DEPARTMENT_NAV[department] });
+
   if (profile.role === "admin") {
-    adminGroup.items.push({ href: "/admin/users", label: "Users & Logins" });
+    groups.push({
+      label: "Administration",
+      items: [
+        { href: "/admin/users", label: "Users & Logins" },
+        { href: "/admin/staff-attendance", label: "Staff Attendance" },
+      ],
+    });
   }
-  if (profile.role === "admin" || profile.role === "manager") {
-    adminGroup.items.push({ href: "/requests", label: "Change Requests" });
+
+  groups.push({ items: [{ href: "/requests", label: "Change Requests" }] });
+
+  // Layer 2/3 mark their own attendance from the topbar; surface whether
+  // they've already done so today.
+  let markedAt: string | null = null;
+  if (marksOwnAttendance(profile.role)) {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("staff_attendance")
+      .select("marked_at")
+      .eq("profile_id", profile.id)
+      .eq("date", todayStr())
+      .maybeSingle();
+    markedAt = data?.marked_at ?? null;
   }
-  if (adminGroup.items.length) groups.push(adminGroup);
 
   return (
     <div className="flex min-h-screen">
@@ -73,6 +99,8 @@ async function AppShell({
           role={profile.role}
           department={department}
           allowed={allowed}
+          canMarkAttendance={marksOwnAttendance(profile.role)}
+          markedAt={markedAt}
         />
         <main className="flex-1 px-6 py-6 md:px-10">{children}</main>
       </div>

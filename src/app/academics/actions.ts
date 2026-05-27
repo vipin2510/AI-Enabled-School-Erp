@@ -1,11 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth";
+import { requireDepartment } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export async function addSection(formData: FormData) {
-  await requireRole("admin", "manager");
+  await requireDepartment("academics");
   const class_id = String(formData.get("class_id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   if (!class_id || !name) return;
@@ -16,7 +16,7 @@ export async function addSection(formData: FormData) {
 }
 
 export async function removeSection(formData: FormData) {
-  await requireRole("admin", "manager");
+  await requireDepartment("academics");
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
@@ -26,7 +26,7 @@ export async function removeSection(formData: FormData) {
 }
 
 export async function addSubject(formData: FormData) {
-  await requireRole("admin", "manager");
+  await requireDepartment("academics");
   const class_id = String(formData.get("class_id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const categoryRaw = String(formData.get("category") ?? "scholastic");
@@ -39,7 +39,7 @@ export async function addSubject(formData: FormData) {
 }
 
 export async function removeSubject(formData: FormData) {
-  await requireRole("admin", "manager");
+  await requireDepartment("academics");
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireRole } from "@/lib/auth";
+import { requireDepartment } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { loadClassesAndSections } from "../../../shared";
 import { updateStudent } from "../../actions";
@@ -13,7 +13,7 @@ export default async function EditStudentPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireRole("admin", "manager");
+  await requireDepartment("academics");
   const { id } = await params;
   const supabase = await createClient();
 

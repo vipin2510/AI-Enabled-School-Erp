@@ -3,7 +3,7 @@
 // there is a single source of truth for who can see/switch what.
 
 export type Role = "admin" | "manager" | "staff";
-export type Department = "fees" | "library" | "results";
+export type Department = "fees" | "academics" | "library" | "results";
 
 export const ROLE_LABELS: Record<Role, string> = {
   admin: "Admin (Layer 1)",
@@ -13,29 +13,39 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 export const DEPARTMENTS: { id: Department; label: string }[] = [
   { id: "fees", label: "Fees" },
+  { id: "academics", label: "Academics" },
   { id: "library", label: "Library" },
   { id: "results", label: "Results" },
 ];
 
 export const DEPARTMENT_LABELS: Record<Department, string> = {
   fees: "Fees",
+  academics: "Academics",
   library: "Library",
   results: "Results",
 };
 
 export type NavItem = { href: string; label: string };
 
-// Department-scoped navigation. Fees is the fully built module; library and
-// results are scaffolded landing pages for now.
+// Department-scoped navigation. Each department leads with its own dashboard.
 export const DEPARTMENT_NAV: Record<Department, NavItem[]> = {
   fees: [
-    { href: "/", label: "Dashboard" },
+    { href: "/fees", label: "Dashboard" },
     { href: "/fees/structures", label: "Fee Structures" },
     { href: "/fees/collect", label: "Collect Fee" },
     { href: "/receipts", label: "Receipts" },
     { href: "/settings/late-fee", label: "Settings" },
   ],
+  academics: [
+    { href: "/academics", label: "Dashboard" },
+    { href: "/academics/students", label: "Students" },
+    { href: "/academics/attendance", label: "Attendance" },
+    { href: "/academics/classes", label: "Classes & Sections" },
+    { href: "/academics/subjects", label: "Subjects" },
+    { href: "/academics/id-cards", label: "ID Cards" },
+  ],
   library: [
+    { href: "/library/dashboard", label: "Dashboard" },
     { href: "/library", label: "Issue / Return" },
     { href: "/library/books", label: "Catalog" },
     { href: "/library/barcodes", label: "Print Labels" },
@@ -44,18 +54,18 @@ export const DEPARTMENT_NAV: Record<Department, NavItem[]> = {
   results: [{ href: "/results", label: "Results" }],
 };
 
-// Cross-department academic administration, available to admin + manager.
-export const ACADEMICS_NAV: NavItem[] = [
-  { href: "/academics/students", label: "Students" },
-  { href: "/academics/classes", label: "Classes & Sections" },
-  { href: "/academics/subjects", label: "Subjects" },
-  { href: "/academics/id-cards", label: "ID Cards" },
-];
+// Who marks their own daily attendance from their device (Layer 2 + Layer 3);
+// Layer 1 (admin) only reviews it.
+export function marksOwnAttendance(role: Role): boolean {
+  return role === "manager" || role === "staff";
+}
 
 export const COOKIE_DEPARTMENT = "erp_dept";
 
 export function isDepartment(value: string | null | undefined): value is Department {
-  return value === "fees" || value === "library" || value === "results";
+  return (
+    value === "fees" || value === "academics" || value === "library" || value === "results"
+  );
 }
 
 // Which departments a profile may switch between.

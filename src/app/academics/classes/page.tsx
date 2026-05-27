@@ -1,4 +1,4 @@
-import { requireRole } from "@/lib/auth";
+import { requireDepartment } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { addSection, removeSection } from "../actions";
 
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 type SectionRow = { id: string; class_id: string; name: string };
 
 export default async function ClassesPage() {
-  await requireRole("admin", "manager");
+  await requireDepartment("academics");
   const supabase = await createClient();
 
   const [{ data: classes }, { data: sections }] = await Promise.all([

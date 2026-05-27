@@ -1,4 +1,4 @@
-import { requireRole } from "@/lib/auth";
+import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import RequestForm from "./request-form";
@@ -18,12 +18,12 @@ type RequestRow = {
 };
 
 export default async function RequestsPage() {
-  // Admin + manager only (staff are redirected home).
-  const me = await requireRole("admin", "manager");
+  // Open to every login. Admins resolve; everyone else raises requests.
+  const me = await requireProfile();
   const isAdmin = me.role === "admin";
   const supabase = await createClient();
 
-  // Admin sees every request; managers see only the ones they raised.
+  // Admin sees every request; everyone else sees only the ones they raised.
   let query = supabase
     .from("change_requests")
     .select("id, requester_email, subject, body, status, admin_note, created_at, resolved_at")

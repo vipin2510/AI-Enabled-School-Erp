@@ -116,6 +116,45 @@ export async function importBooksCsv(
   return { imported: payload.length, skipped };
 }
 
+// --- Book requests (acquisition wishlist) -------------------------------
+
+export async function addBookRequest(formData: FormData) {
+  await requireDepartment("library");
+  const title = String(formData.get("title") ?? "").trim();
+  if (!title) return;
+  const supabase = await createClient();
+  await supabase.from("book_requests").insert({
+    title,
+    author: String(formData.get("author") ?? "").trim() || null,
+    requested_for: String(formData.get("requested_for") ?? "").trim() || null,
+    note: String(formData.get("note") ?? "").trim() || null,
+  });
+  revalidatePath("/library/dashboard");
+}
+
+// Mark a requested title as acquired (or reopen it).
+export async function setBookRequestStatus(formData: FormData) {
+  await requireDepartment("library");
+  const id = String(formData.get("id") ?? "");
+  const status = String(formData.get("status") ?? "") === "fulfilled" ? "fulfilled" : "open";
+  if (!id) return;
+  const supabase = await createClient();
+  await supabase
+    .from("book_requests")
+    .update({ status, fulfilled_at: status === "fulfilled" ? new Date().toISOString() : null })
+    .eq("id", id);
+  revalidatePath("/library/dashboard");
+}
+
+export async function deleteBookRequest(formData: FormData) {
+  await requireDepartment("library");
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  const supabase = await createClient();
+  await supabase.from("book_requests").delete().eq("id", id);
+  revalidatePath("/library/dashboard");
+}
+
 export type DeskResult = { ok?: boolean; message?: string; error?: string };
 
 // Issue a book copy to a student: validate the code, ensure it isn't already

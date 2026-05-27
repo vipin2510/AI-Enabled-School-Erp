@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireRole } from "@/lib/auth";
+import { requireDepartment } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { inr, formatDate } from "@/lib/utils";
 import ProfilePhotos from "@/components/profile-photos";
@@ -13,7 +13,7 @@ export default async function StudentProfilePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireRole("admin", "manager");
+  await requireDepartment("academics");
   const { id } = await params;
   const supabase = await createClient();
 
@@ -29,15 +29,23 @@ export default async function StudentProfilePage({
 
   const klass = (student as unknown as { classes: { display_name?: string } | null }).classes;
 
-  const { data: invoices } = await supabase
-    .from("invoices")
-    .select("id, receipt_no, issued_at, academic_year, total, amount_paid, payment_status, payment_mode")
-    .eq("student_id", id)
-    .order("issued_at", { ascending: false });
+  const [{ data: invoices }, { data: attendance }] = await Promise.all([
+    supabase
+      .from("invoices")
+      .select("id, receipt_no, issued_at, academic_year, total, amount_paid, payment_status, payment_mode")
+      .eq("student_id", id)
+      .order("issued_at", { ascending: false }),
+    supabase.from("attendance").select("status").eq("student_id", id),
+  ]);
 
   const totalPaid = (invoices ?? [])
     .filter((i) => i.payment_status !== "void")
     .reduce((s, i) => s + Number(i.amount_paid || 0), 0);
+
+  const attRows = (attendance ?? []) as { status: string }[];
+  const daysMarked = attRows.length;
+  const daysPresent = attRows.filter((a) => a.status === "present").length;
+  const attendancePct = daysMarked ? Math.round((daysPresent / daysMarked) * 100) : 0;
 
   const classLabel = `${klass?.display_name ?? "—"}${student.section ? ` · ${student.section}` : ""}`;
 
@@ -109,6 +117,33 @@ export default async function StudentProfilePage({
                 }
               />
             </dl>
+          </div>
+
+          <div className="card p-5">
+            <h2 className="mb-3 text-sm font-semibold text-stone-800">Attendance</h2>
+            {daysMarked === 0 ? (
+              <p className="text-sm text-stone-500">No attendance recorded yet.</p>
+            ) : (
+              <div className="flex flex-wrap items-center gap-6">
+                <div>
+                  <div className="text-2xl font-semibold tracking-tight text-stone-900">
+                    {daysPresent}
+                    <span className="text-base font-normal text-stone-400"> / {daysMarked} days</span>
+                  </div>
+                  <div className="text-xs text-stone-500">Days present (of days marked)</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-green-50 px-3 py-1 text-sm font-medium text-green-700">
+                    {attendancePct}% present
+                  </span>
+                  {daysMarked - daysPresent > 0 && (
+                    <span className="rounded-full bg-red-50 px-3 py-1 text-sm font-medium text-red-700">
+                      {daysMarked - daysPresent} absent
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="card overflow-hidden p-0">

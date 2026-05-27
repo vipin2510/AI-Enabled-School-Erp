@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireRole } from "@/lib/auth";
+import { requireDepartment } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { deleteStudent } from "./actions";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -11,7 +11,7 @@ export default async function StudentsAdminPage({
 }: {
   searchParams: Promise<{ q?: string; class?: string }>;
 }) {
-  await requireRole("admin", "manager");
+  await requireDepartment("academics");
   const { q, class: classFilter } = await searchParams;
   const supabase = await createClient();
 

@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireRole } from "@/lib/auth";
+import { requireDepartment } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { uploadStudentPhoto } from "@/lib/storage";
 
@@ -56,7 +56,7 @@ function parse(formData: FormData) {
 }
 
 export async function createStudent(_prev: StudentState, formData: FormData): Promise<StudentState> {
-  await requireRole("admin", "manager");
+  await requireDepartment("academics");
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
@@ -89,7 +89,7 @@ export async function updateStudent(
   _prev: StudentState,
   formData: FormData
 ): Promise<StudentState> {
-  await requireRole("admin", "manager");
+  await requireDepartment("academics");
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
@@ -116,7 +116,7 @@ export async function updateStudent(
 }
 
 export async function deleteStudent(formData: FormData) {
-  await requireRole("admin", "manager");
+  await requireDepartment("academics");
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 

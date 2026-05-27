@@ -6,13 +6,12 @@ import { createClient } from "@/lib/supabase/server";
 
 export type RequestState = { error?: string; success?: string } | undefined;
 
-// Layer 2 (and admins) raise a change request to the admin.
+// Any logged-in user raises a change request to the admin.
 export async function submitRequest(
   _prev: RequestState,
   formData: FormData
 ): Promise<RequestState> {
   const profile = await requireProfile();
-  if (profile.role === "staff") return { error: "Not allowed." };
 
   const subject = String(formData.get("subject") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();

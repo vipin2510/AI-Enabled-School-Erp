@@ -11,7 +11,7 @@ const CreateUserSchema = z
     password: z.string().min(6, "Password must be at least 6 characters."),
     full_name: z.string().trim().min(1, "Name is required."),
     role: z.enum(["admin", "manager", "staff"]),
-    department: z.enum(["fees", "library", "results"]).nullable(),
+    department: z.enum(["fees", "academics", "library", "results"]).nullable(),
   })
   .refine((d) => d.role !== "staff" || d.department !== null, {
     message: "Staff must be assigned a department.",

@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useTransition } from "react";
 import { setDepartment, logout } from "@/app/actions/auth";
+import { markStaffAttendance } from "@/app/actions/staff-attendance";
 import {
   DEPARTMENT_LABELS,
   ROLE_LABELS,
@@ -15,9 +16,19 @@ type Props = {
   role: Role;
   department: Department;
   allowed: Department[];
+  canMarkAttendance: boolean;
+  markedAt: string | null;
 };
 
-export default function Topbar({ fullName, email, role, department, allowed }: Props) {
+export default function Topbar({
+  fullName,
+  email,
+  role,
+  department,
+  allowed,
+  canMarkAttendance,
+  markedAt,
+}: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const canSwitch = role !== "staff" && allowed.length > 1;
 
@@ -50,6 +61,7 @@ export default function Topbar({ fullName, email, role, department, allowed }: P
       </div>
 
       <div className="flex items-center gap-4">
+        {canMarkAttendance && <MarkAttendanceButton initialMarkedAt={markedAt} />}
         <div className="text-right leading-tight">
           <div className="text-sm font-medium">{fullName || email}</div>
           <div className="text-xs text-stone-500">{ROLE_LABELS[role]}</div>
@@ -61,5 +73,76 @@ export default function Topbar({ fullName, email, role, department, allowed }: P
         </form>
       </div>
     </header>
+  );
+}
+
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+}
+
+// Captures the device location (best-effort) and stamps the time via the
+// server action. Already-marked staff see when, and can re-mark.
+function MarkAttendanceButton({ initialMarkedAt }: { initialMarkedAt: string | null }) {
+  const [markedAt, setMarkedAt] = useState<string | null>(initialMarkedAt);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [locating, setLocating] = useState(false);
+
+  const mark = () => {
+    setError(null);
+
+    const send = (coords: { latitude: number; longitude: number; accuracy: number } | null) =>
+      startTransition(async () => {
+        const res = await markStaffAttendance(coords);
+        if (res?.error) setError(res.error);
+        else if (res?.markedAt) setMarkedAt(res.markedAt);
+      });
+
+    if (typeof navigator !== "undefined" && navigator.geolocation) {
+      setLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLocating(false);
+          send({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          });
+        },
+        () => {
+          // Permission denied / unavailable — still record the time.
+          setLocating(false);
+          send(null);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      send(null);
+    }
+  };
+
+  const busy = pending || locating;
+
+  return (
+    <div className="flex flex-col items-end">
+      <button
+        type="button"
+        onClick={mark}
+        disabled={busy}
+        className={
+          "rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-60 " +
+          (markedAt
+            ? "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+            : "bg-accent text-white hover:opacity-90")
+        }
+      >
+        {busy
+          ? "Marking…"
+          : markedAt
+            ? `✓ Marked · ${fmtTime(markedAt)}`
+            : "Mark Attendance"}
+      </button>
+      {error && <span className="mt-0.5 text-xs text-red-600">{error}</span>}
+    </div>
   );
 }
