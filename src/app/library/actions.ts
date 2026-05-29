@@ -4,15 +4,23 @@ import * as XLSX from "xlsx";
 import { revalidatePath } from "next/cache";
 import { requireDepartment } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { todayStr, addDays } from "@/lib/attendance";
 
-// A short, human-typable, reasonably unique code when none is supplied.
-function genCode(): string {
-  return (
-    "BK-" +
-    Date.now().toString(36).toUpperCase().slice(-5) +
-    Math.random().toString(36).toUpperCase().slice(2, 5)
-  );
+// Library IDs are numeric only (the librarian types them at the desk). When
+// none is supplied we hand out the next number after the largest existing one,
+// padded to 4 digits so the first batch is 1001, 1002, …
+async function nextBookCode(): Promise<string> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("books").select("code");
+  let max = 1000;
+  for (const row of (data ?? []) as { code: string | null }[]) {
+    const n = Number((row.code ?? "").replace(/\D+/g, ""));
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return String(max + 1);
 }
+
+const onlyDigits = (s: string) => s.replace(/\D+/g, "");
 
 export async function saveLibrarySettings(formData: FormData) {
   await requireDepartment("library");
@@ -37,8 +45,9 @@ export async function addBook(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return;
   const supabase = await createClient();
+  const typedCode = onlyDigits(String(formData.get("code") ?? ""));
   await supabase.from("books").insert({
-    code: String(formData.get("code") ?? "").trim() || genCode(),
+    code: typedCode || (await nextBookCode()),
     title,
     author: String(formData.get("author") ?? "").trim() || null,
     isbn: String(formData.get("isbn") ?? "").trim() || null,
@@ -89,14 +98,19 @@ export async function importBooksCsv(
 
   const payload: Record<string, string | null>[] = [];
   let skipped = 0;
+  // Number imported books off the current max, so a single CSV doesn't collide
+  // with itself when several rows omit a code.
+  let nextSeq = Number((await nextBookCode())) || 1001;
   for (const r of rows) {
     const title = pick(r, "title", "book", "name");
     if (!title) {
       skipped++;
       continue;
     }
+    const typedCode = onlyDigits(pick(r, "code", "barcode", "id"));
+    const code = typedCode || String(nextSeq++);
     payload.push({
-      code: pick(r, "code", "barcode", "id") || genCode(),
+      code,
       title,
       author: pick(r, "author") || null,
       isbn: pick(r, "isbn") || null,
@@ -161,15 +175,16 @@ export type DeskResult = { ok?: boolean; message?: string; error?: string };
 // out, and enforce the per-student cap. Due date = today + loan_days.
 export async function issueBook(code: string, studentId: string): Promise<DeskResult> {
   await requireDepartment("library");
-  if (!code.trim() || !studentId) return { error: "Pick a book and a student." };
+  const normalised = onlyDigits(code);
+  if (!normalised || !studentId) return { error: "Pick a book and a student." };
   const supabase = await createClient();
 
   const { data: book } = await supabase
     .from("books")
     .select("id, title, status")
-    .eq("code", code.trim())
+    .eq("code", normalised)
     .maybeSingle();
-  if (!book) return { error: "No book found for that code." };
+  if (!book) return { error: "No book found for that number." };
   if (book.status !== "active") return { error: `This book is marked ${book.status}.` };
 
   const { data: openLoan } = await supabase
@@ -197,34 +212,50 @@ export async function issueBook(code: string, studentId: string): Promise<DeskRe
     return { error: `Student is at the limit of ${max} book(s). Return one first.` };
   }
 
-  const due = new Date();
-  due.setDate(due.getDate() + loanDays);
+  const due = addDays(todayStr(), loanDays);
   const { error } = await supabase.from("book_loans").insert({
     book_id: book.id,
     student_id: studentId,
-    due_date: due.toISOString().slice(0, 10),
+    due_date: due,
   });
   if (error) return { error: error.message };
 
+  // Pull the student's name + their new lifetime total so the desk can echo
+  // "Issued to <name> · 7 borrowed all-time" instead of a context-free toast.
+  const [{ data: student }, { count: lifetime }] = await Promise.all([
+    supabase.from("students").select("full_name").eq("id", studentId).maybeSingle(),
+    supabase
+      .from("book_loans")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", studentId),
+  ]);
+
   revalidatePath("/library");
-  return { ok: true, message: `Issued “${book.title}”. Due ${due.toISOString().slice(0, 10)}.` };
+  revalidatePath("/library/dashboard");
+  revalidatePath(`/academics/students/${studentId}`);
+  const name = student?.full_name ?? "student";
+  return {
+    ok: true,
+    message: `Issued “${book.title}” to ${name}. Due ${due}. (${lifetime ?? 0} borrowed all-time)`,
+  };
 }
 
 export async function returnBook(code: string): Promise<DeskResult> {
   await requireDepartment("library");
-  if (!code.trim()) return { error: "Scan or enter a book code." };
+  const normalised = onlyDigits(code);
+  if (!normalised) return { error: "Scan or enter a book number." };
   const supabase = await createClient();
 
   const { data: book } = await supabase
     .from("books")
     .select("id, title")
-    .eq("code", code.trim())
+    .eq("code", normalised)
     .maybeSingle();
-  if (!book) return { error: "No book found for that code." };
+  if (!book) return { error: "No book found for that number." };
 
   const { data: loan } = await supabase
     .from("book_loans")
-    .select("id")
+    .select("id, student_id, students(full_name)")
     .eq("book_id", book.id)
     .is("returned_at", null)
     .maybeSingle();
@@ -236,6 +267,24 @@ export async function returnBook(code: string): Promise<DeskResult> {
     .eq("id", loan.id);
   if (error) return { error: error.message };
 
+  const studentId = (loan as { student_id: string | null }).student_id;
+  const studentName =
+    (loan as unknown as { students: { full_name: string } | null }).students?.full_name ?? "student";
+
+  let lifetime = 0;
+  if (studentId) {
+    const { count } = await supabase
+      .from("book_loans")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", studentId);
+    lifetime = count ?? 0;
+  }
+
   revalidatePath("/library");
-  return { ok: true, message: `Returned “${book.title}”.` };
+  revalidatePath("/library/dashboard");
+  if (studentId) revalidatePath(`/academics/students/${studentId}`);
+  return {
+    ok: true,
+    message: `Collected “${book.title}” from ${studentName}. (${lifetime} borrowed all-time)`,
+  };
 }

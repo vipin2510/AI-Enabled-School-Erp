@@ -66,7 +66,13 @@ export default async function CatalogPage({
             <input name="title" placeholder="Title *" required className={`${inputCls} w-56`} />
             <input name="author" placeholder="Author" className={`${inputCls} w-40`} />
             <input name="category" placeholder="Category" className={`${inputCls} w-36`} />
-            <input name="code" placeholder="Code (auto if blank)" className={`${inputCls} w-44`} />
+            <input
+              name="code"
+              inputMode="numeric"
+              pattern="\d*"
+              placeholder="Number (auto if blank)"
+              className={`${inputCls} w-44`}
+            />
             <button className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800">
               Add
             </button>

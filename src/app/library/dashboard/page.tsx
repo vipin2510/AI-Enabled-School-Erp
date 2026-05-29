@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { requireDepartment } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatDateTime } from "@/lib/utils";
+import { todayStr } from "@/lib/attendance";
 import StatCard from "@/components/stat-card";
 import { addBookRequest, setBookRequestStatus, deleteBookRequest } from "../actions";
 
@@ -16,6 +18,15 @@ type BookRequest = {
   created_at: string;
 };
 
+type ActivityRow = {
+  id: string;
+  issued_at: string;
+  returned_at: string | null;
+  student_id: string | null;
+  books: { title: string; code: string } | null;
+  students: { full_name: string; classes: { display_name: string } | null } | null;
+};
+
 const field =
   "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:border-stone-900 focus:ring-1 focus:ring-stone-900";
 
@@ -23,19 +34,24 @@ export default async function LibraryDashboard() {
   await requireDepartment("library");
   const supabase = await createClient();
 
-  const [booksRes, issuedRes, overdueRes, reqRes] = await Promise.all([
+  const [booksRes, issuedRes, overdueRes, reqRes, activityRes] = await Promise.all([
     supabase.from("books").select("id", { count: "exact", head: true }),
     supabase.from("book_loans").select("id", { count: "exact", head: true }).is("returned_at", null),
     supabase
       .from("book_loans")
       .select("id", { count: "exact", head: true })
       .is("returned_at", null)
-      .lt("due_date", new Date().toISOString().slice(0, 10)),
+      .lt("due_date", todayStr()),
     supabase
       .from("book_requests")
       .select("id, title, author, requested_for, note, status, created_at")
       .order("status", { ascending: true })
       .order("created_at", { ascending: false }),
+    supabase
+      .from("book_loans")
+      .select("id, issued_at, returned_at, student_id, books(title, code), students(full_name, classes(display_name))")
+      .order("issued_at", { ascending: false })
+      .limit(20),
   ]);
 
   const totalBooks = booksRes.count ?? 0;
@@ -44,6 +60,22 @@ export default async function LibraryDashboard() {
   const available = Math.max(totalBooks - issued, 0);
   const requests = (reqRes.data ?? []) as BookRequest[];
   const openRequests = requests.filter((r) => r.status === "open");
+  const activity = (activityRes.data ?? []) as unknown as ActivityRow[];
+
+  // Each loan row has both an issue stamp and (optionally) a return stamp.
+  // Flatten into a single chronological feed so the librarian can see "who
+  // took what, when" at a glance.
+  const events: {
+    kind: "issued" | "collected";
+    at: string;
+    loan: ActivityRow;
+  }[] = [];
+  for (const row of activity) {
+    events.push({ kind: "issued", at: row.issued_at, loan: row });
+    if (row.returned_at) events.push({ kind: "collected", at: row.returned_at, loan: row });
+  }
+  events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+  const recentEvents = events.slice(0, 12);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -58,6 +90,75 @@ export default async function LibraryDashboard() {
         <StatCard title="Available" value={available} icon="✅" tone="emerald" />
         <StatCard title="Open Requests" value={openRequests.length} icon="📝" tone="sky" />
       </div>
+
+      <section className="mt-10">
+        <h2 className="mb-3 text-lg font-medium">
+          Recent Activity{" "}
+          <span className="text-sm font-normal text-stone-500">
+            (issues &amp; collections)
+          </span>
+        </h2>
+        <div className="card overflow-hidden p-0">
+          <table className="w-full text-sm">
+            <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+              <tr>
+                <th className="px-5 py-2 font-medium">When</th>
+                <th className="px-3 py-2 font-medium">Event</th>
+                <th className="px-3 py-2 font-medium">Book</th>
+                <th className="px-3 py-2 font-medium">Student</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentEvents.map((ev, i) => (
+                <tr key={`${ev.loan.id}-${ev.kind}-${i}`} className="border-t border-stone-100">
+                  <td className="px-5 py-2 text-stone-600">{formatDateTime(ev.at)}</td>
+                  <td className="px-3 py-2">
+                    {ev.kind === "issued" ? (
+                      <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
+                        Issued
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                        Collected
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="font-medium text-stone-800">{ev.loan.books?.title ?? "—"}</div>
+                    {ev.loan.books?.code && (
+                      <div className="font-mono text-xs text-stone-400">{ev.loan.books.code}</div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-stone-700">
+                    {ev.loan.student_id ? (
+                      <Link
+                        href={`/academics/students/${ev.loan.student_id}`}
+                        className="hover:underline"
+                      >
+                        {ev.loan.students?.full_name ?? "—"}
+                      </Link>
+                    ) : (
+                      ev.loan.students?.full_name ?? "—"
+                    )}
+                    {ev.loan.students?.classes?.display_name && (
+                      <span className="text-xs text-stone-400">
+                        {" "}· {ev.loan.students.classes.display_name}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {!recentEvents.length && (
+                <tr>
+                  <td colSpan={4} className="px-5 py-10 text-center text-stone-500">
+                    No issues or collections yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section className="mt-10 card p-5">
         <h2 className="text-lg font-medium">Request a Book</h2>

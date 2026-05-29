@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireDepartment } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { inr, formatDate } from "@/lib/utils";
+import { todayStr } from "@/lib/attendance";
 import ProfilePhotos from "@/components/profile-photos";
 import { DownloadButton } from "@/components/ui/download-button";
 
@@ -29,13 +30,18 @@ export default async function StudentProfilePage({
 
   const klass = (student as unknown as { classes: { display_name?: string } | null }).classes;
 
-  const [{ data: invoices }, { data: attendance }] = await Promise.all([
+  const [{ data: invoices }, { data: attendance }, { data: loans }] = await Promise.all([
     supabase
       .from("invoices")
       .select("id, receipt_no, issued_at, academic_year, total, amount_paid, payment_status, payment_mode")
       .eq("student_id", id)
       .order("issued_at", { ascending: false }),
     supabase.from("attendance").select("status").eq("student_id", id),
+    supabase
+      .from("book_loans")
+      .select("id, issued_at, due_date, returned_at, books(title, code)")
+      .eq("student_id", id)
+      .order("issued_at", { ascending: false }),
   ]);
 
   const totalPaid = (invoices ?? [])
@@ -46,6 +52,19 @@ export default async function StudentProfilePage({
   const daysMarked = attRows.length;
   const daysPresent = attRows.filter((a) => a.status === "present").length;
   const attendancePct = daysMarked ? Math.round((daysPresent / daysMarked) * 100) : 0;
+
+  type Loan = {
+    id: string;
+    issued_at: string;
+    due_date: string | null;
+    returned_at: string | null;
+    books: { title: string; code: string } | null;
+  };
+  const loanRows = (loans ?? []) as unknown as Loan[];
+  const totalBorrowed = loanRows.length;
+  const totalReturned = loanRows.filter((l) => l.returned_at).length;
+  const currentlyHeld = loanRows.filter((l) => !l.returned_at).length;
+  const today = todayStr();
 
   const classLabel = `${klass?.display_name ?? "—"}${student.section ? ` · ${student.section}` : ""}`;
 
@@ -144,6 +163,75 @@ export default async function StudentProfilePage({
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="card overflow-hidden p-0">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
+              <h2 className="text-sm font-semibold text-stone-800">Library</h2>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="rounded-full bg-violet-50 px-3 py-1 font-medium text-violet-700">
+                  {totalBorrowed} borrowed all-time
+                </span>
+                <span className="rounded-full bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
+                  {totalReturned} returned
+                </span>
+                {currentlyHeld > 0 && (
+                  <span className="rounded-full bg-amber-50 px-3 py-1 font-medium text-amber-700">
+                    {currentlyHeld} not returned
+                  </span>
+                )}
+              </div>
+            </div>
+            <table className="w-full text-sm">
+              <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+                <tr>
+                  <th className="px-5 py-2 font-medium">Book</th>
+                  <th className="px-3 py-2 font-medium">Issued</th>
+                  <th className="px-3 py-2 font-medium">Due</th>
+                  <th className="px-3 py-2 font-medium">Returned</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loanRows.map((l) => {
+                  const overdue = !l.returned_at && l.due_date && l.due_date < today;
+                  return (
+                    <tr key={l.id} className="border-t border-stone-100">
+                      <td className="px-5 py-2">
+                        <div className="font-medium text-stone-800">{l.books?.title ?? "—"}</div>
+                        {l.books?.code && (
+                          <div className="font-mono text-xs text-stone-400">{l.books.code}</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-stone-600">{formatDate(l.issued_at)}</td>
+                      <td className={"px-3 py-2 " + (overdue ? "font-medium text-red-600" : "text-stone-600")}>
+                        {l.due_date ? formatDate(l.due_date) : "—"}
+                      </td>
+                      <td className="px-3 py-2">
+                        {l.returned_at ? (
+                          <span className="text-stone-600">{formatDate(l.returned_at)}</span>
+                        ) : (
+                          <span
+                            className={
+                              "rounded-full px-2 py-0.5 text-xs font-medium " +
+                              (overdue ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700")
+                            }
+                          >
+                            {overdue ? "Overdue" : "Out"}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!loanRows.length && (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-8 text-center text-stone-500">
+                      No books borrowed yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
 
           <div className="card overflow-hidden p-0">

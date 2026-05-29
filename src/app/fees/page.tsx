@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireDepartment } from "@/lib/auth";
-import { inr, monthName, ACADEMIC_MONTHS } from "@/lib/utils";
+import { inr, monthName, formatDate, monthYearLabel, ACADEMIC_MONTHS } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ export default async function FeesDashboard() {
 
   const now = new Date();
   const monthIndex = now.getMonth() + 1; // 1..12, matches monthly component period_index
-  const monthLabel = now.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  const monthLabel = monthYearLabel(now);
 
   const [studentsRes, structRes, paidRes, todayRes] = await Promise.all([
     supabase.from("students").select("id, class_id").eq("status", "active"),
@@ -144,9 +144,7 @@ export default async function FeesDashboard() {
                 <tr key={r.receipt_no ?? i} className="border-t border-stone-100">
                   <td className="px-4 py-2 font-mono text-xs">{r.receipt_no}</td>
                   <td className="px-4 py-2">{r.students?.full_name ?? "—"}</td>
-                  <td className="px-4 py-2 text-stone-500">
-                    {new Date(r.issued_at).toLocaleDateString("en-IN")}
-                  </td>
+                  <td className="px-4 py-2 text-stone-500">{formatDate(r.issued_at)}</td>
                   <td className="px-4 py-2 text-right font-medium">{inr(r.total)}</td>
                 </tr>
               ))}

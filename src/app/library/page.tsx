@@ -1,6 +1,7 @@
 import { requireDepartment } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
+import { todayStr } from "@/lib/attendance";
 import ScanDesk from "./scan-desk";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ export default async function LibraryPage() {
     .order("issued_at", { ascending: false })
     .limit(100);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayStr();
   const openLoans = (loans ?? []) as unknown as OpenLoan[];
 
   return (

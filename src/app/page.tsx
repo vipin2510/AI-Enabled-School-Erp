@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import { DEPARTMENT_NAV } from "@/lib/access";
-import { inr } from "@/lib/utils";
+import { inr, monthYearLabel } from "@/lib/utils";
 import { todayStr, prettyDate } from "@/lib/attendance";
 import StatCard from "@/components/stat-card";
 
@@ -24,7 +24,7 @@ export default async function Overview() {
   const today = todayStr();
   const now = new Date();
   const monthIndex = now.getMonth() + 1;
-  const monthLabel = now.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  const monthLabel = monthYearLabel(now);
 
   const [
     studentsRes,

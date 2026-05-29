@@ -17,9 +17,13 @@ type StudentHit = { id: string; full_name: string; admission_no: string | null; 
 // html5-qrcode is loaded lazily so it never runs during SSR.
 type Scanner = { start: (a: unknown, b: unknown, c: (t: string) => void, d: () => void) => Promise<void>; stop: () => Promise<void>; clear: () => void };
 
+// Book IDs are numeric. The input rejects anything else so the operator can
+// just enter a number and press Enter — no mode toggle needed; we infer
+// issue-vs-return from the book's current loan state.
+const stripNonDigits = (s: string) => s.replace(/\D+/g, "");
+
 export default function ScanDesk() {
   const router = useRouter();
-  const [mode, setMode] = useState<"issue" | "return">("issue");
   const [code, setCode] = useState("");
   const [lookup, setLookup] = useState<Lookup | null>(null);
   const [busy, setBusy] = useState(false);
@@ -31,8 +35,10 @@ export default function ScanDesk() {
   const [scanning, setScanning] = useState(false);
   const scannerRef = useRef<Scanner | null>(null);
 
-  const doLookup = useCallback(async (value: string) => {
-    const c = value.trim();
+  const codeInputRef = useRef<HTMLInputElement>(null);
+
+  const doLookup = useCallback(async (raw: string) => {
+    const c = stripNonDigits(raw);
     if (!c) return;
     setBusy(true);
     setMsg(null);
@@ -71,9 +77,10 @@ export default function ScanDesk() {
         { facingMode: "environment" },
         { fps: 10, qrbox: 220 },
         (decoded: string) => {
-          setCode(decoded);
+          const digits = stripNonDigits(decoded);
+          setCode(digits);
           stopScan();
-          doLookup(decoded);
+          doLookup(digits);
         },
         () => {}
       );
@@ -103,6 +110,8 @@ export default function ScanDesk() {
     setLookup(null);
     setStudents([]);
     setStudentQuery("");
+    // Keep the desk ready for the next book without forcing another click.
+    codeInputRef.current?.focus();
   };
 
   const onIssue = async (studentId: string) => {
@@ -123,7 +132,7 @@ export default function ScanDesk() {
     setBusy(false);
     if (r.error) setMsg({ kind: "err", text: r.error });
     else {
-      setMsg({ kind: "ok", text: r.message ?? "Returned." });
+      setMsg({ kind: "ok", text: r.message ?? "Collected." });
       reset();
       router.refresh();
     }
@@ -134,27 +143,11 @@ export default function ScanDesk() {
 
   return (
     <div className="card p-5">
-      {/* mode toggle */}
-      <div className="mb-4 inline-flex rounded-lg border border-stone-200 p-0.5">
-        {(["issue", "return"] as const).map((m) => (
-          <button
-            key={m}
-            onClick={() => {
-              setMode(m);
-              reset();
-              setMsg(null);
-            }}
-            className={
-              "rounded-md px-4 py-1.5 text-sm font-medium capitalize transition " +
-              (mode === m ? "bg-stone-900 text-white" : "text-stone-600 hover:bg-stone-100")
-            }
-          >
-            {m}
-          </button>
-        ))}
-      </div>
+      <p className="mb-3 text-sm text-stone-500">
+        Type or scan the book&rsquo;s number and press <kbd className="rounded border border-stone-300 bg-stone-50 px-1.5 py-0.5 font-mono text-xs">Enter</kbd>.
+        We&rsquo;ll figure out if it needs to be issued or collected.
+      </p>
 
-      {/* code entry + scan */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -163,14 +156,21 @@ export default function ScanDesk() {
         className="flex flex-wrap items-center gap-2"
       >
         <input
+          ref={codeInputRef}
           autoFocus
           value={code}
-          onChange={(e) => setCode(e.target.value)}
-          placeholder="Scan or type book code, then Enter"
-          className="w-72 rounded-lg border border-stone-300 bg-white px-3 py-2 font-mono text-sm outline-none focus:border-stone-900 focus:ring-1 focus:ring-stone-900"
+          inputMode="numeric"
+          pattern="\d*"
+          onChange={(e) => setCode(stripNonDigits(e.target.value))}
+          placeholder="Book number"
+          className="w-56 rounded-lg border border-stone-300 bg-white px-3 py-2 text-base font-mono tracking-wider outline-none focus:border-stone-900 focus:ring-1 focus:ring-stone-900"
         />
-        <button type="submit" disabled={busy} className="rounded-lg border border-stone-200 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-200">
-          Look up
+        <button
+          type="submit"
+          disabled={busy || !code}
+          className="rounded-lg bg-stone-900 px-5 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
+        >
+          {busy ? "Looking up…" : "Look up"}
         </button>
         {scanning ? (
           <button type="button" onClick={stopScan} className="rounded-lg border border-stone-200 px-4 py-2 text-sm">
@@ -192,8 +192,8 @@ export default function ScanDesk() {
       {/* result */}
       {book && (
         <div className="mt-4 rounded-lg border border-stone-200 p-4">
-          <div className="flex items-start justify-between">
-            <div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
               <div className="font-semibold text-stone-900">{book.title}</div>
               <div className="text-sm text-stone-500">
                 <span className="font-mono">{book.code}</span>
@@ -207,66 +207,65 @@ export default function ScanDesk() {
             )}
           </div>
 
-          {/* RETURN mode */}
-          {mode === "return" &&
-            (loan ? (
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <div className="text-sm text-stone-600">
-                  Held by <strong>{loan.students?.full_name ?? "—"}</strong>
-                  {loan.students?.classes?.display_name ? ` (${loan.students.classes.display_name}${loan.students.section ? ` · ${loan.students.section}` : ""})` : ""}
-                  {loan.due_date ? ` · due ${loan.due_date}` : ""}
-                </div>
-                <button onClick={onReturn} disabled={busy} className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50">
-                  Mark returned
-                </button>
+          {/* Book is currently issued → only thing to do is collect it back. */}
+          {loan && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm text-stone-600">
+                Held by <strong>{loan.students?.full_name ?? "—"}</strong>
+                {loan.students?.classes?.display_name
+                  ? ` (${loan.students.classes.display_name}${loan.students.section ? ` · ${loan.students.section}` : ""})`
+                  : ""}
+                {loan.due_date ? ` · due ${loan.due_date}` : ""}
               </div>
-            ) : (
-              <p className="mt-3 text-sm text-stone-500">This book isn’t currently issued.</p>
-            ))}
+              <button
+                onClick={onReturn}
+                disabled={busy}
+                className="rounded-lg bg-stone-900 px-5 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
+              >
+                ↩ Collect book
+              </button>
+            </div>
+          )}
 
-          {/* ISSUE mode */}
-          {mode === "issue" &&
-            (loan ? (
-              <p className="mt-3 text-sm text-amber-700">
-                Already issued to {loan.students?.full_name ?? "a student"}. Return it before re-issuing.
-              </p>
-            ) : (
-              <div className="mt-3">
-                <input
-                  value={studentQuery}
-                  onChange={(e) => searchStudents(e.target.value)}
-                  placeholder="Search student by name or admission no.…"
-                  className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:border-stone-900 focus:ring-1 focus:ring-stone-900"
-                />
-                {students.length > 0 && (
-                  <ul className="mt-2 divide-y divide-stone-100 rounded-lg border border-stone-200">
-                    {students.map((s) => (
-                      <li key={s.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-medium text-stone-800">{s.full_name}</div>
-                          <div className="text-xs text-stone-500">
-                            {s.class}
-                            {s.admission_no ? ` · ${s.admission_no}` : ""} · holds {s.openLoans}
-                          </div>
+          {/* Book is on the shelf → ready to issue to a student. */}
+          {!loan && (
+            <div className="mt-4">
+              <div className="mb-2 text-sm font-medium text-stone-700">Issue to student</div>
+              <input
+                value={studentQuery}
+                onChange={(e) => searchStudents(e.target.value)}
+                placeholder="Search student by name or admission no.…"
+                className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:border-stone-900 focus:ring-1 focus:ring-stone-900"
+              />
+              {students.length > 0 && (
+                <ul className="mt-2 divide-y divide-stone-100 rounded-lg border border-stone-200">
+                  {students.map((s) => (
+                    <li key={s.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-stone-800">{s.full_name}</div>
+                        <div className="text-xs text-stone-500">
+                          {s.class}
+                          {s.admission_no ? ` · ${s.admission_no}` : ""} · holds {s.openLoans}
                         </div>
-                        <button
-                          onClick={() => onIssue(s.id)}
-                          disabled={busy}
-                          className="shrink-0 rounded-lg bg-stone-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
-                        >
-                          Issue
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
+                      </div>
+                      <button
+                        onClick={() => onIssue(s.id)}
+                        disabled={busy}
+                        className="shrink-0 rounded-lg bg-stone-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
+                      >
+                        📕 Issue
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {code && lookup && !book && (
-        <p className="mt-4 text-sm text-stone-500">No book found for “{code}”.</p>
+        <p className="mt-4 text-sm text-stone-500">No book found for &ldquo;{code}&rdquo;.</p>
       )}
     </div>
   );

@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ROLE_LABELS, type Role } from "@/lib/access";
 import { todayStr, prettyDate } from "@/lib/attendance";
+import { formatTime, monthYearLabel } from "@/lib/utils";
 import StatCard from "@/components/stat-card";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ function rangeWindow(range: Range): { from: string; to: string; label: string } 
   return {
     from: todayStr(first),
     to,
-    label: now.toLocaleDateString("en-IN", { month: "long", year: "numeric" }),
+    label: monthYearLabel(now),
   };
 }
 
@@ -34,10 +35,6 @@ type Mark = {
   latitude: number | null;
   longitude: number | null;
 };
-
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-}
 
 export default async function StaffAttendancePage({
   searchParams,
@@ -160,7 +157,7 @@ export default async function StaffAttendancePage({
                             </span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-stone-600">{mark ? fmtTime(mark.marked_at) : "—"}</td>
+                        <td className="px-3 py-2 text-stone-600">{mark ? formatTime(mark.marked_at) : "—"}</td>
                         <td className="px-3 py-2">
                           {mark?.latitude != null && mark?.longitude != null ? (
                             <a

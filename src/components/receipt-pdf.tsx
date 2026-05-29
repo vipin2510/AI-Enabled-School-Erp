@@ -91,7 +91,12 @@ function inr(n: number | string) {
 }
 
 function fmtDate(s: string) {
-  return new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(s).toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 // Collapse all (non-waived) monthly items into one line listing the months,

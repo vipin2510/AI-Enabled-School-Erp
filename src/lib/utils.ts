@@ -15,14 +15,46 @@ export function inr(amount: number | string | null | undefined) {
   }).format(n);
 }
 
+// The school operates in India; render every date/time in IST regardless of
+// where the server runs (Vercel functions run in UTC).
+export const TIME_ZONE = "Asia/Kolkata";
+
 export function formatDate(d: string | Date | null | undefined) {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;
   if (isNaN(date.getTime())) return "";
   return date.toLocaleDateString("en-IN", {
+    timeZone: TIME_ZONE,
     day: "2-digit",
     month: "short",
     year: "numeric",
+  });
+}
+
+// Date + time in IST, e.g. "27 May 2026, 02:15 pm".
+export function formatDateTime(d: string | Date | null | undefined) {
+  if (!d) return "";
+  const date = typeof d === "string" ? new Date(d) : d;
+  if (isNaN(date.getTime())) return "";
+  return date.toLocaleString("en-IN", {
+    timeZone: TIME_ZONE,
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// Time-of-day in IST, e.g. "02:15 pm".
+export function formatTime(d: string | Date | null | undefined) {
+  if (!d) return "";
+  const date = typeof d === "string" ? new Date(d) : d;
+  if (isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("en-IN", {
+    timeZone: TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -42,4 +74,13 @@ export const ACADEMIC_MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
 
 export function monthName(index: number) {
   return MONTH_NAMES[index - 1] ?? "";
+}
+
+// "May 2026" rendered in IST regardless of where the code runs.
+export function monthYearLabel(d: Date = new Date()) {
+  return d.toLocaleDateString("en-IN", {
+    timeZone: TIME_ZONE,
+    month: "long",
+    year: "numeric",
+  });
 }

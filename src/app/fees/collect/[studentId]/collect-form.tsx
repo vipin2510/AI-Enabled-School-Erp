@@ -42,7 +42,16 @@ type Props = {
     is_enabled: boolean;
     monthly_due_day: number;
   };
+  isNewAdmission: boolean;
 };
+
+// Registration & new-admission charges only apply on a student's first year.
+// Once they're an existing ("old") student we hide them so they can never be
+// charged again, and the Outstanding calc never accidentally counts them.
+const NEW_ADMISSION_ONLY_KINDS = new Set<FeeKind>([
+  "registration",
+  "admission_one_time",
+]);
 
 type SelectedItem = {
   component: Component;
@@ -59,9 +68,13 @@ export default function CollectForm({
   hostelDefaultOpen,
   paidComponentIds,
   lateFeeSettings,
+  isNewAdmission,
 }: Props) {
   const router = useRouter();
   const paidSet = useMemo(() => new Set(paidComponentIds), [paidComponentIds]);
+
+  const isApplicable = (c: Component) =>
+    isNewAdmission || !NEW_ADMISSION_ONLY_KINDS.has(c.kind);
 
   const [selected, setSelected] = useState<Record<string, SelectedItem>>({});
   const [showHostel, setShowHostel] = useState(hostelDefaultOpen);
@@ -98,6 +111,7 @@ export default function CollectForm({
       for (const c of struct.fee_structure_components) {
         if (c.kind !== kind) continue;
         if (paidSet.has(c.id)) continue;
+        if (!isApplicable(c)) continue;
         if (!next[c.id]) next[c.id] = { component: c, scope: struct.scope, waived: false };
       }
       return next;
@@ -110,6 +124,7 @@ export default function CollectForm({
       const next = { ...prev };
       for (const c of struct.fee_structure_components) {
         if (paidSet.has(c.id)) continue;
+        if (!isApplicable(c)) continue;
         // Skip refundable caution at "full year" default? Keep it included as caution is one-time too.
         if (!next[c.id]) next[c.id] = { component: c, scope: struct.scope, waived: false };
       }
@@ -206,9 +221,10 @@ export default function CollectForm({
 
   const renderStruct = (struct: Structure, title: string) => {
     if (!struct) return null;
-    const monthly = struct.fee_structure_components.filter((c) => c.kind === "monthly");
-    const instalments = struct.fee_structure_components.filter((c) => c.kind === "instalment");
-    const oneTimes = struct.fee_structure_components.filter(
+    const applicable = struct.fee_structure_components.filter(isApplicable);
+    const monthly = applicable.filter((c) => c.kind === "monthly");
+    const instalments = applicable.filter((c) => c.kind === "instalment");
+    const oneTimes = applicable.filter(
       (c) => c.is_one_time || ["registration", "caution", "yearly", "admission_one_time"].includes(c.kind)
     );
 

@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { setDepartment, logout } from "@/app/actions/auth";
 import { markStaffAttendance } from "@/app/actions/staff-attendance";
+import { formatTime } from "@/lib/utils";
 import {
   DEPARTMENT_LABELS,
   ROLE_LABELS,
@@ -76,10 +77,6 @@ export default function Topbar({
   );
 }
 
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-}
-
 // Captures the device location (best-effort) and stamps the time via the
 // server action. Already-marked staff see when, and can re-mark.
 function MarkAttendanceButton({ initialMarkedAt }: { initialMarkedAt: string | null }) {
@@ -139,7 +136,7 @@ function MarkAttendanceButton({ initialMarkedAt }: { initialMarkedAt: string | n
         {busy
           ? "Marking…"
           : markedAt
-            ? `✓ Marked · ${fmtTime(markedAt)}`
+            ? `✓ Marked · ${formatTime(markedAt)}`
             : "Mark Attendance"}
       </button>
       {error && <span className="mt-0.5 text-xs text-red-600">{error}</span>}

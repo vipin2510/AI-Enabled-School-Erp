@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireDepartment } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayStr, prettyDate } from "@/lib/attendance";
+import { monthYearLabel } from "@/lib/utils";
 import StatCard from "@/components/stat-card";
 import BarChart, { type Bar } from "@/components/bar-chart";
 import { loadClassesAndSections } from "./shared";
@@ -22,7 +23,7 @@ function rangeWindow(range: Range): { from: string; to: string; label: string } 
     return { from: todayStr(d), to, label: "Last 7 days" };
   }
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  return { from: todayStr(first), to, label: now.toLocaleDateString("en-IN", { month: "long", year: "numeric" }) };
+  return { from: todayStr(first), to, label: monthYearLabel(now) };
 }
 
 export default async function AcademicsDashboard({

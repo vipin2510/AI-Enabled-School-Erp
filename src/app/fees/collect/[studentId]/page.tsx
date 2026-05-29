@@ -122,6 +122,7 @@ export default async function CollectFeePage({
         hostelDefaultOpen={student.is_hosteller}
         paidComponentIds={Array.from(paidComponentIds)}
         lateFeeSettings={lateFeeSettings}
+        isNewAdmission={!!student.is_new_admission}
       />
     </div>
   );
