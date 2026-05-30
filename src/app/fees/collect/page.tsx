@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,17 +13,21 @@ export default async function CollectFeePicker({
 }: {
   searchParams: Promise<{ q?: string; class_id?: string }>;
 }) {
+  const profile = await requireDepartment("fees");
+  const schoolId = await getCurrentSchoolId(profile);
   const { q, class_id } = await searchParams;
   const supabase = await createClient();
 
   const { data: classes } = await supabase
     .from("classes")
     .select("id, display_name, ordinal")
+    .eq("school_id", schoolId)
     .order("ordinal");
 
   let query = supabase
     .from("students")
     .select("id, full_name, section, contact_number, father_name, class_id, classes(display_name)")
+    .eq("school_id", schoolId)
     .order("full_name")
     .limit(50);
 
@@ -39,7 +44,7 @@ export default async function CollectFeePicker({
 
   // Fee status (current AY, school scope): how many of the class's fee
   // components has each student actually paid for?
-  const statusByStudent = await computePaidStatus(supabase, students);
+  const statusByStudent = await computePaidStatus(supabase, students, schoolId);
 
   return (
     <div className="max-w-3xl">
@@ -126,7 +131,8 @@ type StudentRow = { id: string; class_id: string | null };
 
 async function computePaidStatus(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  students: StudentRow[]
+  students: StudentRow[],
+  schoolId: string
 ): Promise<Map<string, PayState>> {
   const result = new Map<string, PayState>();
   const ids = students.map((s) => s.id);
@@ -139,6 +145,7 @@ async function computePaidStatus(
     const { data: structures } = await supabase
       .from("fee_structures")
       .select("class_id, fee_structure_components(id)")
+      .eq("school_id", schoolId)
       .eq("academic_year", AY)
       .eq("scope", "school")
       .in("class_id", classIds);
@@ -157,6 +164,7 @@ async function computePaidStatus(
   const { data: items } = await supabase
     .from("invoice_items")
     .select("component_id, invoices!inner(student_id, academic_year, payment_status)")
+    .eq("school_id", schoolId)
     .in("invoices.student_id", ids)
     .eq("invoices.academic_year", AY)
     .neq("invoices.payment_status", "void");

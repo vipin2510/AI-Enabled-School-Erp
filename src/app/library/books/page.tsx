@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { addBook, deleteBook } from "../actions";
 import BookImport from "./book-import";
@@ -21,13 +21,15 @@ export default async function CatalogPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const { q } = await searchParams;
   const supabase = await createClient();
 
   let query = supabase
     .from("books")
     .select("id, code, title, author, category, status")
+    .eq("school_id", schoolId)
     .order("title")
     .limit(500);
   if (q) query = query.or(`title.ilike.%${q}%,code.ilike.%${q}%,author.ilike.%${q}%`);
@@ -40,6 +42,7 @@ export default async function CatalogPage({
     const { data: loans } = await supabase
       .from("book_loans")
       .select("book_id")
+      .eq("school_id", schoolId)
       .in("book_id", ids)
       .is("returned_at", null);
     for (const l of (loans ?? []) as { book_id: string }[]) issued.add(l.book_id);

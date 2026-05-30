@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { inr, formatDate } from "@/lib/utils";
 import ReceiptStatus from "./receipt-status";
 
@@ -11,6 +12,8 @@ export default async function ReceiptPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const profile = await requireDepartment("fees");
+  const schoolId = await getCurrentSchoolId(profile);
   const { id } = await params;
   const supabase = await createClient();
 
@@ -19,6 +22,7 @@ export default async function ReceiptPage({
     .select(
       "*, students(full_name, section, father_name, contact_number, classes(display_name)), invoice_items(*)"
     )
+    .eq("school_id", schoolId)
     .eq("id", id)
     .single();
 

@@ -1,6 +1,12 @@
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { ROLE_LABELS, DEPARTMENT_LABELS, type Role, type Department } from "@/lib/access";
+import {
+  ROLE_LABELS,
+  DEPARTMENT_LABELS,
+  SCHOOLS,
+  type Role,
+  type Department,
+} from "@/lib/access";
 import { formatDate } from "@/lib/utils";
 import CreateUserForm from "./create-user-form";
 import { setUserActive } from "./actions";
@@ -10,19 +16,24 @@ export const dynamic = "force-dynamic";
 type ProfileRow = {
   id: string;
   email: string | null;
+  phone: string | null;
   full_name: string | null;
   role: Role;
   department: Department | null;
+  school_ids: string[] | null;
   is_active: boolean;
   created_at: string;
 };
+
+const schoolLabel = (id: string) =>
+  SCHOOLS.find((s) => s.id === id)?.location.split(",")[0] ?? id.slice(0, 8);
 
 export default async function UsersPage() {
   const me = await requireRole("admin");
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role, department, is_active, created_at")
+    .select("id, email, phone, full_name, role, department, school_ids, is_active, created_at")
     .order("created_at", { ascending: true });
 
   const users = (data ?? []) as ProfileRow[];
@@ -46,9 +57,10 @@ export default async function UsersPage() {
           <thead className="bg-stone-50 text-stone-500 text-left">
             <tr>
               <th className="px-4 py-2 font-medium">Name</th>
-              <th className="px-4 py-2 font-medium">Email</th>
+              <th className="px-4 py-2 font-medium">Login</th>
               <th className="px-4 py-2 font-medium">Role</th>
               <th className="px-4 py-2 font-medium">Department</th>
+              <th className="px-4 py-2 font-medium">Schools</th>
               <th className="px-4 py-2 font-medium">Created</th>
               <th className="px-4 py-2 font-medium">Status</th>
               <th className="px-4 py-2"></th>
@@ -58,10 +70,15 @@ export default async function UsersPage() {
             {users.map((u) => (
               <tr key={u.id} className="border-t border-stone-100">
                 <td className="px-4 py-2 font-medium">{u.full_name || "—"}</td>
-                <td className="px-4 py-2 text-stone-600">{u.email}</td>
+                <td className="px-4 py-2 text-stone-600">{u.phone || u.email || "—"}</td>
                 <td className="px-4 py-2">{ROLE_LABELS[u.role]}</td>
                 <td className="px-4 py-2">
                   {u.department ? DEPARTMENT_LABELS[u.department] : "—"}
+                </td>
+                <td className="px-4 py-2 text-stone-600">
+                  {u.role === "admin"
+                    ? "All"
+                    : (u.school_ids ?? []).map(schoolLabel).join(", ") || "—"}
                 </td>
                 <td className="px-4 py-2 text-stone-500">{formatDate(u.created_at)}</td>
                 <td className="px-4 py-2">
@@ -88,7 +105,7 @@ export default async function UsersPage() {
             ))}
             {!users.length && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-stone-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-stone-500">
                   No users yet.
                 </td>
               </tr>

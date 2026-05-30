@@ -1,9 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import LateFeeForm from "./late-fee-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function LateFeeSettingsPage() {
+  const profile = await requireDepartment("fees");
+  const schoolId = await getCurrentSchoolId(profile);
   const supabase = await createClient();
 
   // monthly_due_day may not exist before migration 0004; fall back gracefully.
@@ -17,6 +20,7 @@ export default async function LateFeeSettingsPage() {
   const withDay = await supabase
     .from("late_fee_settings")
     .select("id, per_day_amount, grace_days, is_enabled, monthly_due_day")
+    .eq("school_id", schoolId)
     .maybeSingle();
   if (!withDay.error && withDay.data) {
     settings = { ...settings, ...withDay.data };
@@ -24,6 +28,7 @@ export default async function LateFeeSettingsPage() {
     const basic = await supabase
       .from("late_fee_settings")
       .select("id, per_day_amount, grace_days, is_enabled")
+      .eq("school_id", schoolId)
       .maybeSingle();
     if (basic.data) settings = { ...settings, ...basic.data };
   }
@@ -36,7 +41,7 @@ export default async function LateFeeSettingsPage() {
           Penalty automatically computed per day past the monthly due date.
         </p>
       </header>
-      <LateFeeForm settings={settings} />
+      <LateFeeForm settings={settings} schoolId={schoolId} />
     </div>
   );
 }

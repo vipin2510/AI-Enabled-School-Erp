@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { uploadStudentPhoto } from "@/lib/storage";
 
@@ -56,14 +56,15 @@ function parse(formData: FormData) {
 }
 
 export async function createStudent(_prev: StudentState, formData: FormData): Promise<StudentState> {
-  await requireDepartment("academics");
+  const profile = await requireDepartment("academics");
+  const schoolId = await getCurrentSchoolId(profile);
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
   const supabase = await createClient();
   const { data: inserted, error } = await supabase
     .from("students")
-    .insert(parsed.data)
+    .insert({ ...parsed.data, school_id: schoolId })
     .select("id")
     .single();
   if (error || !inserted) return { error: error?.message ?? "Could not create student." };
@@ -77,7 +78,8 @@ export async function createStudent(_prev: StudentState, formData: FormData): Pr
     const patch: Record<string, string> = {};
     if (studentUrl) patch.student_photo_url = studentUrl;
     if (parentUrl) patch.parent_photo_url = parentUrl;
-    if (Object.keys(patch).length) await supabase.from("students").update(patch).eq("id", inserted.id);
+    if (Object.keys(patch).length)
+      await supabase.from("students").update(patch).eq("school_id", schoolId).eq("id", inserted.id);
   }
 
   revalidatePath("/academics/students");
@@ -89,7 +91,8 @@ export async function updateStudent(
   _prev: StudentState,
   formData: FormData
 ): Promise<StudentState> {
-  await requireDepartment("academics");
+  const profile = await requireDepartment("academics");
+  const schoolId = await getCurrentSchoolId(profile);
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
@@ -107,7 +110,11 @@ export async function updateStudent(
   if (studentUrl) update.student_photo_url = studentUrl;
   if (parentUrl) update.parent_photo_url = parentUrl;
 
-  const { error } = await supabase.from("students").update(update).eq("id", id);
+  const { error } = await supabase
+    .from("students")
+    .update(update)
+    .eq("school_id", schoolId)
+    .eq("id", id);
   if (error) return { error: error.message };
 
   revalidatePath("/academics/students");
@@ -116,15 +123,20 @@ export async function updateStudent(
 }
 
 export async function deleteStudent(formData: FormData) {
-  await requireDepartment("academics");
+  const profile = await requireDepartment("academics");
+  const schoolId = await getCurrentSchoolId(profile);
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
   const supabase = await createClient();
   // Students with receipts can't be hard-deleted (FK restrict); mark inactive.
-  const { error } = await supabase.from("students").delete().eq("id", id);
+  const { error } = await supabase.from("students").delete().eq("school_id", schoolId).eq("id", id);
   if (error) {
-    await supabase.from("students").update({ status: "inactive" }).eq("id", id);
+    await supabase
+      .from("students")
+      .update({ status: "inactive" })
+      .eq("school_id", schoolId)
+      .eq("id", id);
   }
   revalidatePath("/academics/students");
 }

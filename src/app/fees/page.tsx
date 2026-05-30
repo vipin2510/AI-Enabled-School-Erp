@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { inr, monthName, formatDate, monthYearLabel, ACADEMIC_MONTHS } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,8 @@ type RecentInvoice = {
 };
 
 export default async function FeesDashboard() {
-  await requireDepartment("fees");
+  const profile = await requireDepartment("fees");
+  const schoolId = await getCurrentSchoolId(profile);
   const supabase = await createClient();
 
   const now = new Date();
@@ -23,15 +24,17 @@ export default async function FeesDashboard() {
   const monthLabel = monthYearLabel(now);
 
   const [studentsRes, structRes, paidRes, todayRes] = await Promise.all([
-    supabase.from("students").select("id, class_id").eq("status", "active"),
+    supabase.from("students").select("id, class_id").eq("school_id", schoolId).eq("status", "active"),
     supabase
       .from("fee_structures")
       .select("class_id, fee_structure_components(kind, amount)")
+      .eq("school_id", schoolId)
       .eq("academic_year", AY)
       .eq("scope", "school"),
     supabase
       .from("invoice_items")
       .select("invoices!inner(student_id, academic_year, payment_status)")
+      .eq("school_id", schoolId)
       .eq("kind", "monthly")
       .eq("period_index", monthIndex)
       .eq("invoices.academic_year", AY)
@@ -39,6 +42,7 @@ export default async function FeesDashboard() {
     supabase
       .from("invoices")
       .select("total, receipt_no, issued_at, students(full_name)")
+      .eq("school_id", schoolId)
       .order("issued_at", { ascending: false })
       .limit(5),
   ]);

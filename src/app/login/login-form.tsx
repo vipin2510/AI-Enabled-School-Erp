@@ -12,15 +12,17 @@ export default function LoginForm() {
     <form action={action} className="space-y-4">
       <input type="hidden" name="next" value={next} />
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-stone-700 mb-1">
-          Email
+        <label htmlFor="identifier" className="block text-sm font-medium text-stone-700 mb-1">
+          Phone or email
         </label>
         <input
-          id="email"
-          name="email"
-          type="email"
-          autoComplete="email"
+          id="identifier"
+          name="identifier"
+          type="text"
+          inputMode="text"
+          autoComplete="username"
           required
+          placeholder="9876543210 or you@example.com"
           className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm"
         />
       </div>

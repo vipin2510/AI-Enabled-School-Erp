@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { requireProfile, getCurrentSchoolId } from "@/lib/auth";
 
 const ItemSchema = z.object({
   component_id: z.string().uuid().nullable(),
@@ -36,6 +37,8 @@ const BodySchema = z.object({
 });
 
 export async function POST(req: Request) {
+  const profile = await requireProfile();
+  const schoolId = await getCurrentSchoolId(profile);
   const parsed = BodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
@@ -52,6 +55,7 @@ export async function POST(req: Request) {
   const { data: invoice, error: invErr } = await supabase
     .from("invoices")
     .insert({
+      school_id: schoolId,
       student_id: body.student_id,
       academic_year: body.academic_year,
       subtotal: body.subtotal,
@@ -77,6 +81,7 @@ export async function POST(req: Request) {
 
   // Insert items
   const itemsPayload = body.items.map((i) => ({
+    school_id: schoolId,
     invoice_id: invoice.id,
     component_id: i.component_id,
     description: i.description,
@@ -96,6 +101,7 @@ export async function POST(req: Request) {
 
   // Record payment row
   await supabase.from("payments").insert({
+    school_id: schoolId,
     invoice_id: invoice.id,
     amount: body.total,
     mode: body.payment_mode,

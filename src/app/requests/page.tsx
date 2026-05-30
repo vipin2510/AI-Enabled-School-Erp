@@ -1,4 +1,4 @@
-import { requireProfile } from "@/lib/auth";
+import { requireProfile, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import RequestForm from "./request-form";
@@ -20,6 +20,7 @@ type RequestRow = {
 export default async function RequestsPage() {
   // Open to every login. Admins resolve; everyone else raises requests.
   const me = await requireProfile();
+  const schoolId = await getCurrentSchoolId(me);
   const isAdmin = me.role === "admin";
   const supabase = await createClient();
 
@@ -27,6 +28,7 @@ export default async function RequestsPage() {
   let query = supabase
     .from("change_requests")
     .select("id, requester_email, subject, body, status, admin_note, created_at, resolved_at")
+    .eq("school_id", schoolId)
     .order("created_at", { ascending: false });
   if (!isAdmin) query = query.eq("requested_by", me.id);
 

@@ -1,0 +1,2 @@
+admission_no,full_name,class_code,section,gender,date_of_birth,blood_group,father_name,mother_name,contact_number,alt_contact,address,is_hosteller,is_new_admission,profile_image_url,father_image_url,mother_image_url
+K-2026-0001,Aarav Sharma,1ST,A,M,15-04-2019,O+,Rajesh Sharma,Sunita Sharma,9876543210,9876543211,"Near Bus Stand, Kondagaon",no,yes,https://drive.google.com/file/d/PASTE_FILE_ID/view?usp=sharing,https://drive.google.com/file/d/PASTE_FILE_ID/view?usp=sharing,https://drive.google.com/file/d/PASTE_FILE_ID/view?usp=sharing

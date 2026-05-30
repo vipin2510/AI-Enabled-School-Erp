@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { loadClassesAndSections } from "../../../shared";
 import { updateStudent } from "../../actions";
@@ -13,7 +13,8 @@ export default async function EditStudentPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireDepartment("academics");
+  const profile = await requireDepartment("academics");
+  const schoolId = await getCurrentSchoolId(profile);
   const { id } = await params;
   const supabase = await createClient();
 
@@ -22,12 +23,13 @@ export default async function EditStudentPage({
     .select(
       "id, full_name, admission_no, class_id, section, gender, father_name, mother_name, contact_number, address, is_hosteller, is_new_admission, status, student_photo_url, parent_photo_url"
     )
+    .eq("school_id", schoolId)
     .eq("id", id)
     .single();
 
   if (!student) notFound();
 
-  const { classes, sectionsByClass } = await loadClassesAndSections();
+  const { classes, sectionsByClass } = await loadClassesAndSections(schoolId);
 
   // Bind the student id into the update action so the form signature stays
   // (prevState, formData). `.bind` keeps it a real Server Action, which is

@@ -1,0 +1,7 @@
+full_name,phone,role,department,initial_password
+Principal Ji,9999900001,admin,,ChangeMe@123
+Fees Manager,9999900002,manager,,ChangeMe@123
+Academics Teacher,9999900003,staff,academics,ChangeMe@123
+Librarian,9999900004,staff,library,ChangeMe@123
+Results Clerk,9999900005,staff,results,ChangeMe@123
+Fees Clerk,9999900006,staff,fees,ChangeMe@123

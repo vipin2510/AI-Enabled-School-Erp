@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { requireProfile, getCurrentSchoolId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,8 @@ const pad = (n: number) => String(n).padStart(2, "0");
 // → CSV: one row per student, one column per working date of that month, each
 // cell "Present"/"Absent"/"" plus per-student present/absent totals.
 export async function GET(req: Request) {
+  const profile = await requireProfile();
+  const schoolId = await getCurrentSchoolId(profile);
   const url = new URL(req.url);
   const classId = url.searchParams.get("class_id") ?? "";
   const section = url.searchParams.get("section") ?? "";
@@ -39,14 +42,21 @@ export async function GET(req: Request) {
     supabase
       .from("students")
       .select("id, full_name, admission_no")
+      .eq("school_id", schoolId)
       .eq("class_id", classId)
       .eq("section", section)
       .neq("status", "alumni")
       .order("full_name"),
-    supabase.from("classes").select("display_name").eq("id", classId).maybeSingle(),
+    supabase
+      .from("classes")
+      .select("display_name")
+      .eq("school_id", schoolId)
+      .eq("id", classId)
+      .maybeSingle(),
     supabase
       .from("attendance")
       .select("student_id, date, status")
+      .eq("school_id", schoolId)
       .eq("class_id", classId)
       .eq("section", section)
       .gte("date", first)

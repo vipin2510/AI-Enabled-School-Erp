@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayStr, prettyDate } from "@/lib/attendance";
 import { monthYearLabel } from "@/lib/utils";
@@ -31,7 +31,8 @@ export default async function AcademicsDashboard({
 }: {
   searchParams: Promise<{ range?: string }>;
 }) {
-  await requireDepartment("academics");
+  const profile = await requireDepartment("academics");
+  const schoolId = await getCurrentSchoolId(profile);
   const { range: rawRange } = await searchParams;
   const range: Range = rawRange === "week" || rawRange === "month" ? rawRange : "day";
   const win = rangeWindow(range);
@@ -39,14 +40,19 @@ export default async function AcademicsDashboard({
   const supabase = await createClient();
   const today = todayStr();
 
-  const { classes, sectionsByClass } = await loadClassesAndSections();
+  const { classes, sectionsByClass } = await loadClassesAndSections(schoolId);
 
   const [studentsRes, todayRes, rangeRes] = await Promise.all([
-    supabase.from("students").select("id", { count: "exact", head: true }).eq("status", "active"),
-    supabase.from("attendance").select("status").eq("date", today),
+    supabase
+      .from("students")
+      .select("id", { count: "exact", head: true })
+      .eq("school_id", schoolId)
+      .eq("status", "active"),
+    supabase.from("attendance").select("status").eq("school_id", schoolId).eq("date", today),
     supabase
       .from("attendance")
       .select("class_id, status")
+      .eq("school_id", schoolId)
       .gte("date", win.from)
       .lte("date", win.to),
   ]);

@@ -5,6 +5,62 @@
 export type Role = "admin" | "manager" | "staff";
 export type Department = "fees" | "academics" | "library" | "results";
 
+// Each school is a tenant: data never crosses school boundaries. Layer 3
+// (staff) is pinned to exactly one school, Layer 2 (manager) sees a subset,
+// Layer 1 (admin) sees all. The id values match the seeded UUIDs in
+// supabase/migrations/0011_schools.sql.
+export type SchoolId = string;
+export type School = {
+  id: SchoolId;
+  code: string;           // url-safe slug, also used as the cookie value
+  name: string;
+  location: string;
+  board?: string;
+  boardCode?: string;
+  parentNote?: string;
+};
+
+export const SCHOOLS: School[] = [
+  {
+    id: "00000000-0000-0000-0000-000000000001",
+    code: "kondagaon",
+    name: "Adeshwar Public School",
+    location: "Kondagaon, Chhattisgarh",
+    board: "CISCE",
+    boardCode: "CG 024",
+  },
+  {
+    id: "00000000-0000-0000-0000-000000000002",
+    code: "pharasgaon",
+    name: "Adeshwar Public School",
+    location: "Pharasgaon, Chhattisgarh",
+    parentNote: "A Unit of Adeshwar Public School, Kondagaon, C.G.",
+  },
+  {
+    id: "00000000-0000-0000-0000-000000000003",
+    code: "chipawand",
+    name: "Adeshwar Public School",
+    location: "Chipawand, Chhattisgarh",
+    parentNote: "A Unit of Adeshwar Public School, Kondagaon, C.G.",
+  },
+];
+
+export const COOKIE_SCHOOL = "erp_school";
+
+export function findSchool(idOrCode: string | null | undefined): School | null {
+  if (!idOrCode) return null;
+  return SCHOOLS.find((s) => s.id === idOrCode || s.code === idOrCode) ?? null;
+}
+
+// Schools a profile may switch between. Admin always sees all (so onboarding
+// a fourth school doesn't require touching every profile row). Manager/staff
+// see only the explicit ids stored on their profile.
+export function allowedSchools(role: Role, schoolIds: SchoolId[]): School[] {
+  if (role === "admin") return SCHOOLS;
+  const set = new Set(schoolIds);
+  return SCHOOLS.filter((s) => set.has(s.id));
+}
+
 export const ROLE_LABELS: Record<Role, string> = {
   admin: "Admin (Layer 1)",
   manager: "Manager (Layer 2)",

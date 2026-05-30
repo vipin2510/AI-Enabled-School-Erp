@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { inr, formatDate } from "@/lib/utils";
 import { todayStr } from "@/lib/attendance";
@@ -14,7 +14,8 @@ export default async function StudentProfilePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireDepartment("academics");
+  const profile = await requireDepartment("academics");
+  const schoolId = await getCurrentSchoolId(profile);
   const { id } = await params;
   const supabase = await createClient();
 
@@ -23,6 +24,7 @@ export default async function StudentProfilePage({
     .select(
       "id, full_name, admission_no, section, gender, blood_group, date_of_birth, father_name, mother_name, contact_number, alt_contact, address, is_hosteller, is_new_admission, status, student_photo_url, parent_photo_url, classes(display_name)"
     )
+    .eq("school_id", schoolId)
     .eq("id", id)
     .single();
 
@@ -34,12 +36,18 @@ export default async function StudentProfilePage({
     supabase
       .from("invoices")
       .select("id, receipt_no, issued_at, academic_year, total, amount_paid, payment_status, payment_mode")
+      .eq("school_id", schoolId)
       .eq("student_id", id)
       .order("issued_at", { ascending: false }),
-    supabase.from("attendance").select("status").eq("student_id", id),
+    supabase
+      .from("attendance")
+      .select("status")
+      .eq("school_id", schoolId)
+      .eq("student_id", id),
     supabase
       .from("book_loans")
       .select("id, issued_at, due_date, returned_at, books(title, code)")
+      .eq("school_id", schoolId)
       .eq("student_id", id)
       .order("issued_at", { ascending: false }),
   ]);

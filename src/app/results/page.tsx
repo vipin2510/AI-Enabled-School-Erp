@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { currentAcademicYear } from "@/lib/results";
 
@@ -8,12 +8,13 @@ export const dynamic = "force-dynamic";
 type SectionRow = { class_id: string; name: string };
 
 export default async function ResultsPage() {
-  await requireDepartment("results");
+  const profile = await requireDepartment("results");
+  const schoolId = await getCurrentSchoolId(profile);
   const supabase = await createClient();
 
   const [{ data: classes }, { data: sections }] = await Promise.all([
-    supabase.from("classes").select("id, display_name, ordinal").order("ordinal"),
-    supabase.from("sections").select("class_id, name").order("name"),
+    supabase.from("classes").select("id, display_name, ordinal").eq("school_id", schoolId).order("ordinal"),
+    supabase.from("sections").select("class_id, name").eq("school_id", schoolId).order("name"),
   ]);
 
   const byClass = new Map<string, string[]>();

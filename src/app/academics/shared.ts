@@ -1,12 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
 
 // Classes (sorted) plus their sections, shaped for the student form's
-// class → section dependent dropdown.
-export async function loadClassesAndSections() {
+// class → section dependent dropdown. Scoped to a single school — every
+// caller must pass the active school id from `getCurrentSchoolId(profile)`.
+export async function loadClassesAndSections(schoolId: string) {
   const supabase = await createClient();
   const [{ data: classes }, { data: sections }] = await Promise.all([
-    supabase.from("classes").select("id, display_name, ordinal").order("ordinal"),
-    supabase.from("sections").select("class_id, name").order("name"),
+    supabase
+      .from("classes")
+      .select("id, display_name, ordinal")
+      .eq("school_id", schoolId)
+      .order("ordinal"),
+    supabase
+      .from("sections")
+      .select("class_id, name")
+      .eq("school_id", schoolId)
+      .order("name"),
   ]);
 
   const sectionsByClass: Record<string, string[]> = {};

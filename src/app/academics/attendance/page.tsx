@@ -1,4 +1,4 @@
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isSunday, prettyDate, todayStr } from "@/lib/attendance";
 import AttendancePicker from "./picker";
@@ -13,14 +13,23 @@ export default async function AttendancePage({
 }: {
   searchParams: Promise<{ class_id?: string; section?: string; date?: string }>;
 }) {
-  await requireDepartment("academics");
+  const profile = await requireDepartment("academics");
+  const schoolId = await getCurrentSchoolId(profile);
   const { class_id, section, date: rawDate } = await searchParams;
   const date = rawDate || todayStr();
   const supabase = await createClient();
 
   const [{ data: classes }, { data: sections }] = await Promise.all([
-    supabase.from("classes").select("id, display_name, ordinal").order("ordinal"),
-    supabase.from("sections").select("class_id, name").order("name"),
+    supabase
+      .from("classes")
+      .select("id, display_name, ordinal")
+      .eq("school_id", schoolId)
+      .order("ordinal"),
+    supabase
+      .from("sections")
+      .select("class_id, name")
+      .eq("school_id", schoolId)
+      .order("name"),
   ]);
 
   const sectionsByClass: Record<string, string[]> = {};
@@ -38,14 +47,21 @@ export default async function AttendancePage({
       supabase
         .from("students")
         .select("id, full_name, admission_no")
+        .eq("school_id", schoolId)
         .eq("class_id", class_id!)
         .eq("section", section!)
         .neq("status", "alumni")
         .order("full_name"),
-      supabase.from("classes").select("display_name").eq("id", class_id!).single(),
+      supabase
+        .from("classes")
+        .select("display_name")
+        .eq("school_id", schoolId)
+        .eq("id", class_id!)
+        .single(),
       supabase
         .from("attendance")
         .select("student_id, status")
+        .eq("school_id", schoolId)
         .eq("class_id", class_id!)
         .eq("section", section!)
         .eq("date", date),

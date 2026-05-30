@@ -7,7 +7,14 @@ import { NextResponse, type NextRequest } from "next/server";
 // client and calling getUser(), and always return the response carrying the
 // refreshed cookies.
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // Inject the request pathname as a header so server components (the root
+  // layout in particular) can branch on the active route without hardcoding
+  // routing logic. Next 16 doesn't expose pathname to server components by
+  // default — middleware/proxy is the supported channel for it.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
+
+  let response = NextResponse.next({ request: { headers: requestHeaders } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,7 +24,7 @@ export async function proxy(request: NextRequest) {
         getAll: () => request.cookies.getAll(),
         setAll: (cookiesToSet) => {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
+          response = NextResponse.next({ request: { headers: requestHeaders } });
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );

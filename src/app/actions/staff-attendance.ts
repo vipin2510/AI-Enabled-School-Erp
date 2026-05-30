@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireProfile } from "@/lib/auth";
+import { requireProfile, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { marksOwnAttendance } from "@/lib/access";
 import { todayStr } from "@/lib/attendance";
@@ -16,6 +16,7 @@ export async function markStaffAttendance(
 ): Promise<MarkState> {
   const profile = await requireProfile();
   if (!marksOwnAttendance(profile.role)) return { error: "Not allowed." };
+  const schoolId = await getCurrentSchoolId(profile);
 
   const now = new Date().toISOString();
   const supabase = await createClient();
@@ -27,6 +28,7 @@ export async function markStaffAttendance(
       latitude: coords?.latitude ?? null,
       longitude: coords?.longitude ?? null,
       accuracy: coords?.accuracy ?? null,
+      school_id: schoolId,
     },
     { onConflict: "profile_id,date" }
   );

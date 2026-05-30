@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { loadClassesAndSections } from "../../shared";
 import { createStudent } from "../actions";
 import StudentForm from "../student-form";
@@ -7,8 +7,9 @@ import StudentForm from "../student-form";
 export const dynamic = "force-dynamic";
 
 export default async function NewStudentPage() {
-  await requireDepartment("academics");
-  const { classes, sectionsByClass } = await loadClassesAndSections();
+  const profile = await requireDepartment("academics");
+  const schoolId = await getCurrentSchoolId(profile);
+  const { classes, sectionsByClass } = await loadClassesAndSections(schoolId);
 
   return (
     <div className="max-w-3xl">

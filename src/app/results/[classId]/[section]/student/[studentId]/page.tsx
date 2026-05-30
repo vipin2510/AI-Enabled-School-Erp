@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { currentAcademicYear, markKey, type MarksMap } from "@/lib/results";
 import { saveStudentMarks } from "@/app/results/actions";
@@ -13,7 +13,8 @@ export default async function StudentMarksPage({
 }: {
   params: Promise<{ classId: string; section: string; studentId: string }>;
 }) {
-  await requireDepartment("results");
+  const profile = await requireDepartment("results");
+  const schoolId = await getCurrentSchoolId(profile);
   const { classId, section: rawSection, studentId } = await params;
   const section = decodeURIComponent(rawSection);
   const supabase = await createClient();
@@ -25,18 +26,21 @@ export default async function StudentMarksPage({
       supabase
         .from("students")
         .select("id, full_name, admission_no, father_name")
+        .eq("school_id", schoolId)
         .eq("id", studentId)
         .single(),
-      supabase.from("subjects").select("id, name, category").eq("class_id", classId).order("name"),
-      supabase.from("classes").select("display_name").eq("id", classId).single(),
+      supabase.from("subjects").select("id, name, category").eq("school_id", schoolId).eq("class_id", classId).order("name"),
+      supabase.from("classes").select("display_name").eq("school_id", schoolId).eq("id", classId).single(),
       supabase
         .from("marks")
         .select("subject_id, exam, marks_obtained")
+        .eq("school_id", schoolId)
         .eq("student_id", studentId)
         .eq("academic_year", academicYear),
       supabase
         .from("co_curricular_grades")
         .select("subject_id, grade")
+        .eq("school_id", schoolId)
         .eq("student_id", studentId)
         .eq("academic_year", academicYear),
     ]);

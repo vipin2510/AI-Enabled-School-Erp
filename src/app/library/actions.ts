@@ -2,16 +2,16 @@
 
 import * as XLSX from "xlsx";
 import { revalidatePath } from "next/cache";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayStr, addDays } from "@/lib/attendance";
 
 // Library IDs are numeric only (the librarian types them at the desk). When
 // none is supplied we hand out the next number after the largest existing one,
 // padded to 4 digits so the first batch is 1001, 1002, …
-async function nextBookCode(): Promise<string> {
+async function nextBookCode(schoolId: string): Promise<string> {
   const supabase = await createClient();
-  const { data } = await supabase.from("books").select("code");
+  const { data } = await supabase.from("books").select("code").eq("school_id", schoolId);
   let max = 1000;
   for (const row of (data ?? []) as { code: string | null }[]) {
     const n = Number((row.code ?? "").replace(/\D+/g, ""));
@@ -23,45 +23,55 @@ async function nextBookCode(): Promise<string> {
 const onlyDigits = (s: string) => s.replace(/\D+/g, "");
 
 export async function saveLibrarySettings(formData: FormData) {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const max = Math.max(1, Math.round(Number(formData.get("max_books_per_student")) || 3));
   const days = Math.max(1, Math.round(Number(formData.get("loan_days")) || 14));
 
   const supabase = await createClient();
-  const { data: row } = await supabase.from("library_settings").select("id").limit(1).maybeSingle();
+  const { data: row } = await supabase
+    .from("library_settings")
+    .select("id")
+    .eq("school_id", schoolId)
+    .limit(1)
+    .maybeSingle();
   if (row) {
     await supabase
       .from("library_settings")
       .update({ max_books_per_student: max, loan_days: days, updated_at: new Date().toISOString() })
-      .eq("id", row.id);
+      .eq("id", row.id)
+      .eq("school_id", schoolId);
   } else {
-    await supabase.from("library_settings").insert({ max_books_per_student: max, loan_days: days });
+    await supabase.from("library_settings").insert({ max_books_per_student: max, loan_days: days, school_id: schoolId });
   }
   revalidatePath("/library/settings");
 }
 
 export async function addBook(formData: FormData) {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return;
   const supabase = await createClient();
   const typedCode = onlyDigits(String(formData.get("code") ?? ""));
   await supabase.from("books").insert({
-    code: typedCode || (await nextBookCode()),
+    code: typedCode || (await nextBookCode(schoolId)),
     title,
     author: String(formData.get("author") ?? "").trim() || null,
     isbn: String(formData.get("isbn") ?? "").trim() || null,
     category: String(formData.get("category") ?? "").trim() || null,
+    school_id: schoolId,
   });
   revalidatePath("/library/books");
 }
 
 export async function deleteBook(formData: FormData) {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   const supabase = await createClient();
-  await supabase.from("books").delete().eq("id", id);
+  await supabase.from("books").delete().eq("id", id).eq("school_id", schoolId);
   revalidatePath("/library/books");
 }
 
@@ -75,7 +85,8 @@ export async function importBooksCsv(
   _prev: ImportBooksState,
   formData: FormData
 ): Promise<ImportBooksState> {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a CSV file to import." };
 
@@ -100,7 +111,7 @@ export async function importBooksCsv(
   let skipped = 0;
   // Number imported books off the current max, so a single CSV doesn't collide
   // with itself when several rows omit a code.
-  let nextSeq = Number((await nextBookCode())) || 1001;
+  let nextSeq = Number((await nextBookCode(schoolId))) || 1001;
   for (const r of rows) {
     const title = pick(r, "title", "book", "name");
     if (!title) {
@@ -115,6 +126,7 @@ export async function importBooksCsv(
       author: pick(r, "author") || null,
       isbn: pick(r, "isbn") || null,
       category: pick(r, "category", "subject") || null,
+      school_id: schoolId,
     });
   }
 
@@ -133,7 +145,8 @@ export async function importBooksCsv(
 // --- Book requests (acquisition wishlist) -------------------------------
 
 export async function addBookRequest(formData: FormData) {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return;
   const supabase = await createClient();
@@ -142,13 +155,15 @@ export async function addBookRequest(formData: FormData) {
     author: String(formData.get("author") ?? "").trim() || null,
     requested_for: String(formData.get("requested_for") ?? "").trim() || null,
     note: String(formData.get("note") ?? "").trim() || null,
+    school_id: schoolId,
   });
   revalidatePath("/library/dashboard");
 }
 
 // Mark a requested title as acquired (or reopen it).
 export async function setBookRequestStatus(formData: FormData) {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "") === "fulfilled" ? "fulfilled" : "open";
   if (!id) return;
@@ -156,16 +171,18 @@ export async function setBookRequestStatus(formData: FormData) {
   await supabase
     .from("book_requests")
     .update({ status, fulfilled_at: status === "fulfilled" ? new Date().toISOString() : null })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("school_id", schoolId);
   revalidatePath("/library/dashboard");
 }
 
 export async function deleteBookRequest(formData: FormData) {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   const supabase = await createClient();
-  await supabase.from("book_requests").delete().eq("id", id);
+  await supabase.from("book_requests").delete().eq("id", id).eq("school_id", schoolId);
   revalidatePath("/library/dashboard");
 }
 
@@ -174,7 +191,8 @@ export type DeskResult = { ok?: boolean; message?: string; error?: string };
 // Issue a book copy to a student: validate the code, ensure it isn't already
 // out, and enforce the per-student cap. Due date = today + loan_days.
 export async function issueBook(code: string, studentId: string): Promise<DeskResult> {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const normalised = onlyDigits(code);
   if (!normalised || !studentId) return { error: "Pick a book and a student." };
   const supabase = await createClient();
@@ -182,6 +200,7 @@ export async function issueBook(code: string, studentId: string): Promise<DeskRe
   const { data: book } = await supabase
     .from("books")
     .select("id, title, status")
+    .eq("school_id", schoolId)
     .eq("code", normalised)
     .maybeSingle();
   if (!book) return { error: "No book found for that number." };
@@ -190,6 +209,7 @@ export async function issueBook(code: string, studentId: string): Promise<DeskRe
   const { data: openLoan } = await supabase
     .from("book_loans")
     .select("id")
+    .eq("school_id", schoolId)
     .eq("book_id", book.id)
     .is("returned_at", null)
     .maybeSingle();
@@ -198,6 +218,7 @@ export async function issueBook(code: string, studentId: string): Promise<DeskRe
   const { data: settings } = await supabase
     .from("library_settings")
     .select("max_books_per_student, loan_days")
+    .eq("school_id", schoolId)
     .limit(1)
     .maybeSingle();
   const max = settings?.max_books_per_student ?? 3;
@@ -206,6 +227,7 @@ export async function issueBook(code: string, studentId: string): Promise<DeskRe
   const { count } = await supabase
     .from("book_loans")
     .select("id", { count: "exact", head: true })
+    .eq("school_id", schoolId)
     .eq("student_id", studentId)
     .is("returned_at", null);
   if ((count ?? 0) >= max) {
@@ -217,16 +239,18 @@ export async function issueBook(code: string, studentId: string): Promise<DeskRe
     book_id: book.id,
     student_id: studentId,
     due_date: due,
+    school_id: schoolId,
   });
   if (error) return { error: error.message };
 
   // Pull the student's name + their new lifetime total so the desk can echo
   // "Issued to <name> · 7 borrowed all-time" instead of a context-free toast.
   const [{ data: student }, { count: lifetime }] = await Promise.all([
-    supabase.from("students").select("full_name").eq("id", studentId).maybeSingle(),
+    supabase.from("students").select("full_name").eq("school_id", schoolId).eq("id", studentId).maybeSingle(),
     supabase
       .from("book_loans")
       .select("id", { count: "exact", head: true })
+      .eq("school_id", schoolId)
       .eq("student_id", studentId),
   ]);
 
@@ -241,7 +265,8 @@ export async function issueBook(code: string, studentId: string): Promise<DeskRe
 }
 
 export async function returnBook(code: string): Promise<DeskResult> {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const normalised = onlyDigits(code);
   if (!normalised) return { error: "Scan or enter a book number." };
   const supabase = await createClient();
@@ -249,6 +274,7 @@ export async function returnBook(code: string): Promise<DeskResult> {
   const { data: book } = await supabase
     .from("books")
     .select("id, title")
+    .eq("school_id", schoolId)
     .eq("code", normalised)
     .maybeSingle();
   if (!book) return { error: "No book found for that number." };
@@ -256,6 +282,7 @@ export async function returnBook(code: string): Promise<DeskResult> {
   const { data: loan } = await supabase
     .from("book_loans")
     .select("id, student_id, students(full_name)")
+    .eq("school_id", schoolId)
     .eq("book_id", book.id)
     .is("returned_at", null)
     .maybeSingle();
@@ -264,7 +291,8 @@ export async function returnBook(code: string): Promise<DeskResult> {
   const { error } = await supabase
     .from("book_loans")
     .update({ returned_at: new Date().toISOString() })
-    .eq("id", loan.id);
+    .eq("id", loan.id)
+    .eq("school_id", schoolId);
   if (error) return { error: error.message };
 
   const studentId = (loan as { student_id: string | null }).student_id;
@@ -276,6 +304,7 @@ export async function returnBook(code: string): Promise<DeskResult> {
     const { count } = await supabase
       .from("book_loans")
       .select("id", { count: "exact", head: true })
+      .eq("school_id", schoolId)
       .eq("student_id", studentId);
     lifetime = count ?? 0;
   }

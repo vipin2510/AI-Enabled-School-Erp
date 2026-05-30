@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import QRCode from "qrcode";
 import { createClient } from "@/lib/supabase/server";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { BookLabelSheet, type BookLabel } from "@/components/book-label-pdf";
 
 export const dynamic = "force-dynamic";
@@ -12,13 +12,14 @@ export const runtime = "nodejs";
 // QR labels (with the code printed below) for printing & sticking on books.
 // Without `ids`, all active books are included.
 export async function GET(req: Request) {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const url = new URL(req.url);
   const perPage = Math.max(1, Math.min(40, Math.round(Number(url.searchParams.get("perPage")) || 12)));
   const idsParam = url.searchParams.get("ids");
 
   const supabase = await createClient();
-  let q = supabase.from("books").select("code, title").eq("status", "active").order("created_at", { ascending: false });
+  let q = supabase.from("books").select("code, title").eq("school_id", schoolId).eq("status", "active").order("created_at", { ascending: false });
   if (idsParam) q = q.in("id", idsParam.split(",").filter(Boolean));
   const { data: books } = await q;
 

@@ -13,7 +13,7 @@ type Settings = {
   monthly_due_day: number;
 };
 
-export default function LateFeeForm({ settings }: { settings: Settings }) {
+export default function LateFeeForm({ settings, schoolId }: { settings: Settings; schoolId: string }) {
   const [amount, setAmount] = useState(String(settings.per_day_amount));
   const [grace, setGrace] = useState(String(settings.grace_days));
   const [dueDay, setDueDay] = useState(String(settings.monthly_due_day));
@@ -36,8 +36,8 @@ export default function LateFeeForm({ settings }: { settings: Settings }) {
     };
     const run = (body: typeof payload | Omit<typeof payload, "monthly_due_day">) =>
       settings.id
-        ? supabase.from("late_fee_settings").update(body).eq("id", settings.id)
-        : supabase.from("late_fee_settings").insert(body);
+        ? supabase.from("late_fee_settings").update(body).eq("id", settings.id).eq("school_id", schoolId)
+        : supabase.from("late_fee_settings").insert({ ...body, school_id: schoolId });
 
     const first = await run(payload);
     if (first.error && /monthly_due_day/.test(first.error.message)) {

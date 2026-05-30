@@ -2,21 +2,28 @@
  * Creates (or promotes) a Layer-1 admin login. Run once to bootstrap, since
  * only an admin can create other logins from inside the app.
  *
- *   npx tsx scripts/create-admin.ts <email> <password> ["Full Name"]
+ *   npx tsx scripts/create-admin.ts <identifier> <password> ["Full Name"]
+ *
+ * Where <identifier> is either:
+ *   - an email   (e.g. principal@example.com), or
+ *   - a 10-digit phone number (e.g. 9876543210).
+ *
+ * Admin profiles get school_ids = all three franchise schools.
  *
  * Requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local.
  */
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 
-// Load .env.local first (Next's convention), then fall back to .env.
 config({ path: ".env.local" });
 config();
 
-const [, , email, password, fullName] = process.argv;
+const [, , identifier, password, fullName] = process.argv;
 
-if (!email || !password) {
-  console.error('Usage: npx tsx scripts/create-admin.ts <email> <password> ["Full Name"]');
+if (!identifier || !password) {
+  console.error(
+    'Usage: npx tsx scripts/create-admin.ts <email-or-10-digit-phone> <password> ["Full Name"]'
+  );
   process.exit(1);
 }
 
@@ -34,27 +41,68 @@ const supabase = createClient(url, serviceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
+// Match the SCHOOLS constant in src/lib/access.ts.
+const ALL_SCHOOLS = [
+  "00000000-0000-0000-0000-000000000001",
+  "00000000-0000-0000-0000-000000000002",
+  "00000000-0000-0000-0000-000000000003",
+];
+
+function classify(raw: string): { email?: string; phone?: string } {
+  if (raw.includes("@")) return { email: raw };
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 10) return { phone: digits };
+  if (digits.length === 12 && digits.startsWith("91")) return { phone: digits.slice(2) };
+  throw new Error("Identifier must be an email or a 10-digit phone number.");
+}
+
 async function main() {
-  // Create the auth user with admin role baked into metadata so the
-  // handle_new_user trigger writes the right profile.
-  const { data, error } = await supabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: fullName ?? "Administrator", role: "admin" },
-  });
+  const id = classify(identifier);
+
+  const createPayload = id.email
+    ? {
+        email: id.email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: fullName ?? "Administrator",
+          role: "admin",
+          school_ids: ALL_SCHOOLS,
+        },
+      }
+    : {
+        phone: id.phone!,
+        password,
+        phone_confirm: true,
+        user_metadata: {
+          full_name: fullName ?? "Administrator",
+          role: "admin",
+          phone: id.phone!,
+          school_ids: ALL_SCHOOLS,
+        },
+      };
+
+  const { data, error } = await supabase.auth.admin.createUser(createPayload);
 
   if (error) {
-    // Already exists? Promote the existing profile to admin instead.
     if (error.message.toLowerCase().includes("already")) {
+      // Already exists — promote the matching profile to admin with all schools.
       const { data: list } = await supabase.auth.admin.listUsers();
-      const existing = list.users.find((u) => u.email === email);
+      const existing = list.users.find((u) =>
+        id.email ? u.email === id.email : u.phone === id.phone
+      );
       if (existing) {
         await supabase
           .from("profiles")
-          .update({ role: "admin", is_active: true, department: null })
+          .update({
+            role: "admin",
+            is_active: true,
+            department: null,
+            school_ids: ALL_SCHOOLS,
+            ...(id.phone ? { phone: id.phone } : {}),
+          })
           .eq("id", existing.id);
-        console.log(`Existing user ${email} promoted to admin.`);
+        console.log(`Existing user ${identifier} promoted to admin (all schools).`);
         return;
       }
     }
@@ -62,24 +110,25 @@ async function main() {
     process.exit(1);
   }
 
-  // Ensure the profile is admin (in case the trigger isn't installed yet).
   if (data.user) {
     await supabase
       .from("profiles")
       .upsert(
         {
           id: data.user.id,
-          email,
+          email: id.email ?? null,
+          phone: id.phone ?? null,
           full_name: fullName ?? "Administrator",
           role: "admin",
           department: null,
+          school_ids: ALL_SCHOOLS,
           is_active: true,
         },
         { onConflict: "id" }
       );
   }
 
-  console.log(`Admin created: ${email}`);
+  console.log(`Admin created: ${identifier}`);
 }
 
 main().catch((e) => {

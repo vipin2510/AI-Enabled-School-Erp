@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireProfile, getCurrentSchoolId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,8 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const profile = await requireProfile();
+  const schoolId = await getCurrentSchoolId(profile);
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
 
@@ -25,6 +28,7 @@ export async function PATCH(
   const { data: current, error: readErr } = await supabase
     .from("invoices")
     .select("payment_status")
+    .eq("school_id", schoolId)
     .eq("id", id)
     .single();
 
@@ -46,6 +50,7 @@ export async function PATCH(
   const { error } = await supabase
     .from("invoices")
     .update({ payment_status: "paid" })
+    .eq("school_id", schoolId)
     .eq("id", id);
 
   if (error) {

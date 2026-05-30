@@ -3,7 +3,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { createClient } from "@/lib/supabase/server";
-import { requireRole } from "@/lib/auth";
+import { requireRole, getCurrentSchoolId } from "@/lib/auth";
 import { currentAcademicYear } from "@/lib/results";
 import { IdCardSheet, CM, type IdCardStudent } from "@/components/id-card-pdf";
 
@@ -41,7 +41,8 @@ function toCard(r: Row): IdCardStudent {
 // GET /api/id-cards?studentId=...                          → single card
 // GET /api/id-cards?classId=...&section=&perPage=6&w=6&h=9 → whole class sheet
 export async function GET(req: Request) {
-  await requireRole("admin", "manager");
+  const profile = await requireRole("admin", "manager");
+  const schoolId = await getCurrentSchoolId(profile);
   const url = new URL(req.url);
   const studentId = url.searchParams.get("studentId");
   const classId = url.searchParams.get("classId");
@@ -57,7 +58,12 @@ export async function GET(req: Request) {
   let filename = "id-cards.pdf";
 
   if (studentId) {
-    const { data } = await supabase.from("students").select(STUDENT_SELECT).eq("id", studentId).single();
+    const { data } = await supabase
+      .from("students")
+      .select(STUDENT_SELECT)
+      .eq("school_id", schoolId)
+      .eq("id", studentId)
+      .single();
     if (!data) return NextResponse.json({ error: "Student not found" }, { status: 404 });
     rows = [data as unknown as Row];
     filename = `id-card-${(data as unknown as Row).full_name.replace(/[^a-z0-9]+/gi, "-")}.pdf`;
@@ -65,6 +71,7 @@ export async function GET(req: Request) {
     let q = supabase
       .from("students")
       .select(STUDENT_SELECT)
+      .eq("school_id", schoolId)
       .eq("class_id", classId)
       .neq("status", "alumni")
       .order("full_name");

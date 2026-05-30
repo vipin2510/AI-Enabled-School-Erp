@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireProfile, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -8,12 +9,15 @@ export default async function StudentsList({
 }: {
   searchParams: Promise<{ q?: string; class?: string }>;
 }) {
+  const profile = await requireProfile();
+  const schoolId = await getCurrentSchoolId(profile);
   const { q, class: classFilter } = await searchParams;
   const supabase = await createClient();
 
   let query = supabase
     .from("students")
     .select("id, full_name, section, father_name, contact_number, classes(code, display_name, ordinal)")
+    .eq("school_id", schoolId)
     .order("full_name", { ascending: true })
     .limit(500);
 
@@ -24,6 +28,7 @@ export default async function StudentsList({
   const { data: classes } = await supabase
     .from("classes")
     .select("id, display_name, ordinal")
+    .eq("school_id", schoolId)
     .order("ordinal");
 
   return (

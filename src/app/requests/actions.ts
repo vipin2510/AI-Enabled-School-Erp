@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireProfile, requireRole } from "@/lib/auth";
+import { requireProfile, requireRole, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export type RequestState = { error?: string; success?: string } | undefined;
@@ -12,6 +12,7 @@ export async function submitRequest(
   formData: FormData
 ): Promise<RequestState> {
   const profile = await requireProfile();
+  const schoolId = await getCurrentSchoolId(profile);
 
   const subject = String(formData.get("subject") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
@@ -23,6 +24,7 @@ export async function submitRequest(
     requester_email: profile.email,
     subject,
     body,
+    school_id: schoolId,
   });
   if (error) return { error: error.message };
 
@@ -32,7 +34,8 @@ export async function submitRequest(
 
 // Admin resolves a request.
 export async function resolveRequest(formData: FormData) {
-  await requireRole("admin");
+  const profile = await requireRole("admin");
+  const schoolId = await getCurrentSchoolId(profile);
   const id = String(formData.get("id") ?? "");
   const note = String(formData.get("admin_note") ?? "").trim() || null;
   if (!id) return;
@@ -41,6 +44,7 @@ export async function resolveRequest(formData: FormData) {
   await supabase
     .from("change_requests")
     .update({ status: "resolved", admin_note: note, resolved_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("school_id", schoolId);
   revalidatePath("/requests");
 }

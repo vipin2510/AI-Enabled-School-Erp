@@ -3,7 +3,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { createClient } from "@/lib/supabase/server";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { currentAcademicYear, computeResult, examsForTerm } from "@/lib/results";
 import { loadClassSection, loadMarksByStudent, loadGradesByStudent } from "@/app/results/shared";
 import { ResultCardPdf } from "@/components/result-card-pdf";
@@ -16,7 +16,8 @@ export const runtime = "nodejs";
 // Renders one report-card PDF per student in the class-section and bundles them
 // into a ZIP for download.
 export async function GET(req: Request) {
-  await requireDepartment("results");
+  const profile = await requireDepartment("results");
+  const schoolId = await getCurrentSchoolId(profile);
   const url = new URL(req.url);
   const classId = url.searchParams.get("classId") ?? "";
   const section = url.searchParams.get("section") ?? "";
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
   const exams = examsForTerm(term);
   const termLabel = term === "1" ? "Term 1" : undefined;
 
-  const { klass, subjects, coCurricular, students } = await loadClassSection(classId, section);
+  const { klass, subjects, coCurricular, students } = await loadClassSection(classId, section, schoolId);
   if (!klass) return NextResponse.json({ error: "Class not found" }, { status: 404 });
   if (students.length === 0) {
     return NextResponse.json({ error: "No students in this section" }, { status: 404 });
@@ -38,6 +39,7 @@ export async function GET(req: Request) {
   const { data: extra } = await supabase
     .from("students")
     .select("id, mother_name")
+    .eq("school_id", schoolId)
     .in("id", students.map((s) => s.id));
   const motherById = new Map(
     (extra ?? []).map((r: { id: string; mother_name: string | null }) => [r.id, r.mother_name])
@@ -45,8 +47,8 @@ export async function GET(req: Request) {
 
   const academicYear = currentAcademicYear();
   const studentIds = students.map((s) => s.id);
-  const marksByStudent = await loadMarksByStudent(studentIds, academicYear);
-  const gradesByStudent = await loadGradesByStudent(studentIds, academicYear);
+  const marksByStudent = await loadMarksByStudent(studentIds, academicYear, schoolId);
+  const gradesByStudent = await loadGradesByStudent(studentIds, academicYear, schoolId);
 
   const logoPath = path.join(process.cwd(), "public", "letterhead", "aps-logo.jpeg");
   const logoDataUrl = `data:image/jpeg;base64,${(await fs.readFile(logoPath)).toString("base64")}`;

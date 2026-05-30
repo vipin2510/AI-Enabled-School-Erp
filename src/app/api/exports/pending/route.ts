@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { requireProfile, getCurrentSchoolId } from "@/lib/auth";
 import { monthName } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,8 @@ function csvCell(value: string | number | null | undefined) {
 // GET /api/exports/pending?month=5  → CSV of class-wise students who have NOT
 // paid that month's monthly fee, with name + mobile number.
 export async function GET(req: Request) {
+  const profile = await requireProfile();
+  const schoolId = await getCurrentSchoolId(profile);
   const url = new URL(req.url);
   const month = Number(url.searchParams.get("month"));
 
@@ -27,15 +30,18 @@ export async function GET(req: Request) {
     supabase
       .from("students")
       .select("id, full_name, contact_number, class_id, classes(display_name, ordinal)")
+      .eq("school_id", schoolId)
       .eq("status", "active"),
     supabase
       .from("fee_structures")
       .select("class_id, fee_structure_components(kind, amount)")
+      .eq("school_id", schoolId)
       .eq("academic_year", AY)
       .eq("scope", "school"),
     supabase
       .from("invoice_items")
       .select("invoices!inner(student_id, academic_year, payment_status)")
+      .eq("school_id", schoolId)
       .eq("kind", "monthly")
       .eq("period_index", month)
       .eq("invoices.academic_year", AY)

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { inr, formatDate, monthName, ACADEMIC_MONTHS } from "@/lib/utils";
 import { StatusBadge } from "./[id]/receipt-status";
 
@@ -37,6 +38,8 @@ export default async function ReceiptsPage({
 }: {
   searchParams: Promise<{ q?: string; month?: string }>;
 }) {
+  const profile = await requireDepartment("fees");
+  const schoolId = await getCurrentSchoolId(profile);
   const { q, month } = await searchParams;
   const monthNum = month ? Number(month) : 0;
   const isMonthView = monthNum >= 1 && monthNum <= 12;
@@ -54,6 +57,7 @@ export default async function ReceiptsPage({
       .select(
         "amount, invoices!inner(id, receipt_no, issued_at, payment_status, payment_mode, students(full_name, classes(display_name)))"
       )
+      .eq("school_id", schoolId)
       .eq("kind", "monthly")
       .eq("period_index", monthNum)
       .neq("invoices.payment_status", "void")
@@ -96,12 +100,14 @@ export default async function ReceiptsPage({
       supabase
         .from("invoices")
         .select(SELECT)
+        .eq("school_id", schoolId)
         .ilike("receipt_no", `%${term}%`)
         .order("issued_at", { ascending: false })
         .limit(100),
       supabase
         .from("invoices")
         .select(SELECT.replace("students(", "students!inner("))
+        .eq("school_id", schoolId)
         .ilike("students.full_name", `%${term}%`)
         .order("issued_at", { ascending: false })
         .limit(100),
@@ -121,6 +127,7 @@ export default async function ReceiptsPage({
     const { data } = await supabase
       .from("invoices")
       .select(SELECT)
+      .eq("school_id", schoolId)
       .order("issued_at", { ascending: false })
       .limit(100);
     rows = (data ?? []) as unknown as Row[];

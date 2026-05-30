@@ -3,7 +3,7 @@
 import * as XLSX from "xlsx";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
   EXAMS,
@@ -24,6 +24,7 @@ type MarkRow = {
   marks_obtained: number | null;
   max_marks: number;
   updated_at: string;
+  school_id: string;
 };
 
 // Parse one "m_<subjectId>_<exam>" field into its parts. Subject ids are UUIDs
@@ -56,7 +57,8 @@ export async function saveStudentMarks(
   _prev: SaveState,
   formData: FormData
 ): Promise<SaveState> {
-  await requireDepartment("results");
+  const profile = await requireDepartment("results");
+  const schoolId = await getCurrentSchoolId(profile);
   const academicYear = currentAcademicYear();
   const now = new Date().toISOString();
   const rows: MarkRow[] = [];
@@ -66,6 +68,7 @@ export async function saveStudentMarks(
     academic_year: string;
     grade: string | null;
     updated_at: string;
+    school_id: string;
   }[] = [];
 
   for (const [name, raw] of formData.entries()) {
@@ -83,6 +86,7 @@ export async function saveStudentMarks(
         marks_obtained: value,
         max_marks: exam.max,
         updated_at: now,
+        school_id: schoolId,
       });
       continue;
     }
@@ -97,6 +101,7 @@ export async function saveStudentMarks(
         academic_year: academicYear,
         grade: g === "" ? null : g,
         updated_at: now,
+        school_id: schoolId,
       });
     }
   }
@@ -126,7 +131,8 @@ export type ImportState =
 // Import a filled subject CSV/XLSX: rows keyed by the "Student ID" column,
 // columns per exam. Anything unparseable for a row is skipped, not fatal.
 export async function importMarksCsv(_prev: ImportState, formData: FormData): Promise<ImportState> {
-  await requireDepartment("results");
+  const profile = await requireDepartment("results");
+  const schoolId = await getCurrentSchoolId(profile);
   const subjectId = String(formData.get("subjectId") ?? "");
   const classId = String(formData.get("classId") ?? "");
   const section = String(formData.get("section") ?? "");
@@ -139,6 +145,7 @@ export async function importMarksCsv(_prev: ImportState, formData: FormData): Pr
   const { data: subject } = await supabase
     .from("subjects")
     .select("name")
+    .eq("school_id", schoolId)
     .eq("id", subjectId)
     .single();
 
@@ -176,6 +183,7 @@ export async function importMarksCsv(_prev: ImportState, formData: FormData): Pr
         marks_obtained: value,
         max_marks: exam.max,
         updated_at: now,
+        school_id: schoolId,
       });
     }
   }

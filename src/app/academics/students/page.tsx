@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { deleteStudent } from "./actions";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -11,13 +11,15 @@ export default async function StudentsAdminPage({
 }: {
   searchParams: Promise<{ q?: string; class?: string }>;
 }) {
-  await requireDepartment("academics");
+  const profile = await requireDepartment("academics");
+  const schoolId = await getCurrentSchoolId(profile);
   const { q, class: classFilter } = await searchParams;
   const supabase = await createClient();
 
   let query = supabase
     .from("students")
     .select("id, full_name, section, father_name, contact_number, status, classes(display_name, ordinal)")
+    .eq("school_id", schoolId)
     .order("full_name", { ascending: true })
     .limit(1000);
   if (q) query = query.or(`full_name.ilike.%${q}%,admission_no.ilike.%${q}%`);
@@ -27,6 +29,7 @@ export default async function StudentsAdminPage({
   const { data: classes } = await supabase
     .from("classes")
     .select("id, display_name, ordinal")
+    .eq("school_id", schoolId)
     .order("ordinal");
 
   return (

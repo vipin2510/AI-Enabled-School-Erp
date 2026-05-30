@@ -1,4 +1,4 @@
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { addSubject, removeSubject } from "../actions";
 
@@ -7,12 +7,21 @@ export const dynamic = "force-dynamic";
 type SubjectRow = { id: string; class_id: string; name: string; category: string };
 
 export default async function SubjectsPage() {
-  await requireDepartment("academics");
+  const profile = await requireDepartment("academics");
+  const schoolId = await getCurrentSchoolId(profile);
   const supabase = await createClient();
 
   const [{ data: classes }, { data: subjects }] = await Promise.all([
-    supabase.from("classes").select("id, display_name, ordinal").order("ordinal"),
-    supabase.from("subjects").select("id, class_id, name, category").order("name"),
+    supabase
+      .from("classes")
+      .select("id, display_name, ordinal")
+      .eq("school_id", schoolId)
+      .order("ordinal"),
+    supabase
+      .from("subjects")
+      .select("id, class_id, name, category")
+      .eq("school_id", schoolId)
+      .order("name"),
   ]);
 
   const byClass = new Map<string, SubjectRow[]>();

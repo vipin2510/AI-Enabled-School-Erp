@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { setDepartment, logout } from "@/app/actions/auth";
+import { setDepartment, setSchool, logout } from "@/app/actions/auth";
 import { markStaffAttendance } from "@/app/actions/staff-attendance";
 import { formatTime } from "@/lib/utils";
 import {
@@ -9,6 +9,7 @@ import {
   ROLE_LABELS,
   type Department,
   type Role,
+  type School,
 } from "@/lib/access";
 
 type Props = {
@@ -17,6 +18,8 @@ type Props = {
   role: Role;
   department: Department;
   allowed: Department[];
+  school: School;
+  allowedSchools: School[];
   canMarkAttendance: boolean;
   markedAt: string | null;
 };
@@ -27,38 +30,73 @@ export default function Topbar({
   role,
   department,
   allowed,
+  school,
+  allowedSchools,
   canMarkAttendance,
   markedAt,
 }: Props) {
-  const formRef = useRef<HTMLFormElement>(null);
-  const canSwitch = role !== "staff" && allowed.length > 1;
+  const deptFormRef = useRef<HTMLFormElement>(null);
+  const schoolFormRef = useRef<HTMLFormElement>(null);
+  const canSwitchDept = role !== "staff" && allowed.length > 1;
+  const canSwitchSchool = role !== "staff" && allowedSchools.length > 1;
 
   return (
     <header className="flex items-center justify-between gap-4 border-b border-[color:var(--border)] bg-[color:var(--card)] px-6 py-3">
-      <div className="flex items-center gap-3">
-        <span className="text-xs uppercase tracking-wide text-stone-400">Department</span>
-        {canSwitch ? (
-          // Switching submits the server action, which sets the cookie; the
-          // action's revalidation re-renders the shell + page for the new dept.
-          <form ref={formRef} action={setDepartment}>
-            <select
-              name="department"
-              defaultValue={department}
-              onChange={() => formRef.current?.requestSubmit()}
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium"
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3">
+          <span className="text-xs uppercase tracking-wide text-stone-400">School</span>
+          {canSwitchSchool ? (
+            <form ref={schoolFormRef} action={setSchool}>
+              <input type="hidden" name="next" value="/" />
+              <select
+                name="school_id"
+                defaultValue={school.id}
+                onChange={() => schoolFormRef.current?.requestSubmit()}
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium"
+                title={school.location}
+              >
+                {allowedSchools.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.location.split(",")[0]}
+                  </option>
+                ))}
+              </select>
+            </form>
+          ) : (
+            <span
+              className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-medium"
+              title={school.location}
             >
-              {allowed.map((d) => (
-                <option key={d} value={d}>
-                  {DEPARTMENT_LABELS[d]}
-                </option>
-              ))}
-            </select>
-          </form>
-        ) : (
-          <span className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-medium">
-            {DEPARTMENT_LABELS[department]}
-          </span>
-        )}
+              {school.location.split(",")[0]}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="text-xs uppercase tracking-wide text-stone-400">Department</span>
+          {canSwitchDept ? (
+            // Switching submits the server action, which sets the cookie; the
+            // action's revalidation re-renders the shell + page for the new dept.
+            <form ref={deptFormRef} action={setDepartment}>
+              <select
+                name="department"
+                defaultValue={department}
+                onChange={() => deptFormRef.current?.requestSubmit()}
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium"
+              >
+                {allowed.map((d) => (
+                  <option key={d} value={d}>
+                    {DEPARTMENT_LABELS[d]}
+                  </option>
+                ))}
+              </select>
+            </form>
+          ) : (
+            <span className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-medium">
+              {DEPARTMENT_LABELS[department]}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-4">

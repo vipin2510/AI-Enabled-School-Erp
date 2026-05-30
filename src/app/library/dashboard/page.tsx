@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { todayStr } from "@/lib/attendance";
@@ -31,25 +31,29 @@ const field =
   "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:border-stone-900 focus:ring-1 focus:ring-stone-900";
 
 export default async function LibraryDashboard() {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const supabase = await createClient();
 
   const [booksRes, issuedRes, overdueRes, reqRes, activityRes] = await Promise.all([
-    supabase.from("books").select("id", { count: "exact", head: true }),
-    supabase.from("book_loans").select("id", { count: "exact", head: true }).is("returned_at", null),
+    supabase.from("books").select("id", { count: "exact", head: true }).eq("school_id", schoolId),
+    supabase.from("book_loans").select("id", { count: "exact", head: true }).eq("school_id", schoolId).is("returned_at", null),
     supabase
       .from("book_loans")
       .select("id", { count: "exact", head: true })
+      .eq("school_id", schoolId)
       .is("returned_at", null)
       .lt("due_date", todayStr()),
     supabase
       .from("book_requests")
       .select("id, title, author, requested_for, note, status, created_at")
+      .eq("school_id", schoolId)
       .order("status", { ascending: true })
       .order("created_at", { ascending: false }),
     supabase
       .from("book_loans")
       .select("id, issued_at, returned_at, student_id, books(title, code), students(full_name, classes(display_name))")
+      .eq("school_id", schoolId)
       .order("issued_at", { ascending: false })
       .limit(20),
   ]);

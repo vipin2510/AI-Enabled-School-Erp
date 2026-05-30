@@ -3,13 +3,16 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Sidebar, { type NavGroup } from "@/components/sidebar";
 import Topbar from "@/components/topbar";
-import { getProfile, getCurrentDepartment } from "@/lib/auth";
+import { getProfile, getCurrentDepartment, getCurrentSchool } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayStr } from "@/lib/attendance";
+import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import {
   DEPARTMENT_NAV,
   DEPARTMENT_LABELS,
   allowedDepartments,
+  allowedSchools,
   marksOwnAttendance,
 } from "@/lib/access";
 
@@ -52,6 +55,20 @@ async function AppShell({
   const allowed = allowedDepartments(profile.role, profile.department);
   const isLeader = profile.role === "admin" || profile.role === "manager";
 
+  // Resolve the active school. Leaders without one picked yet get bounced to
+  // /select-school. Staff always have one (pinned by their profile).
+  const school = await getCurrentSchool(profile);
+  const schools = allowedSchools(profile.role, profile.school_ids);
+  if (!school) {
+    const headerStore = await headers();
+    const pathname = headerStore.get("x-pathname") ?? "";
+    if (!pathname.startsWith("/select-school")) {
+      redirect("/select-school");
+    }
+    // No school + on /select-school: render the page bare without the shell.
+    return <>{children}</>;
+  }
+
   // Build the sidebar: an Overview (leaders), the active department's nav, the
   // admin-only Administration block, and Change Requests — which every login
   // can reach. Academics is one of the switchable departments now.
@@ -83,6 +100,7 @@ async function AppShell({
     const { data } = await supabase
       .from("staff_attendance")
       .select("marked_at")
+      .eq("school_id", school.id)
       .eq("profile_id", profile.id)
       .eq("date", todayStr())
       .maybeSingle();
@@ -95,10 +113,12 @@ async function AppShell({
       <div className="flex flex-1 flex-col">
         <Topbar
           fullName={profile.full_name ?? ""}
-          email={profile.email ?? ""}
+          email={profile.email ?? profile.phone ?? ""}
           role={profile.role}
           department={department}
           allowed={allowed}
+          school={school}
+          allowedSchools={schools}
           canMarkAttendance={marksOwnAttendance(profile.role)}
           markedAt={markedAt}
         />

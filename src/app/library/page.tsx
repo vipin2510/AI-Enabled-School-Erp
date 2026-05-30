@@ -1,4 +1,4 @@
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import { todayStr } from "@/lib/attendance";
@@ -15,12 +15,14 @@ type OpenLoan = {
 };
 
 export default async function LibraryPage() {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const supabase = await createClient();
 
   const { data: loans } = await supabase
     .from("book_loans")
     .select("id, issued_at, due_date, books(code, title), students(full_name, section, classes(display_name))")
+    .eq("school_id", schoolId)
     .is("returned_at", null)
     .order("issued_at", { ascending: false })
     .limit(100);

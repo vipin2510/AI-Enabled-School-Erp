@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { EXAMS, examColumnHeader, currentAcademicYear, markKey } from "@/lib/results";
 import { loadClassSection, loadMarksByStudent } from "@/app/results/shared";
 
@@ -16,7 +16,8 @@ function csvCell(value: string | number): string {
 // A per-subject marks sheet: one row per student, prefilled with any marks
 // already entered. Teachers fill the exam columns and re-import it.
 export async function GET(req: Request) {
-  await requireDepartment("results");
+  const profile = await requireDepartment("results");
+  const schoolId = await getCurrentSchoolId(profile);
   const url = new URL(req.url);
   const classId = url.searchParams.get("classId") ?? "";
   const section = url.searchParams.get("section") ?? "";
@@ -29,15 +30,17 @@ export async function GET(req: Request) {
   const { data: subject } = await supabase
     .from("subjects")
     .select("name")
+    .eq("school_id", schoolId)
     .eq("id", subjectId)
     .single();
   if (!subject) return NextResponse.json({ error: "Subject not found" }, { status: 404 });
 
-  const { klass, students } = await loadClassSection(classId, section);
+  const { klass, students } = await loadClassSection(classId, section, schoolId);
   const academicYear = currentAcademicYear();
   const marksByStudent = await loadMarksByStudent(
     students.map((s) => s.id),
-    academicYear
+    academicYear,
+    schoolId
   );
 
   const headers = ["Student ID", "Admission No", "Student Name", ...EXAMS.map(examColumnHeader)];

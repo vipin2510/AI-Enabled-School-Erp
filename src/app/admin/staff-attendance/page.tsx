@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireRole } from "@/lib/auth";
+import { requireRole, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ROLE_LABELS, type Role } from "@/lib/access";
 import { todayStr, prettyDate } from "@/lib/attendance";
@@ -41,7 +41,8 @@ export default async function StaffAttendancePage({
 }: {
   searchParams: Promise<{ range?: string }>;
 }) {
-  await requireRole("admin");
+  const profile = await requireRole("admin");
+  const schoolId = await getCurrentSchoolId(profile);
   const { range: rawRange } = await searchParams;
   const range: Range = rawRange === "week" || rawRange === "month" ? rawRange : "day";
   const win = rangeWindow(range);
@@ -58,6 +59,7 @@ export default async function StaffAttendancePage({
     supabase
       .from("staff_attendance")
       .select("profile_id, date, marked_at, latitude, longitude")
+      .eq("school_id", schoolId)
       .gte("date", win.from)
       .lte("date", win.to),
   ]);

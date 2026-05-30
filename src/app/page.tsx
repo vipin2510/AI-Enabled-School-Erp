@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfile } from "@/lib/auth";
+import { requireProfile, getCurrentSchoolId } from "@/lib/auth";
 import { DEPARTMENT_NAV } from "@/lib/access";
 import { inr, monthYearLabel } from "@/lib/utils";
 import { todayStr, prettyDate } from "@/lib/attendance";
@@ -20,6 +20,7 @@ export default async function Overview() {
     redirect(DEPARTMENT_NAV[dept][0]?.href ?? "/fees");
   }
 
+  const schoolId = await getCurrentSchoolId(profile);
   const supabase = await createClient();
   const today = todayStr();
   const now = new Date();
@@ -38,26 +39,28 @@ export default async function Overview() {
     staffMarkedRes,
     changeReqRes,
   ] = await Promise.all([
-    supabase.from("students").select("id, class_id").eq("status", "active"),
+    supabase.from("students").select("id, class_id").eq("school_id", schoolId).eq("status", "active"),
     supabase
       .from("fee_structures")
       .select("class_id, fee_structure_components(kind, amount)")
+      .eq("school_id", schoolId)
       .eq("academic_year", AY)
       .eq("scope", "school"),
     supabase
       .from("invoice_items")
       .select("invoices!inner(student_id, academic_year, payment_status)")
+      .eq("school_id", schoolId)
       .eq("kind", "monthly")
       .eq("period_index", monthIndex)
       .eq("invoices.academic_year", AY)
       .neq("invoices.payment_status", "void"),
-    supabase.from("attendance").select("status").eq("date", today),
-    supabase.from("books").select("id", { count: "exact", head: true }),
-    supabase.from("book_loans").select("id", { count: "exact", head: true }).is("returned_at", null),
-    supabase.from("book_requests").select("id", { count: "exact", head: true }).eq("status", "open"),
+    supabase.from("attendance").select("status").eq("school_id", schoolId).eq("date", today),
+    supabase.from("books").select("id", { count: "exact", head: true }).eq("school_id", schoolId),
+    supabase.from("book_loans").select("id", { count: "exact", head: true }).eq("school_id", schoolId).is("returned_at", null),
+    supabase.from("book_requests").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("status", "open"),
     supabase.from("profiles").select("id").in("role", ["manager", "staff"]).eq("is_active", true),
-    supabase.from("staff_attendance").select("profile_id").eq("date", today),
-    supabase.from("change_requests").select("id", { count: "exact", head: true }).eq("status", "open"),
+    supabase.from("staff_attendance").select("profile_id").eq("school_id", schoolId).eq("date", today),
+    supabase.from("change_requests").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("status", "open"),
   ]);
 
   const students = studentsRes.data ?? [];

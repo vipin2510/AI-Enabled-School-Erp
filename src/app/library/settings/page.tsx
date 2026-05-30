@@ -1,15 +1,17 @@
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { saveLibrarySettings } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function LibrarySettingsPage() {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const supabase = await createClient();
   const { data: settings } = await supabase
     .from("library_settings")
     .select("max_books_per_student, loan_days")
+    .eq("school_id", schoolId)
     .limit(1)
     .maybeSingle();
 

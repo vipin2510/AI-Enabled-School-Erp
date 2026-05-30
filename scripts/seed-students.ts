@@ -21,6 +21,36 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+const SCHOOL_IDS: Record<string, string> = {
+  kondagaon: "00000000-0000-0000-0000-000000000001",
+  pharasgaon: "00000000-0000-0000-0000-000000000002",
+  chipawand: "00000000-0000-0000-0000-000000000003",
+};
+
+function parseSchoolArg(): { code: string; id: string } {
+  const argv = process.argv.slice(2);
+  let code = "kondagaon";
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--school" && argv[i + 1]) {
+      code = argv[i + 1];
+      break;
+    }
+    if (argv[i].startsWith("--school=")) {
+      code = argv[i].slice("--school=".length);
+      break;
+    }
+  }
+  const id = SCHOOL_IDS[code];
+  if (!id) {
+    throw new Error(
+      `Unknown --school "${code}". Valid: ${Object.keys(SCHOOL_IDS).join(", ")}`
+    );
+  }
+  return { code, id };
+}
+
+const { code: SCHOOL_CODE, id: SCHOOL_ID } = parseSchoolArg();
+
 // Map sheet/class string → canonical class code that exists in `classes`.
 function classCodeFor(raw: string | undefined | null): string | null {
   if (!raw) return null;
@@ -134,6 +164,7 @@ function rowsFromSheet(ws: XLSX.WorkSheet, sheetName: string): Row[] {
 }
 
 async function main() {
+  console.log(`School: ${SCHOOL_CODE} (${SCHOOL_ID})`);
   const files = [
     path.resolve("reference/KONDGAON STUDENTS DETAILS.xlsx"),
     path.resolve("reference/KONDAGAON KG.xlsx"),
@@ -154,7 +185,8 @@ async function main() {
   // Resolve class codes → ids
   const { data: classes, error: classErr } = await supabase
     .from("classes")
-    .select("id, code");
+    .select("id, code")
+    .eq("school_id", SCHOOL_ID);
 
   if (classErr) {
     console.error("\n❌ Could not query `classes` table:", classErr.message);
@@ -192,6 +224,7 @@ async function main() {
         contact_number: r.contact_number ?? null,
         date_of_birth: r.date_of_birth ?? null,
         address: r.address ?? null,
+        school_id: SCHOOL_ID,
       };
     })
     .filter(Boolean) as Record<string, unknown>[];

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isSunday } from "@/lib/attendance";
 
@@ -19,7 +19,8 @@ export async function saveAttendance(
   _prev: AttendanceState,
   formData: FormData
 ): Promise<AttendanceState> {
-  await requireDepartment("academics");
+  const profile = await requireDepartment("academics");
+  const schoolId = await getCurrentSchoolId(profile);
   if (!classId || !section || !date) return { error: "Pick a class, section and date." };
   if (isSunday(date)) return { error: "Attendance can’t be taken on a Sunday." };
 
@@ -31,6 +32,7 @@ export async function saveAttendance(
     date: string;
     status: string;
     updated_at: string;
+    school_id: string;
   }[] = [];
 
   for (const [name, value] of formData.entries()) {
@@ -42,6 +44,7 @@ export async function saveAttendance(
       date,
       status: String(value) === "absent" ? "absent" : "present",
       updated_at: now,
+      school_id: schoolId,
     });
   }
 

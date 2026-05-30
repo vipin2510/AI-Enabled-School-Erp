@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "seed:students": "tsx scripts/seed-students.ts",
-    "create:admin": "tsx scripts/create-admin.ts"
+    "create:admin": "tsx scripts/create-admin.ts",
+    "pdfs:build": "tsx scripts/build-requirements-pdfs.tsx"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

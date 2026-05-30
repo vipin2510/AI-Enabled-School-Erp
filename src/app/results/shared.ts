@@ -14,14 +14,15 @@ export type SubjectRow = { id: string; name: string };
 // enrolled (active, in that section), ready for the marks workspace.
 // Subjects are split: scholastic ones get numeric marks; co-curricular ones
 // get a single A–E grade.
-export async function loadClassSection(classId: string, section: string) {
+export async function loadClassSection(classId: string, section: string, schoolId: string) {
   const supabase = await createClient();
   const [{ data: klass }, { data: subjectRows }, { data: students }] = await Promise.all([
-    supabase.from("classes").select("id, display_name").eq("id", classId).single(),
-    supabase.from("subjects").select("id, name, category").eq("class_id", classId).order("name"),
+    supabase.from("classes").select("id, display_name").eq("school_id", schoolId).eq("id", classId).single(),
+    supabase.from("subjects").select("id, name, category").eq("school_id", schoolId).eq("class_id", classId).order("name"),
     supabase
       .from("students")
       .select("id, full_name, admission_no, father_name")
+      .eq("school_id", schoolId)
       .eq("class_id", classId)
       .eq("section", section)
       .neq("status", "alumni")
@@ -43,7 +44,8 @@ export async function loadClassSection(classId: string, section: string) {
 // student_id → { subject_id → grade }.
 export async function loadGradesByStudent(
   studentIds: string[],
-  academicYear: string
+  academicYear: string,
+  schoolId: string
 ): Promise<Record<string, Record<string, string>>> {
   const result: Record<string, Record<string, string>> = {};
   if (studentIds.length === 0) return result;
@@ -52,6 +54,7 @@ export async function loadGradesByStudent(
   const { data } = await supabase
     .from("co_curricular_grades")
     .select("student_id, subject_id, grade")
+    .eq("school_id", schoolId)
     .in("student_id", studentIds)
     .eq("academic_year", academicYear);
 
@@ -69,7 +72,8 @@ export async function loadGradesByStudent(
 // keyed "subjectId:exam".
 export async function loadMarksByStudent(
   studentIds: string[],
-  academicYear: string
+  academicYear: string,
+  schoolId: string
 ): Promise<Record<string, MarksMap>> {
   const result: Record<string, MarksMap> = {};
   if (studentIds.length === 0) return result;
@@ -78,6 +82,7 @@ export async function loadMarksByStudent(
   const { data } = await supabase
     .from("marks")
     .select("student_id, subject_id, exam, marks_obtained")
+    .eq("school_id", schoolId)
     .in("student_id", studentIds)
     .eq("academic_year", academicYear);
 

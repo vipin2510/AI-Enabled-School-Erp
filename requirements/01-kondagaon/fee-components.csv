@@ -1,0 +1,7 @@
+academic_year,scope,class_code,group_label,student_kind,kind,label,period_index,amount,due_date,is_refundable,is_one_time,sort_order
+2026-27,school,1ST,,any,registration,Registration,,500,,no,yes,1
+2026-27,school,1ST,,any,admission_one_time,Admission Fee,,2500,,no,yes,2
+2026-27,school,1ST,,any,caution,Caution Money,,1000,,yes,yes,3
+2026-27,school,1ST,,any,yearly,Annual Charges,,4000,,no,no,4
+2026-27,school,1ST,,any,monthly,Tuition Apr,1,1000,10-04-2026,no,no,5
+2026-27,school,1ST,,any,monthly,Tuition May,2,1000,10-05-2026,no,no,6

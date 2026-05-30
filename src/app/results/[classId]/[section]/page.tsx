@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { currentAcademicYear, computeResult, EXAMS, gradeFor } from "@/lib/results";
 import { loadClassSection, loadMarksByStudent } from "../../shared";
 import ResultsToolbar from "./toolbar";
@@ -16,16 +16,17 @@ export default async function ClassSectionResultsPage({
   params: Promise<{ classId: string; section: string }>;
   searchParams: Promise<{ saved?: string }>;
 }) {
-  await requireDepartment("results");
+  const profile = await requireDepartment("results");
+  const schoolId = await getCurrentSchoolId(profile);
   const { classId, section: rawSection } = await params;
   const section = decodeURIComponent(rawSection);
   const { saved } = await searchParams;
 
-  const { klass, subjects, students } = await loadClassSection(classId, section);
+  const { klass, subjects, students } = await loadClassSection(classId, section, schoolId);
   if (!klass) notFound();
 
   const academicYear = currentAcademicYear();
-  const marksByStudent = await loadMarksByStudent(students.map((s) => s.id), academicYear);
+  const marksByStudent = await loadMarksByStudent(students.map((s) => s.id), academicYear, schoolId);
   const cellsPerStudent = subjects.length * TOTAL_CELLS;
 
   return (

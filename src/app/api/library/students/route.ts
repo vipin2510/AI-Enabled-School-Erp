@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { requireDepartment } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/library/students?q=NAME_OR_ADMISSION
 // Students matching the query, each with how many books they currently hold.
 export async function GET(req: Request) {
-  await requireDepartment("library");
+  const profile = await requireDepartment("library");
+  const schoolId = await getCurrentSchoolId(profile);
   const q = (new URL(req.url).searchParams.get("q") ?? "").trim();
   if (q.length < 1) return NextResponse.json({ students: [] });
 
@@ -15,6 +16,7 @@ export async function GET(req: Request) {
   const { data: students } = await supabase
     .from("students")
     .select("id, full_name, admission_no, section, classes(display_name)")
+    .eq("school_id", schoolId)
     .or(`full_name.ilike.%${q}%,admission_no.ilike.%${q}%`)
     .neq("status", "alumni")
     .order("full_name")
@@ -26,6 +28,7 @@ export async function GET(req: Request) {
     const { data: loans } = await supabase
       .from("book_loans")
       .select("student_id")
+      .eq("school_id", schoolId)
       .in("student_id", ids)
       .is("returned_at", null);
     for (const l of (loans ?? []) as { student_id: string }[]) {

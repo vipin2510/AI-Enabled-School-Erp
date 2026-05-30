@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import CollectForm from "./collect-form";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,8 @@ export default async function CollectFeePage({
 }: {
   params: Promise<{ studentId: string }>;
 }) {
+  const profile = await requireDepartment("fees");
+  const schoolId = await getCurrentSchoolId(profile);
   const { studentId } = await params;
   const supabase = await createClient();
 
@@ -22,6 +25,7 @@ export default async function CollectFeePage({
     .select(
       "id, full_name, section, father_name, contact_number, is_hosteller, is_new_admission, class_id, classes(id, code, display_name, group_label, ordinal)"
     )
+    .eq("school_id", schoolId)
     .eq("id", studentId)
     .single();
 
@@ -36,6 +40,7 @@ export default async function CollectFeePage({
   const { data: schoolRows } = await supabase
     .from("fee_structures")
     .select(STRUCT_SELECT)
+    .eq("school_id", schoolId)
     .eq("academic_year", AY)
     .eq("scope", "school")
     .eq("class_id", student.class_id)
@@ -52,6 +57,7 @@ export default async function CollectFeePage({
       const { data } = await supabase
         .from("fee_structures")
         .select(STRUCT_SELECT)
+        .eq("school_id", schoolId)
         .eq("academic_year", AY)
         .eq("scope", "hostel")
         .eq("group_label", klass.group_label)
@@ -69,6 +75,7 @@ export default async function CollectFeePage({
   const { data: paidItems } = await supabase
     .from("invoice_items")
     .select("component_id, invoices!inner(student_id, academic_year, payment_status)")
+    .eq("school_id", schoolId)
     .eq("invoices.student_id", studentId)
     .eq("invoices.academic_year", AY)
     .neq("invoices.payment_status", "void");
@@ -90,6 +97,7 @@ export default async function CollectFeePage({
   const withDay = await supabase
     .from("late_fee_settings")
     .select("per_day_amount, grace_days, is_enabled, monthly_due_day")
+    .eq("school_id", schoolId)
     .maybeSingle();
   if (!withDay.error && withDay.data) {
     lateFeeSettings = { ...lateFeeSettings, ...withDay.data };
@@ -97,6 +105,7 @@ export default async function CollectFeePage({
     const basic = await supabase
       .from("late_fee_settings")
       .select("per_day_amount, grace_days, is_enabled")
+      .eq("school_id", schoolId)
       .maybeSingle();
     if (basic.data) lateFeeSettings = { ...lateFeeSettings, ...basic.data };
   }
