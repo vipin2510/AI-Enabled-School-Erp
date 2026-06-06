@@ -43,6 +43,10 @@ type Props = {
     monthly_due_day: number;
   };
   isNewAdmission: boolean;
+  // Per-month bus fee from the student's profile. null = no bus service; the
+  // collect form adds a synthetic Bus Fee line that scales with the number of
+  // monthly slots the cashier selects.
+  busFeeAmount: number | null;
 };
 
 // Registration & new-admission charges only apply on a student's first year.
@@ -52,6 +56,20 @@ const NEW_ADMISSION_ONLY_KINDS = new Set<FeeKind>([
   "registration",
   "admission_one_time",
 ]);
+
+// The session opens fees collection from May onward — April's monthly slot is
+// hidden because rosters aren't finalised yet at the start of the academic
+// year. (period_index uses calendar months: 4 = April.)
+const HIDDEN_MONTHLY_PERIODS = new Set<number>([4]);
+const isHiddenMonthly = (c: Component) =>
+  c.kind === "monthly" && c.period_index !== null && HIDDEN_MONTHLY_PERIODS.has(c.period_index);
+
+function todayLocalIso() {
+  const d = new Date();
+  const tz = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - tz * 60_000);
+  return local.toISOString().slice(0, 10);
+}
 
 type SelectedItem = {
   component: Component;
@@ -69,12 +87,13 @@ export default function CollectForm({
   paidComponentIds,
   lateFeeSettings,
   isNewAdmission,
+  busFeeAmount,
 }: Props) {
   const router = useRouter();
   const paidSet = useMemo(() => new Set(paidComponentIds), [paidComponentIds]);
 
   const isApplicable = (c: Component) =>
-    isNewAdmission || !NEW_ADMISSION_ONLY_KINDS.has(c.kind);
+    (isNewAdmission || !NEW_ADMISSION_ONLY_KINDS.has(c.kind)) && !isHiddenMonthly(c);
 
   const [selected, setSelected] = useState<Record<string, SelectedItem>>({});
   const [showHostel, setShowHostel] = useState(hostelDefaultOpen);
@@ -84,6 +103,10 @@ export default function CollectForm({
   const [paymentRef, setPaymentRef] = useState("");
   const [notes, setNotes] = useState("");
   const [createdBy, setCreatedBy] = useState("");
+  const [paidAt, setPaidAt] = useState<string>(todayLocalIso());
+  const [includeBus, setIncludeBus] = useState<boolean>(
+    () => busFeeAmount != null && busFeeAmount > 0
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -153,12 +176,22 @@ export default function CollectForm({
   // --- Totals ---
   const today = new Date();
   const items = Object.values(selected);
-  const subtotal = items
+  const subtotalItems = items
     .filter((i) => !i.waived)
     .reduce((s, i) => s + Number(i.component.amount), 0);
   const waiverAmount = items
     .filter((i) => i.waived)
     .reduce((s, i) => s + Number(i.component.amount), 0);
+
+  // Bus fee: per-month amount × number of monthly slots in this collection.
+  // Cashier can opt out (e.g. one-time fees only). Hidden entirely if the
+  // student isn't on the bus.
+  const monthlyCount = items.filter(
+    (i) => !i.waived && i.component.kind === "monthly"
+  ).length;
+  const busAvailable = busFeeAmount != null && busFeeAmount > 0;
+  const busAmount = includeBus && busAvailable && monthlyCount > 0 ? (busFeeAmount as number) * monthlyCount : 0;
+  const subtotal = subtotalItems + busAmount;
 
   // Late fee: per-day from settings × days past due (only for items with a due_date that's past).
   // For monthly fees the due day comes from the configurable "last fee date of the month".
@@ -182,21 +215,42 @@ export default function CollectForm({
     setSubmitting(true);
     setError(null);
     try {
+      type ApiItem = {
+        component_id: string | null;
+        description: string;
+        kind: FeeKind;
+        period_index: number | null;
+        amount: number;
+        waived: boolean;
+        waiver_reason: string | null;
+      };
+      const apiItems: ApiItem[] = items.map((i) => ({
+        component_id: i.component.id,
+        description: i.component.label,
+        kind: i.component.kind,
+        period_index: i.component.period_index,
+        amount: Number(i.component.amount),
+        waived: i.waived,
+        waiver_reason: i.waived ? waiverReason || null : null,
+      }));
+      if (busAmount > 0) {
+        apiItems.push({
+          component_id: null,
+          description: `Bus Fee (${monthlyCount} month${monthlyCount === 1 ? "" : "s"} × ${inr(busFeeAmount as number)})`,
+          kind: "monthly",
+          period_index: null,
+          amount: busAmount,
+          waived: false,
+          waiver_reason: null,
+        });
+      }
       const res = await fetch("/api/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           student_id: studentId,
           academic_year: academicYear,
-          items: items.map((i) => ({
-            component_id: i.component.id,
-            description: i.component.label,
-            kind: i.component.kind,
-            period_index: i.component.period_index,
-            amount: Number(i.component.amount),
-            waived: i.waived,
-            waiver_reason: i.waived ? waiverReason || null : null,
-          })),
+          items: apiItems,
           subtotal,
           late_fee: lateFee,
           waiver_amount: waiverAmount,
@@ -207,6 +261,7 @@ export default function CollectForm({
           payment_ref: paymentRef || null,
           notes: notes || null,
           created_by: createdBy || null,
+          paid_at: paidAt,
         }),
       });
       const json = await res.json();
@@ -321,7 +376,24 @@ export default function CollectForm({
           <h3 className="font-medium">Payment Summary</h3>
           <div className="text-sm space-y-1.5">
             <Row label={`Items selected`} value={String(items.length)} />
-            <Row label="Subtotal" value={inr(subtotal)} />
+            <Row label="Subtotal" value={inr(subtotalItems)} />
+            {busAvailable && (
+              <Row
+                label={
+                  includeBus && monthlyCount > 0
+                    ? `Bus Fee (${monthlyCount} × ${inr(busFeeAmount as number)})`
+                    : "Bus Fee"
+                }
+                value={
+                  includeBus
+                    ? monthlyCount > 0
+                      ? inr(busAmount)
+                      : "—"
+                    : "skipped"
+                }
+                muted={!includeBus || monthlyCount === 0}
+              />
+            )}
             {waiverAmount > 0 && (
               <Row label="Waived (items)" value={`− ${inr(waiverAmount)}`} muted />
             )}
@@ -335,6 +407,15 @@ export default function CollectForm({
           </div>
 
           <div className="pt-2 space-y-3">
+            {busAvailable && (
+              <Toggle
+                checked={includeBus}
+                onChange={setIncludeBus}
+                label="Include bus fee"
+                description={`₹${busFeeAmount}/month · charged per monthly slot selected`}
+              />
+            )}
+
             <Toggle
               checked={lateFeeWaived}
               onChange={setLateFeeWaived}
@@ -363,6 +444,16 @@ export default function CollectForm({
                 placeholder="Txn / cheque #"
                 value={paymentRef}
                 onChange={(e) => setPaymentRef(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-stone-500 mb-1">Paid on</label>
+              <Input
+                type="date"
+                value={paidAt}
+                max={todayLocalIso()}
+                onChange={(e) => setPaidAt(e.target.value)}
               />
             </div>
 

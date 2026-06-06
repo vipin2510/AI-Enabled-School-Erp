@@ -34,6 +34,9 @@ const BodySchema = z.object({
   payment_ref: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   created_by: z.string().nullable().optional(),
+  // Date (YYYY-MM-DD) the fee was actually collected. Defaults to now in the
+  // DB if omitted; the collect form posts whatever the cashier picks.
+  paid_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 export async function POST(req: Request) {
@@ -51,7 +54,10 @@ export async function POST(req: Request) {
   // cheque to done — but never the other way round.
   const isCheque = body.payment_mode === "cheque";
 
-  // Insert invoice
+  // Insert invoice. issued_at takes the cashier-supplied paid date (anchored
+  // at 12:00 IST so the displayed day never drifts across timezones); falling
+  // back to the DB default when no date was provided.
+  const issuedAt = body.paid_at ? `${body.paid_at}T12:00:00+05:30` : undefined;
   const { data: invoice, error: invErr } = await supabase
     .from("invoices")
     .insert({
@@ -71,6 +77,7 @@ export async function POST(req: Request) {
       waiver_reason: body.waiver_reason ?? null,
       notes: body.notes ?? null,
       created_by: body.created_by ?? null,
+      ...(issuedAt ? { issued_at: issuedAt } : {}),
     })
     .select("id, receipt_no")
     .single();

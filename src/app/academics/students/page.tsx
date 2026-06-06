@@ -6,38 +6,69 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 
 export const dynamic = "force-dynamic";
 
+// Server-side pagination: only this many rows hit the wire per page. Bumping
+// it raises payload weight linearly, so keep it small enough to stay snappy on
+// 3G but large enough that admins rarely need to click Next.
+const PAGE_SIZE = 50;
+
 export default async function StudentsAdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; class?: string }>;
+  searchParams: Promise<{ q?: string; class?: string; page?: string }>;
 }) {
   const profile = await requireDepartment("academics");
   const schoolId = await getCurrentSchoolId(profile);
-  const { q, class: classFilter } = await searchParams;
+  const { q, class: classFilter, page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
   const supabase = await createClient();
 
+  // Single query returning the page slice + an exact total count via the
+  // PostgREST `Prefer: count=exact` header — saves a separate count round-trip.
   let query = supabase
     .from("students")
-    .select("id, full_name, section, father_name, contact_number, status, classes(display_name, ordinal)")
+    .select(
+      "id, full_name, section, father_name, contact_number, status, classes(display_name, ordinal)",
+      { count: "exact" }
+    )
     .eq("school_id", schoolId)
     .order("full_name", { ascending: true })
-    .limit(1000);
+    .range(from, to);
   if (q) query = query.or(`full_name.ilike.%${q}%,admission_no.ilike.%${q}%`);
   if (classFilter) query = query.eq("class_id", classFilter);
 
-  const { data: students } = await query;
+  const { data: students, count } = await query;
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const showingFrom = total === 0 ? 0 : from + 1;
+  const showingTo = Math.min(from + (students?.length ?? 0), total);
+
   const { data: classes } = await supabase
     .from("classes")
     .select("id, display_name, ordinal")
     .eq("school_id", schoolId)
     .order("ordinal");
 
+  const pageHref = (n: number) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (classFilter) params.set("class", classFilter);
+    if (n > 1) params.set("page", String(n));
+    const qs = params.toString();
+    return qs ? `/academics/students?${qs}` : "/academics/students";
+  };
+
   return (
     <div className="max-w-6xl">
       <header className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Students</h1>
-          <p className="text-stone-500 text-sm">{students?.length ?? 0} shown</p>
+          <p className="text-stone-500 text-sm">
+            {total === 0
+              ? "0 students"
+              : `Showing ${showingFrom}–${showingTo} of ${total}`}
+          </p>
         </div>
         <Link
           href="/academics/students/new"
@@ -128,6 +159,40 @@ export default async function StudentsAdminPage({
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <nav className="mt-4 flex items-center justify-between text-sm">
+          <div className="text-stone-500">
+            Page {page} of {totalPages}
+          </div>
+          <div className="flex items-center gap-2">
+            {page > 1 ? (
+              <Link
+                href={pageHref(page - 1)}
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-stone-700 hover:bg-stone-100"
+              >
+                ← Prev
+              </Link>
+            ) : (
+              <span className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-stone-400">
+                ← Prev
+              </span>
+            )}
+            {page < totalPages ? (
+              <Link
+                href={pageHref(page + 1)}
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-stone-700 hover:bg-stone-100"
+              >
+                Next →
+              </Link>
+            ) : (
+              <span className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-stone-400">
+                Next →
+              </span>
+            )}
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

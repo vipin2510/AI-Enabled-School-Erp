@@ -1,11 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
-import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
+import { requireRole, getCurrentSchoolId } from "@/lib/auth";
 import StructuresEditor, { type Structure } from "./structures-editor";
 
 export const dynamic = "force-dynamic";
 
 export default async function FeeStructuresPage() {
-  const profile = await requireDepartment("fees");
+  // Fee structures hold rate cards — only admin/manager may edit. Staff (Layer
+  // 3) are bounced home if they navigate here directly.
+  const profile = await requireRole("admin", "manager");
   const schoolId = await getCurrentSchoolId(profile);
   const supabase = await createClient();
   const { data } = await supabase

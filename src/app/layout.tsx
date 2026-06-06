@@ -78,7 +78,8 @@ async function AppShell({
     groups.push({ items: [{ href: "/", label: "Overview" }] });
   }
 
-  groups.push({ label: DEPARTMENT_LABELS[department], items: DEPARTMENT_NAV[department] });
+  const deptItems = DEPARTMENT_NAV[department].filter((n) => isLeader || !n.leaderOnly);
+  groups.push({ label: DEPARTMENT_LABELS[department], items: deptItems });
 
   if (profile.role === "admin") {
     groups.push({

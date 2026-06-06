@@ -30,6 +30,8 @@ const StudentSchema = z.object({
   is_hosteller: z.boolean(),
   is_new_admission: z.boolean(),
   status: z.enum(["active", "inactive", "alumni"]),
+  // Per-month bus fee; null means student does not use the bus.
+  bus_fee_amount: z.number().int().nonnegative().nullable(),
 });
 
 export type StudentState = { error?: string } | undefined;
@@ -39,6 +41,8 @@ function parse(formData: FormData) {
     const v = String(formData.get(k) ?? "").trim();
     return v === "" ? null : v;
   };
+  const busRaw = blank("bus_fee_amount");
+  const busNum = busRaw == null ? null : Number(busRaw);
   return StudentSchema.safeParse({
     full_name: String(formData.get("full_name") ?? "").trim(),
     admission_no: blank("admission_no"),
@@ -52,6 +56,7 @@ function parse(formData: FormData) {
     is_hosteller: formData.get("is_hosteller") === "on",
     is_new_admission: formData.get("is_new_admission") === "on",
     status: String(formData.get("status") ?? "active"),
+    bus_fee_amount: busNum != null && Number.isFinite(busNum) ? busNum : null,
   });
 }
 

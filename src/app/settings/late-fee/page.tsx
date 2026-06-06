@@ -1,11 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
-import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
+import { requireRole, getCurrentSchoolId } from "@/lib/auth";
 import LateFeeForm from "./late-fee-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function LateFeeSettingsPage() {
-  const profile = await requireDepartment("fees");
+  // Late-fee policy controls billing — admin/manager only. Staff get bounced.
+  const profile = await requireRole("admin", "manager");
   const schoolId = await getCurrentSchoolId(profile);
   const supabase = await createClient();
 

@@ -10,15 +10,18 @@ export type Exam = {
   label: string; // full label, e.g. "Unit Test I"
   short: string; // compact label for table headers, e.g. "UT I"
   max: number;
+  weight: number; // share of the final percentage (sums to 100 across full scheme)
 };
 
+// Unit tests count for 10% each, terminals for 30% each — final % is a weighted
+// blend so a partial entry (e.g. UT1 + UT2 only) can never inflate to 80%.
 export const EXAMS: Exam[] = [
-  { key: "ut1", label: "Unit Test I", short: "UT I", max: 25 },
-  { key: "ut2", label: "Unit Test II", short: "UT II", max: 25 },
-  { key: "ut3", label: "Unit Test III", short: "UT III", max: 25 },
-  { key: "ut4", label: "Unit Test IV", short: "UT IV", max: 25 },
-  { key: "terminal", label: "Terminal Examination I", short: "Terminal I", max: 100 },
-  { key: "terminal2", label: "Terminal Examination II", short: "Terminal II", max: 100 },
+  { key: "ut1", label: "Unit Test I", short: "UT I", max: 25, weight: 10 },
+  { key: "ut2", label: "Unit Test II", short: "UT II", max: 25, weight: 10 },
+  { key: "ut3", label: "Unit Test III", short: "UT III", max: 25, weight: 10 },
+  { key: "ut4", label: "Unit Test IV", short: "UT IV", max: 25, weight: 10 },
+  { key: "terminal", label: "Terminal Examination I", short: "Terminal I", max: 100, weight: 30 },
+  { key: "terminal2", label: "Terminal Examination II", short: "Terminal II", max: 100, weight: 30 },
 ];
 
 // Co-curricular subjects are graded once per year, not scored per exam.
@@ -100,40 +103,47 @@ export type SubjectResult = {
 
 // Compute a student's per-subject and overall result from a marks map.
 // Pass `exams` to score only a subset (e.g. a single term); defaults to the
-// full scheme.
+// full scheme. Percentages are weighted by exam (see EXAMS.weight) so partial
+// entries reflect their true share of the year rather than averaging only
+// what's been entered.
 export function computeResult(
   subjects: { id: string; name: string }[],
   marks: MarksMap,
   exams: Exam[] = EXAMS
 ): { subjects: SubjectResult[]; total: number; max: number; percent: number; grade: string } {
+  const schemeWeight = exams.reduce((sum, e) => sum + e.weight, 0);
   let grandTotal = 0;
   let grandMax = 0;
+  let grandWeighted = 0;
 
   const subjectResults: SubjectResult[] = subjects.map((s) => {
     const obtained = {} as Record<ExamKey, number | null>;
     let total = 0;
     let max = 0;
+    let weighted = 0;
     for (const exam of exams) {
       const v = marks[markKey(s.id, exam.key)];
       obtained[exam.key] = v ?? null;
       if (v !== null && v !== undefined) {
         total += v;
         max += exam.max;
+        weighted += (v / exam.max) * exam.weight;
       }
     }
     grandTotal += total;
     grandMax += max;
+    grandWeighted += weighted;
     return {
       subjectId: s.id,
       name: s.name,
       obtained,
       total,
       max,
-      percent: max ? (total / max) * 100 : 0,
+      percent: schemeWeight ? (weighted / schemeWeight) * 100 : 0,
     };
   });
 
-  const percent = grandMax ? (grandTotal / grandMax) * 100 : 0;
+  const percent = schemeWeight ? (grandWeighted / (schemeWeight * subjects.length || 1)) * 100 : 0;
   return {
     subjects: subjectResults,
     total: grandTotal,

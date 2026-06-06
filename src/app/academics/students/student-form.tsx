@@ -19,6 +19,7 @@ export type StudentValues = {
   status: string;
   student_photo_url: string;
   parent_photo_url: string;
+  bus_fee_amount: number | null;
 };
 
 type Props = {
@@ -134,6 +135,19 @@ export default function StudentForm({
           New admission
         </label>
       </div>
+
+      <Field label="Bus fee (per month, ₹) — leave blank if student doesn't use bus">
+        <input
+          name="bus_fee_amount"
+          type="number"
+          min={0}
+          step={1}
+          inputMode="numeric"
+          placeholder="e.g. 800"
+          defaultValue={initial?.bus_fee_amount ?? ""}
+          className={inputCls}
+        />
+      </Field>
 
       <div>
         <div className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">Photos</div>

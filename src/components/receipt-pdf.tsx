@@ -43,45 +43,47 @@ type Invoice = {
 
 const MONTH_ABBR = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
+// Receipt prints two A6-sized copies (school + student) side-by-side in the top
+// half of an A4 sheet — each copy is a quarter of the page, so the bottom half
+// stays blank for cutting and the same form factor fits a stapled office file.
 const styles = StyleSheet.create({
-  page: { padding: 24, fontSize: 9, fontFamily: "Helvetica" },
-  copy: { flex: 1 },
-  cutRow: { flexDirection: "row", alignItems: "center", marginVertical: 8 },
-  cutLine: { flex: 1, borderBottomWidth: 1, borderBottomColor: "#a8a29e", borderStyle: "dashed" },
-  cutText: { fontSize: 7, color: "#a8a29e", marginHorizontal: 6, letterSpacing: 1 },
+  page: { padding: 16, fontSize: 7.5, fontFamily: "Helvetica" },
+  topRow: { flexDirection: "row", alignItems: "stretch" },
+  copy: { flex: 1, paddingHorizontal: 8 },
+  cutCol: { width: 0, borderLeftWidth: 1, borderLeftColor: "#a8a29e", borderStyle: "dashed" },
 
-  copyTag: { alignSelf: "flex-end", fontSize: 7, fontWeight: 700, color: "#78716c", letterSpacing: 1, marginBottom: 2 },
+  copyTag: { alignSelf: "flex-end", fontSize: 6, fontWeight: 700, color: "#78716c", letterSpacing: 1, marginBottom: 2 },
   headerRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: "#a8a29e",
-    paddingBottom: 5,
-    marginBottom: 6,
+    paddingBottom: 4,
+    marginBottom: 4,
     alignItems: "center",
   },
-  logo: { width: 38, height: 38, marginRight: 8 },
-  schoolName: { fontSize: 13, fontWeight: 700 },
-  schoolSub: { fontSize: 7, color: "#57534e" },
-  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 5 },
-  receiptLabel: { fontSize: 7, color: "#78716c", letterSpacing: 1 },
-  receiptNo: { fontSize: 11, fontWeight: 700 },
+  logo: { width: 26, height: 26, marginRight: 6 },
+  schoolName: { fontSize: 10, fontWeight: 700 },
+  schoolSub: { fontSize: 5.5, color: "#57534e" },
+  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
+  receiptLabel: { fontSize: 5.5, color: "#78716c", letterSpacing: 1 },
+  receiptNo: { fontSize: 9, fontWeight: 700 },
 
-  grid: { flexDirection: "row", flexWrap: "wrap", marginBottom: 5 },
-  field: { width: "33.33%", marginBottom: 3, paddingRight: 6 },
-  fieldLabel: { fontSize: 6.5, color: "#78716c" },
-  fieldValue: { fontSize: 8.5, fontWeight: 700 },
+  grid: { flexDirection: "row", flexWrap: "wrap", marginBottom: 4 },
+  field: { width: "50%", marginBottom: 2, paddingRight: 4 },
+  fieldLabel: { fontSize: 5.5, color: "#78716c" },
+  fieldValue: { fontSize: 7, fontWeight: 700 },
 
   table: { borderWidth: 1, borderColor: "#e7e5e4" },
   thead: { flexDirection: "row", backgroundColor: "#f5f5f4" },
   tr: { flexDirection: "row", borderTopWidth: 1, borderTopColor: "#e7e5e4" },
-  th: { padding: 3.5, fontWeight: 700, fontSize: 8 },
-  td: { padding: 3.5, fontSize: 8 },
+  th: { padding: 2.5, fontWeight: 700, fontSize: 6.5 },
+  td: { padding: 2.5, fontSize: 6.5 },
   colDesc: { flex: 3 },
   colAmt: { flex: 1, textAlign: "right" },
   totalRow: { backgroundColor: "#f5f5f4", fontWeight: 700 },
-  meta: { fontSize: 7.5, color: "#57534e", marginTop: 3 },
-  sigRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 18 },
-  sigBox: { width: 130, borderTopWidth: 1, borderTopColor: "#78716c", paddingTop: 3, fontSize: 7.5 },
+  meta: { fontSize: 6, color: "#57534e", marginTop: 2 },
+  sigRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 12 },
+  sigBox: { width: 90, borderTopWidth: 1, borderTopColor: "#78716c", paddingTop: 2, fontSize: 6 },
   strike: { textDecoration: "line-through", color: "#a8a29e" },
 });
 
@@ -138,13 +140,13 @@ function ReceiptCopy({
       <Text style={styles.copyTag}>{copyTag}</Text>
       <View style={styles.headerRow}>
         <Image src={logoDataUrl} style={styles.logo} />
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.schoolName}>ADESHWAR PUBLIC SCHOOL</Text>
           <Text style={styles.schoolSub}>
-            Affiliated to CISCE Board, New Delhi · Kondagaon, Dist. Kondagaon (C.G.)
+            Affiliated to CISCE Board · Kondagaon (C.G.)
           </Text>
           <Text style={styles.schoolSub}>
-            Udise: 22172604322 · Mob: 9111005301, 9111005303 · apskondagaon@gmail.com
+            School Code: CG024 · 9111005301, 9111005303
           </Text>
         </View>
       </View>
@@ -229,13 +231,11 @@ export function ReceiptPdf({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <ReceiptCopy invoice={invoice} logoDataUrl={logoDataUrl} copyTag="OFFICE COPY" />
-        <View style={styles.cutRow}>
-          <View style={styles.cutLine} />
-          <Text style={styles.cutText}>✂  CUT HERE</Text>
-          <View style={styles.cutLine} />
+        <View style={styles.topRow}>
+          <ReceiptCopy invoice={invoice} logoDataUrl={logoDataUrl} copyTag="SCHOOL COPY" />
+          <View style={styles.cutCol} />
+          <ReceiptCopy invoice={invoice} logoDataUrl={logoDataUrl} copyTag="STUDENT COPY" />
         </View>
-        <ReceiptCopy invoice={invoice} logoDataUrl={logoDataUrl} copyTag="STUDENT COPY" />
       </Page>
     </Document>
   );

@@ -78,7 +78,7 @@ export default async function ReceiptPage({
               Affiliated to CISCE Board, New Delhi · Kondagaon, Dist. Kondagaon (C.G.)
             </p>
             <p className="text-xs text-stone-500">
-              Udise: 22172604322 · Mob: 9111005301, 9111005303 · apskondagaon@gmail.com
+              School Code: CG024 · Mob: 9111005301, 9111005303 · apskondagaon@gmail.com
             </p>
           </div>
         </header>

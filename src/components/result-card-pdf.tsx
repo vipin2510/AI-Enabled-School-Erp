@@ -115,7 +115,7 @@ export function ResultCardPdf({ data, logoDataUrl }: { data: ResultCardData; log
               Affiliated to CISCE Board, New Delhi · Kondagaon, Dist. Kondagaon (C.G.)
             </Text>
             <Text style={styles.schoolSub}>
-              Udise: 22172604322 · Mob: 9111005301, 9111005303 · apskondagaon@gmail.com
+              School Code: CG024 · Mob: 9111005301, 9111005303 · apskondagaon@gmail.com
             </Text>
           </View>
         </View>

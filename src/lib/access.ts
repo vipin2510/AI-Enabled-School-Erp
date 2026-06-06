@@ -81,16 +81,17 @@ export const DEPARTMENT_LABELS: Record<Department, string> = {
   results: "Results",
 };
 
-export type NavItem = { href: string; label: string };
+export type NavItem = { href: string; label: string; leaderOnly?: boolean };
 
 // Department-scoped navigation. Each department leads with its own dashboard.
+// `leaderOnly: true` items are filtered out for Layer 3 staff in the shell.
 export const DEPARTMENT_NAV: Record<Department, NavItem[]> = {
   fees: [
     { href: "/fees", label: "Dashboard" },
-    { href: "/fees/structures", label: "Fee Structures" },
+    { href: "/fees/structures", label: "Fee Structures", leaderOnly: true },
     { href: "/fees/collect", label: "Collect Fee" },
     { href: "/receipts", label: "Receipts" },
-    { href: "/settings/late-fee", label: "Settings" },
+    { href: "/settings/late-fee", label: "Settings", leaderOnly: true },
   ],
   academics: [
     { href: "/academics", label: "Dashboard" },
