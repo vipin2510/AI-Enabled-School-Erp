@@ -1,11 +1,10 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
+import { currentAcademicYear } from "@/lib/academic-year";
 import CollectForm from "./collect-form";
 
 export const dynamic = "force-dynamic";
-
-const AY = "2026-27";
 
 const STRUCT_SELECT =
   "id, scope, group_label, student_kind, total_amount, created_at, fee_structure_components(id, kind, label, period_index, amount, due_date, is_refundable, is_one_time, sort_order)";
@@ -19,6 +18,7 @@ export default async function CollectFeePage({
   const schoolId = await getCurrentSchoolId(profile);
   const { studentId } = await params;
   const supabase = await createClient();
+  const AY = currentAcademicYear();
 
   const { data: student } = await supabase
     .from("students")

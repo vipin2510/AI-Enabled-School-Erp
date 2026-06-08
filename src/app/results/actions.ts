@@ -62,6 +62,18 @@ export async function saveStudentMarks(
   const academicYear = currentAcademicYear();
   const now = new Date().toISOString();
   const rows: MarkRow[] = [];
+
+  // Verify the student belongs to the caller's school. RLS is permissive, so
+  // without this any results-dept session could write marks for any student
+  // UUID it happens to know.
+  const supabaseEarly = await createClient();
+  const { data: ownsStudent } = await supabaseEarly
+    .from("students")
+    .select("id")
+    .eq("school_id", schoolId)
+    .eq("id", studentId)
+    .maybeSingle();
+  if (!ownsStudent) return { error: "Student not found in this school." };
   const gradeRows: {
     student_id: string;
     subject_id: string;
@@ -106,7 +118,7 @@ export async function saveStudentMarks(
     }
   }
 
-  const supabase = await createClient();
+  const supabase = supabaseEarly;
   if (rows.length) {
     const { error } = await supabase
       .from("marks")
@@ -142,12 +154,15 @@ export async function importMarksCsv(_prev: ImportState, formData: FormData): Pr
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a CSV file to import." };
 
   const supabase = await createClient();
+  // Verify subject belongs to this school — `.single()` errors if not, which
+  // would crash the action. Use maybeSingle and check.
   const { data: subject } = await supabase
     .from("subjects")
     .select("name")
     .eq("school_id", schoolId)
     .eq("id", subjectId)
-    .single();
+    .maybeSingle();
+  if (!subject) return { error: "Subject not found in this school." };
 
   let sheet: Record<string, unknown>[];
   try {
@@ -164,9 +179,29 @@ export async function importMarksCsv(_prev: ImportState, formData: FormData): Pr
   let skipped = 0;
 
   // Match each exam column by the prefix of its header label ("Unit Test I …").
+  const claimedIds = new Set<string>();
+  for (const record of sheet) {
+    const sid = String(record["Student ID"] ?? "").trim();
+    if (sid) claimedIds.add(sid);
+  }
+
+  // Pull every student id from the CSV that's in THIS school. Any id missing
+  // from this set (cross-school injection or a typo'd UUID) is skipped — we
+  // never write marks for it.
+  let allowedIds = new Set<string>();
+  if (claimedIds.size) {
+    const { data: owned, error: ownedErr } = await supabase
+      .from("students")
+      .select("id")
+      .eq("school_id", schoolId)
+      .in("id", Array.from(claimedIds));
+    if (ownedErr) return { error: ownedErr.message };
+    allowedIds = new Set((owned ?? []).map((r) => r.id));
+  }
+
   for (const record of sheet) {
     const studentId = String(record["Student ID"] ?? "").trim();
-    if (!studentId) {
+    if (!studentId || !allowedIds.has(studentId)) {
       skipped++;
       continue;
     }

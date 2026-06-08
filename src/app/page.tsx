@@ -4,13 +4,14 @@ import { requireProfile, getCurrentSchoolId } from "@/lib/auth";
 import { DEPARTMENT_NAV } from "@/lib/access";
 import { inr, monthYearLabel } from "@/lib/utils";
 import { todayStr, prettyDate } from "@/lib/attendance";
+import { currentAcademicYear } from "@/lib/academic-year";
 import StatCard from "@/components/stat-card";
 
 export const dynamic = "force-dynamic";
 
-const AY = "2026-27";
-
 export default async function Overview() {
+  // Recompute per request so April rollover doesn't need a redeploy.
+  const AY = currentAcademicYear();
   const profile = await requireProfile();
 
   // Staff land on their own department's dashboard; the combined overview is

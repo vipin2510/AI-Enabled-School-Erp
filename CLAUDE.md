@@ -62,3 +62,8 @@ SQL lives in `supabase/migrations/`, numbered and applied **in order**. They are
 ### Framework gotchas (Next.js 16 — not your training data)
 - Middleware is renamed **Proxy**: `src/proxy.ts` exports `proxy()`. It refreshes the Supabase session and redirects anonymous users to `/login`.
 - `searchParams`, `params`, and `cookies()` are **async** (`await` them / they're `Promise`s).
+
+
+## Code Review Standards
+- When asked to perform a code review, ALWAYS spawn the `code-reviewer` subagent.
+- The main agent must not review the code directly to avoid self-review bias.

@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createClient } from "@/lib/supabase/client";
 import { inr } from "@/lib/utils";
+import { saveStructureUpdates } from "./actions";
 
 type Component = {
   id: string;
@@ -93,53 +93,73 @@ export default function StructuresEditor({ structures }: { structures: Structure
   const save = async () => {
     setSaving(true);
     setError(null);
-    const supabase = createClient();
     try {
+      // Collect edits as (structure_id, component_id, amount) — the server
+      // verifies each pair belongs to the caller's school before writing.
+      const componentsPayload: { structure_id: string; component_id: string; amount: number }[] = [];
+      const structuresPayload: { structure_id: string; total_amount: number }[] = [];
       const all = [...school, ...hostel];
+
       for (const s of all) {
-        const compUpdates: { id: string; amount: number }[] = [];
         const pushIf = (c: Component | undefined, field: string) => {
           if (!c) return;
           const k = key(s.id, field);
-          if (k in edits) compUpdates.push({ id: c.id, amount: num(s.id, field, c.amount) });
+          if (k in edits) {
+            componentsPayload.push({
+              structure_id: s.id,
+              component_id: c.id,
+              amount: num(s.id, field, c.amount),
+            });
+          }
         };
 
+        let structureTouched = false;
         if (s.scope === "school") {
+          const before = componentsPayload.length;
           pushIf(comp(s, "registration"), "registration");
           pushIf(comp(s, "admission_one_time"), "admission_one_time");
           pushIf(comp(s, "yearly"), "yearly");
           pushIf(comp(s, "caution"), "caution");
-          // monthly: one input updates all 12 month components
           if (key(s.id, "monthly") in edits) {
             const amt = num(s.id, "monthly", monthlyComps(s)[0]?.amount ?? 0);
-            for (const m of monthlyComps(s)) compUpdates.push({ id: m.id, amount: amt });
+            for (const m of monthlyComps(s)) {
+              componentsPayload.push({
+                structure_id: s.id,
+                component_id: m.id,
+                amount: amt,
+              });
+            }
           }
+          structureTouched = componentsPayload.length > before;
         } else {
+          const before = componentsPayload.length;
           pushIf(comp(s, "registration"), "registration");
           pushIf(comp(s, "caution"), "caution");
           for (const n of [1, 2, 3, 4]) pushIf(comp(s, "instalment", n), `inst${n}`);
+          structureTouched = componentsPayload.length > before;
         }
 
-        if (compUpdates.length === 0) continue;
-
-        for (const u of compUpdates) {
-          const { error: e } = await supabase
-            .from("fee_structure_components")
-            .update({ amount: u.amount })
-            .eq("id", u.id);
-          if (e) throw new Error(e.message);
+        if (structureTouched) {
+          structuresPayload.push({
+            structure_id: s.id,
+            total_amount: s.scope === "school" ? schoolTotal(s) : hostelTotal(s),
+          });
         }
-
-        const total = s.scope === "school" ? schoolTotal(s) : hostelTotal(s);
-        const { error: te } = await supabase
-          .from("fee_structures")
-          .update({ total_amount: total })
-          .eq("id", s.id);
-        if (te) throw new Error(te.message);
       }
+
+      if (componentsPayload.length === 0 && structuresPayload.length === 0) {
+        setSaving(false);
+        return;
+      }
+
+      const result = await saveStructureUpdates({
+        components: componentsPayload,
+        structures: structuresPayload,
+      });
+      if (!result.ok) throw new Error(result.error);
+
       setSavedAt(new Date().toLocaleTimeString());
       setEdits({});
-      // Pull fresh server data so totals/labels reflect the save.
       setTimeout(() => window.location.reload(), 400);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");

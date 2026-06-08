@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
+import { currentAcademicYear } from "@/lib/academic-year";
+import BusFeeInline from "./bus-fee-inline";
 
 export const dynamic = "force-dynamic";
-
-const AY = "2026-27";
 
 type PayState = "paid" | "partial" | "due" | "unknown";
 
@@ -17,6 +17,7 @@ export default async function CollectFeePicker({
   const schoolId = await getCurrentSchoolId(profile);
   const { q, class_id } = await searchParams;
   const supabase = await createClient();
+  const AY = currentAcademicYear();
 
   const { data: classes } = await supabase
     .from("classes")
@@ -26,7 +27,7 @@ export default async function CollectFeePicker({
 
   let query = supabase
     .from("students")
-    .select("id, full_name, section, contact_number, father_name, class_id, classes(display_name)")
+    .select("id, full_name, section, contact_number, father_name, class_id, bus_fee_amount, classes(display_name)")
     .eq("school_id", schoolId)
     .order("full_name")
     .limit(50);
@@ -44,7 +45,7 @@ export default async function CollectFeePicker({
 
   // Fee status (current AY, school scope): how many of the class's fee
   // components has each student actually paid for?
-  const statusByStudent = await computePaidStatus(supabase, students, schoolId);
+  const statusByStudent = await computePaidStatus(supabase, students, schoolId, AY);
 
   return (
     <div className="max-w-3xl">
@@ -81,14 +82,17 @@ export default async function CollectFeePicker({
 
       <div className="card divide-y divide-stone-100">
         {students.map((s) => {
-          const klass = (s as unknown as { classes: { display_name?: string } | null }).classes;
+          const row = s as unknown as {
+            classes: { display_name?: string } | null;
+            bus_fee_amount: number | null;
+          };
+          const klass = row.classes;
           return (
-            <Link
+            <div
               key={s.id}
-              href={`/fees/collect/${s.id}`}
               className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-stone-50"
             >
-              <div>
+              <Link href={`/fees/collect/${s.id}`} className="min-w-0 flex-1">
                 <div className="font-medium">{s.full_name}</div>
                 <div className="text-xs text-stone-500">
                   {klass?.display_name ?? "—"}
@@ -96,9 +100,12 @@ export default async function CollectFeePicker({
                   {s.father_name ? ` · S/o ${s.father_name}` : ""}
                   {s.contact_number ? ` · ${s.contact_number}` : ""}
                 </div>
+              </Link>
+              <div className="flex shrink-0 items-center gap-3">
+                <BusFeeInline studentId={s.id} initial={row.bus_fee_amount} />
+                <PayBadge state={statusByStudent.get(s.id) ?? "unknown"} />
               </div>
-              <PayBadge state={statusByStudent.get(s.id) ?? "unknown"} />
-            </Link>
+            </div>
           );
         })}
         {!students.length && (
@@ -132,7 +139,8 @@ type StudentRow = { id: string; class_id: string | null };
 async function computePaidStatus(
   supabase: Awaited<ReturnType<typeof createClient>>,
   students: StudentRow[],
-  schoolId: string
+  schoolId: string,
+  AY: string,
 ): Promise<Map<string, PayState>> {
   const result = new Map<string, PayState>();
   const ids = students.map((s) => s.id);

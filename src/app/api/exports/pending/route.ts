@@ -1,10 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile, getCurrentSchoolId } from "@/lib/auth";
 import { monthName } from "@/lib/utils";
+import { currentAcademicYear } from "@/lib/academic-year";
 
 export const dynamic = "force-dynamic";
-
-const AY = "2026-27";
 
 // Wrap a CSV cell, escaping quotes. Numbers/strings both welcome.
 function csvCell(value: string | number | null | undefined) {
@@ -25,6 +24,7 @@ export async function GET(req: Request) {
   }
 
   const supabase = await createClient();
+  const AY = currentAcademicYear();
 
   const [studentsRes, structRes, paidRes] = await Promise.all([
     supabase

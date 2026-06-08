@@ -77,13 +77,9 @@ export function gradeFor(percent: number): string {
   return "E";
 }
 
-// The current academic year as "YYYY-YY". The session starts in April, so any
-// month from April onward belongs to year→year+1.
-export function currentAcademicYear(now = new Date()): string {
-  const y = now.getFullYear();
-  const startYear = now.getMonth() + 1 >= 4 ? y : y - 1;
-  return `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;
-}
+// Re-exported so existing results-module callers don't have to change their
+// import paths. The canonical definition lives in @/lib/academic-year.
+export { currentAcademicYear } from "@/lib/academic-year";
 
 // A marks lookup keyed "subjectId:exam" → obtained marks (number) or null.
 export type MarksMap = Record<string, number | null>;

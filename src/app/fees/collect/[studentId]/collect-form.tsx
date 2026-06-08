@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui/button";
@@ -64,6 +64,15 @@ const HIDDEN_MONTHLY_PERIODS = new Set<number>([4]);
 const isHiddenMonthly = (c: Component) =>
   c.kind === "monthly" && c.period_index !== null && HIDDEN_MONTHLY_PERIODS.has(c.period_index);
 
+// 24 chars of url-safe random, enough to make collisions astronomically rare
+// across the school's annual receipt volume.
+function newIdempotencyKey() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
 function todayLocalIso() {
   const d = new Date();
   const tz = d.getTimezoneOffset();
@@ -75,6 +84,9 @@ type SelectedItem = {
   component: Component;
   scope: "school" | "hostel";
   waived: boolean;
+  // Per-month bus-fare add-on. Only meaningful when component.kind === "monthly"
+  // and the student has a positive bus_fee_amount on their profile.
+  withBus?: boolean;
 };
 
 export default function CollectForm({
@@ -104,17 +116,30 @@ export default function CollectForm({
   const [notes, setNotes] = useState("");
   const [createdBy, setCreatedBy] = useState("");
   const [paidAt, setPaidAt] = useState<string>(todayLocalIso());
-  const [includeBus, setIncludeBus] = useState<boolean>(
-    () => busFeeAmount != null && busFeeAmount > 0
-  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // One idempotency key per Collect click. Re-rolls on success or after an
+  // error so retries from a stale form don't accidentally collapse with a
+  // future, intentional second collection.
+  const idempotencyKey = useRef<string>(newIdempotencyKey());
+
+  const busAvailable = busFeeAmount != null && busFeeAmount > 0;
+
+  // Adding a monthly slot auto-includes the bus add-on iff the student is on
+  // the bus. Cashier can untick the bus chip per month.
+  const newItem = (c: Component, scope: "school" | "hostel"): SelectedItem => ({
+    component: c,
+    scope,
+    waived: false,
+    withBus: c.kind === "monthly" && busAvailable ? true : undefined,
+  });
 
   const toggleItem = (c: Component, scope: "school" | "hostel") => {
     setSelected((prev) => {
       const next = { ...prev };
       if (next[c.id]) delete next[c.id];
-      else next[c.id] = { component: c, scope, waived: false };
+      else next[c.id] = newItem(c, scope);
       return next;
     });
   };
@@ -127,6 +152,14 @@ export default function CollectForm({
     });
   };
 
+  const toggleBusFor = (componentId: string) => {
+    setSelected((prev) => {
+      const item = prev[componentId];
+      if (!item || item.component.kind !== "monthly") return prev;
+      return { ...prev, [componentId]: { ...item, withBus: !item.withBus } };
+    });
+  };
+
   const selectAllOfKind = (struct: Structure, kind: FeeKind) => {
     if (!struct) return;
     setSelected((prev) => {
@@ -135,7 +168,7 @@ export default function CollectForm({
         if (c.kind !== kind) continue;
         if (paidSet.has(c.id)) continue;
         if (!isApplicable(c)) continue;
-        if (!next[c.id]) next[c.id] = { component: c, scope: struct.scope, waived: false };
+        if (!next[c.id]) next[c.id] = newItem(c, struct.scope);
       }
       return next;
     });
@@ -149,7 +182,7 @@ export default function CollectForm({
         if (paidSet.has(c.id)) continue;
         if (!isApplicable(c)) continue;
         // Skip refundable caution at "full year" default? Keep it included as caution is one-time too.
-        if (!next[c.id]) next[c.id] = { component: c, scope: struct.scope, waived: false };
+        if (!next[c.id]) next[c.id] = newItem(c, struct.scope);
       }
       return next;
     });
@@ -183,14 +216,14 @@ export default function CollectForm({
     .filter((i) => i.waived)
     .reduce((s, i) => s + Number(i.component.amount), 0);
 
-  // Bus fee: per-month amount × number of monthly slots in this collection.
-  // Cashier can opt out (e.g. one-time fees only). Hidden entirely if the
-  // student isn't on the bus.
-  const monthlyCount = items.filter(
-    (i) => !i.waived && i.component.kind === "monthly"
-  ).length;
-  const busAvailable = busFeeAmount != null && busFeeAmount > 0;
-  const busAmount = includeBus && busAvailable && monthlyCount > 0 ? (busFeeAmount as number) * monthlyCount : 0;
+  // Bus fee is now opt-in per month. Each selected, non-waived monthly slot
+  // can independently include its month's bus fare — the cashier ticks "+ Bus"
+  // on the months a student rode the bus for. The total bus charge is the
+  // sum across those months.
+  const busMonths = busAvailable
+    ? items.filter((i) => !i.waived && i.component.kind === "monthly" && i.withBus)
+    : [];
+  const busAmount = busAvailable ? busMonths.length * (busFeeAmount as number) : 0;
   const subtotal = subtotalItems + busAmount;
 
   // Late fee: per-day from settings × days past due (only for items with a due_date that's past).
@@ -233,13 +266,15 @@ export default function CollectForm({
         waived: i.waived,
         waiver_reason: i.waived ? waiverReason || null : null,
       }));
-      if (busAmount > 0) {
+      // Append one Bus Fee line per selected month — keeps the receipt /
+      // ledger month-attributable instead of one blended row.
+      for (const i of busMonths) {
         apiItems.push({
           component_id: null,
-          description: `Bus Fee (${monthlyCount} month${monthlyCount === 1 ? "" : "s"} × ${inr(busFeeAmount as number)})`,
+          description: `Bus Fee — ${i.component.label}`,
           kind: "monthly",
-          period_index: null,
-          amount: busAmount,
+          period_index: i.component.period_index,
+          amount: busFeeAmount as number,
           waived: false,
           waiver_reason: null,
         });
@@ -262,12 +297,16 @@ export default function CollectForm({
           notes: notes || null,
           created_by: createdBy || null,
           paid_at: paidAt,
+          idempotency_key: idempotencyKey.current,
         }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to record payment");
       router.push(`/receipts/${json.id}`);
     } catch (e: unknown) {
+      // New attempt = new key, so a failed-then-retried collect doesn't get
+      // squashed by the idempotency check.
+      idempotencyKey.current = newIdempotencyKey();
       setError(e instanceof Error ? e.message : "Failed");
     } finally {
       setSubmitting(false);
@@ -335,6 +374,8 @@ export default function CollectForm({
             paidSet={paidSet}
             onToggle={toggleItem}
             onToggleWaiver={toggleWaiver}
+            onToggleBus={toggleBusFor}
+            busFeeAmount={busAvailable ? (busFeeAmount as number) : null}
             columns={3}
           />
         )}
@@ -380,18 +421,12 @@ export default function CollectForm({
             {busAvailable && (
               <Row
                 label={
-                  includeBus && monthlyCount > 0
-                    ? `Bus Fee (${monthlyCount} × ${inr(busFeeAmount as number)})`
+                  busMonths.length > 0
+                    ? `Bus Fee (${busMonths.length} × ${inr(busFeeAmount as number)})`
                     : "Bus Fee"
                 }
-                value={
-                  includeBus
-                    ? monthlyCount > 0
-                      ? inr(busAmount)
-                      : "—"
-                    : "skipped"
-                }
-                muted={!includeBus || monthlyCount === 0}
+                value={busMonths.length > 0 ? inr(busAmount) : "—"}
+                muted={busMonths.length === 0}
               />
             )}
             {waiverAmount > 0 && (
@@ -408,12 +443,10 @@ export default function CollectForm({
 
           <div className="pt-2 space-y-3">
             {busAvailable && (
-              <Toggle
-                checked={includeBus}
-                onChange={setIncludeBus}
-                label="Include bus fee"
-                description={`₹${busFeeAmount}/month · charged per monthly slot selected`}
-              />
+              <p className="text-xs text-stone-500">
+                Bus ₹{busFeeAmount}/month — tick <strong>+ Bus</strong> on the
+                months this student rode for.
+              </p>
             )}
 
             <Toggle
@@ -522,6 +555,8 @@ function ComponentGroup({
   paidSet,
   onToggle,
   onToggleWaiver,
+  onToggleBus,
+  busFeeAmount,
   columns = 2,
 }: {
   label: string;
@@ -531,8 +566,12 @@ function ComponentGroup({
   paidSet: Set<string>;
   onToggle: (c: Component, scope: "school" | "hostel") => void;
   onToggleWaiver: (id: string) => void;
+  // Provided only for the Monthly group when the student is on the bus.
+  onToggleBus?: (id: string) => void;
+  busFeeAmount?: number | null;
   columns?: number;
 }) {
+  const showBusChip = busFeeAmount != null && busFeeAmount > 0 && !!onToggleBus;
   return (
     <div className="mb-4 last:mb-0">
       <div className="text-xs uppercase tracking-wide text-stone-500 mb-2">{label}</div>
@@ -573,7 +612,7 @@ function ComponentGroup({
                 </span>
               </label>
               {isSelected && (
-                <div className="mt-1 ml-6 text-xs">
+                <div className="mt-1 ml-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                   <button
                     type="button"
                     onClick={() => onToggleWaiver(c.id)}
@@ -581,6 +620,20 @@ function ComponentGroup({
                   >
                     {waived ? "Un-waive" : "Waive this item"}
                   </button>
+                  {showBusChip && c.kind === "monthly" && !waived && (
+                    <button
+                      type="button"
+                      onClick={() => onToggleBus!(c.id)}
+                      className={`rounded-full border px-2 py-0.5 transition ${
+                        selected[c.id]?.withBus
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                          : "border-stone-300 bg-white text-stone-500 hover:border-stone-400"
+                      }`}
+                      title={`Add ${inr(busFeeAmount!)} bus fare for this month`}
+                    >
+                      {selected[c.id]?.withBus ? `✓ Bus +${inr(busFeeAmount!)}` : `+ Bus ${inr(busFeeAmount!)}`}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

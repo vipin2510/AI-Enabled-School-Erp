@@ -51,10 +51,32 @@ export async function saveAttendance(
   if (rows.length === 0) return { error: "No students to mark." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("attendance").upsert(rows, { onConflict: "student_id,date" });
+
+  // Verify every student_id belongs to this school + class + section. Without
+  // this, a marker for one class can post `att_<otherStudentId>` and overwrite
+  // attendance in any class in any school the system knows about. We filter
+  // the bad rows out rather than rejecting the whole save — usually the
+  // tampered ids are a small minority and the legitimate rows still need
+  // to land.
+  const claimedIds = rows.map((r) => r.student_id);
+  const { data: owned, error: ownedErr } = await supabase
+    .from("students")
+    .select("id")
+    .eq("school_id", schoolId)
+    .eq("class_id", classId)
+    .eq("section", section)
+    .in("id", claimedIds);
+  if (ownedErr) return { error: ownedErr.message };
+  const allowed = new Set((owned ?? []).map((r) => r.id));
+  const safeRows = rows.filter((r) => allowed.has(r.student_id));
+  if (safeRows.length === 0) return { error: "No matching students for this class/section." };
+
+  const { error } = await supabase
+    .from("attendance")
+    .upsert(safeRows, { onConflict: "student_id,date" });
   if (error) return { error: error.message };
 
   revalidatePath("/academics/attendance");
-  const present = rows.filter((r) => r.status === "present").length;
-  return { ok: true, present, absent: rows.length - present };
+  const present = safeRows.filter((r) => r.status === "present").length;
+  return { ok: true, present, absent: safeRows.length - present };
 }

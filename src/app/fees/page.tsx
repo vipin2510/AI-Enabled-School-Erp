@@ -2,10 +2,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { inr, monthName, formatDate, monthYearLabel, ACADEMIC_MONTHS } from "@/lib/utils";
+import { currentAcademicYear } from "@/lib/academic-year";
 
 export const dynamic = "force-dynamic";
-
-const AY = "2026-27";
 
 type RecentInvoice = {
   receipt_no: string | null;
@@ -18,6 +17,7 @@ export default async function FeesDashboard() {
   const profile = await requireDepartment("fees");
   const schoolId = await getCurrentSchoolId(profile);
   const supabase = await createClient();
+  const AY = currentAcademicYear();
 
   const now = new Date();
   const monthIndex = now.getMonth() + 1; // 1..12, matches monthly component period_index
