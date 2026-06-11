@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Toggle } from "@/components/ui/toggle";
 import { createClient } from "@/lib/supabase/client";
+import { bustLateFeeCache } from "./actions";
 
 type Settings = {
   id: string | null;
@@ -50,6 +51,10 @@ export default function LateFeeForm({ settings, schoolId }: { settings: Settings
     } else if (first.error) {
       setError(first.error.message);
     } else {
+      // Settings are cached on the Collect Fee page for 30 min; force a flush
+      // so the cashier sees the new rate immediately. Best-effort — a failed
+      // bust just means the page picks the new value up at next TTL.
+      try { await bustLateFeeCache(); } catch { /* fall through to TTL */ }
       setSavedAt(new Date().toLocaleTimeString());
     }
     setSaving(false);

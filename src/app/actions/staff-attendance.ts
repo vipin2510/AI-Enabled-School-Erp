@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireProfile, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { marksOwnAttendance } from "@/lib/access";
+import { bustTag, tagFor } from "@/lib/cache/index";
 import { todayStr } from "@/lib/attendance";
 
 export type MarkState = { error?: string; markedAt?: string } | undefined;
@@ -34,6 +35,9 @@ export async function markStaffAttendance(
   );
   if (error) return { error: error.message };
 
+  // Layout caches "marked today?" for 60s per user. Bust it so the topbar
+  // flips from "Mark attendance" → "Marked at …" on the next navigation.
+  await bustTag(tagFor.staffAttendance(schoolId, profile.id, todayStr()));
   revalidatePath("/", "layout");
   return { markedAt: now };
 }

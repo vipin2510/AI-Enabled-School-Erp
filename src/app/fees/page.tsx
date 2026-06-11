@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { inr, monthName, formatDate, monthYearLabel, ACADEMIC_MONTHS } from "@/lib/utils";
 import { currentAcademicYear } from "@/lib/academic-year";
+import { getFeeStructures } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -23,14 +24,12 @@ export default async function FeesDashboard() {
   const monthIndex = now.getMonth() + 1; // 1..12, matches monthly component period_index
   const monthLabel = monthYearLabel(now);
 
-  const [studentsRes, structRes, paidRes, todayRes] = await Promise.all([
+  // structures is cached (TTL 10 min, tag bust on save). The other three are
+  // live: student roster / paid / recent receipts all change too frequently
+  // to cache without confusing the cashier.
+  const [studentsRes, structures, paidRes, todayRes] = await Promise.all([
     supabase.from("students").select("id, class_id").eq("school_id", schoolId).eq("status", "active"),
-    supabase
-      .from("fee_structures")
-      .select("class_id, fee_structure_components(kind, amount)")
-      .eq("school_id", schoolId)
-      .eq("academic_year", AY)
-      .eq("scope", "school"),
+    getFeeStructures(schoolId, AY),
     supabase
       .from("invoice_items")
       .select("invoices!inner(student_id, academic_year, payment_status)")
@@ -47,15 +46,23 @@ export default async function FeesDashboard() {
       .limit(5),
   ]);
 
+  // Money screens must NEVER silently render an empty list when a query fails
+  // — a zero outstanding number that's actually a DB outage is the kind of
+  // thing that hides for a week. Surface the first error to the route error
+  // boundary (src/app/error.tsx) instead of pretending the data is empty.
+  const firstError = studentsRes.error ?? paidRes.error ?? todayRes.error;
+  if (firstError) throw firstError;
+
   const students = studentsRes.data ?? [];
   const totalStudents = students.length;
 
   const monthlyByClass = new Map<string, number>();
-  for (const s of (structRes.data ?? []) as unknown as {
+  for (const s of structures as unknown as {
     class_id: string | null;
+    scope: string;
     fee_structure_components: { kind: string; amount: number }[];
   }[]) {
-    if (!s.class_id) continue;
+    if (s.scope !== "school" || !s.class_id) continue;
     const m = s.fee_structure_components.find((c) => c.kind === "monthly");
     monthlyByClass.set(s.class_id, Number(m?.amount ?? 0));
   }

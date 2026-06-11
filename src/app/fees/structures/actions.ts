@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireRole, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { bustTag, tagFor } from "@/lib/cache/index";
 
 // Payload shape sent by the structures editor. Every component update names
 // the structure it belongs to so the server can verify ownership before
@@ -112,5 +113,9 @@ export async function saveStructureUpdates(payload: unknown): Promise<Structures
   }
 
   revalidatePath("/fees/structures");
+  // Bust the cached fee_structures bundle so the Collect Fee picker, Fees
+  // dashboard, and Overview pick up the new amounts on their very next render
+  // (instead of waiting up to 10 min for the TTL to elapse).
+  await bustTag(tagFor.feeStructures(schoolId));
   return { ok: true, updated };
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getClasses } from "@/lib/cache";
 import { deleteStudent } from "./actions";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 
@@ -38,17 +39,16 @@ export default async function StudentsAdminPage({
   if (q) query = query.or(`full_name.ilike.%${q}%,admission_no.ilike.%${q}%`);
   if (classFilter) query = query.eq("class_id", classFilter);
 
-  const { data: students, count } = await query;
+  // Page the live student list (typed search hits this); classes dropdown is
+  // cached because it changes maybe twice a year.
+  const [{ data: students, count }, classes] = await Promise.all([
+    query,
+    getClasses(schoolId),
+  ]);
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const showingFrom = total === 0 ? 0 : from + 1;
   const showingTo = Math.min(from + (students?.length ?? 0), total);
-
-  const { data: classes } = await supabase
-    .from("classes")
-    .select("id, display_name, ordinal")
-    .eq("school_id", schoolId)
-    .order("ordinal");
 
   const pageHref = (n: number) => {
     const params = new URLSearchParams();

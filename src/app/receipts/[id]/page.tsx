@@ -17,15 +17,17 @@ export default async function ReceiptPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: invoice } = await supabase
+  // .single() returns an error when no row matches — distinguish "not found"
+  // (treat as 404) from "real DB error" (let the error boundary catch it).
+  const { data: invoice, error } = await supabase
     .from("invoices")
     .select(
       "*, students(full_name, section, father_name, contact_number, classes(display_name)), invoice_items(*)"
     )
     .eq("school_id", schoolId)
     .eq("id", id)
-    .single();
-
+    .maybeSingle();
+  if (error) throw error;
   if (!invoice) notFound();
 
   const s = (invoice as unknown as {

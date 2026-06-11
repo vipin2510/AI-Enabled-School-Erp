@@ -39,6 +39,9 @@ yarn-error.log*
 # claude code local session/settings
 .claude/
 
+# vendor mockup — kept locally for reference, never shipped or version-tracked
+reference/Pathshala Admin Demo.html
+
 # onboarding requirements (CSVs, generated PDFs, archives)
 /requirements
 

@@ -5,6 +5,7 @@ import { DEPARTMENT_NAV } from "@/lib/access";
 import { inr, monthYearLabel } from "@/lib/utils";
 import { todayStr, prettyDate } from "@/lib/attendance";
 import { currentAcademicYear } from "@/lib/academic-year";
+import { getFeeStructures } from "@/lib/cache";
 import StatCard from "@/components/stat-card";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ export default async function Overview() {
 
   const [
     studentsRes,
-    structRes,
+    structures,
     paidRes,
     attendanceTodayRes,
     booksRes,
@@ -41,12 +42,8 @@ export default async function Overview() {
     changeReqRes,
   ] = await Promise.all([
     supabase.from("students").select("id, class_id").eq("school_id", schoolId).eq("status", "active"),
-    supabase
-      .from("fee_structures")
-      .select("class_id, fee_structure_components(kind, amount)")
-      .eq("school_id", schoolId)
-      .eq("academic_year", AY)
-      .eq("scope", "school"),
+    // Cached — see @/lib/cache.ts.
+    getFeeStructures(schoolId, AY),
     supabase
       .from("invoice_items")
       .select("invoices!inner(student_id, academic_year, payment_status)")
@@ -69,11 +66,12 @@ export default async function Overview() {
 
   // Fees — paid vs outstanding for the current month.
   const monthlyByClass = new Map<string, number>();
-  for (const s of (structRes.data ?? []) as unknown as {
+  for (const s of structures as unknown as {
     class_id: string | null;
+    scope: string;
     fee_structure_components: { kind: string; amount: number }[];
   }[]) {
-    if (!s.class_id) continue;
+    if (s.scope !== "school" || !s.class_id) continue;
     const m = s.fee_structure_components.find((c) => c.kind === "monthly");
     monthlyByClass.set(s.class_id, Number(m?.amount ?? 0));
   }

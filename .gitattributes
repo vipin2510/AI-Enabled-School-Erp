@@ -1,0 +1,13 @@
+# Tell GitHub's Linguist what is and isn't "source" so the language stats on
+# the repo home page reflect what we actually write (TypeScript / React) and
+# not the byte size of bundled vendor mockups, generated docs, and CSV seeds.
+
+# Reference materials — vendor-supplied HTML mockups, docx/xlsx sources of
+# truth for fees + rosters. None of it is hand-authored code.
+reference/**           linguist-vendored
+
+# Onboarding seed data — CSV rosters per school. Counted as data, not source.
+requirements/**        linguist-generated
+
+# Supabase migrations are SQL we author; keep them visible.
+supabase/migrations/** linguist-detectable

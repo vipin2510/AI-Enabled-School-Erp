@@ -4,7 +4,7 @@ import "./globals.css";
 import Sidebar, { type NavGroup } from "@/components/sidebar";
 import Topbar from "@/components/topbar";
 import { getProfile, getCurrentDepartment, getCurrentSchool } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { getStaffAttendanceMarkedAt } from "@/lib/cache";
 import { todayStr } from "@/lib/attendance";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
@@ -94,18 +94,12 @@ async function AppShell({
   groups.push({ items: [{ href: "/requests", label: "Change Requests" }] });
 
   // Layer 2/3 mark their own attendance from the topbar; surface whether
-  // they've already done so today.
+  // they've already done so today. Cached for 60s per (school, profile, date)
+  // so the shell isn't paying for a fresh DB roundtrip on every navigation —
+  // the mark-attendance action busts the tag immediately on success.
   let markedAt: string | null = null;
   if (marksOwnAttendance(profile.role)) {
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from("staff_attendance")
-      .select("marked_at")
-      .eq("school_id", school.id)
-      .eq("profile_id", profile.id)
-      .eq("date", todayStr())
-      .maybeSingle();
-    markedAt = data?.marked_at ?? null;
+    markedAt = await getStaffAttendanceMarkedAt(school.id, profile.id, todayStr());
   }
 
   return (

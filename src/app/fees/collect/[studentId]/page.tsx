@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { currentAcademicYear } from "@/lib/academic-year";
+import { getLateFeeSettings } from "@/lib/cache";
 import CollectForm from "./collect-form";
 
 export const dynamic = "force-dynamic";
@@ -35,80 +36,72 @@ export default async function CollectFeePage({
     classes: { id: string; code: string; display_name: string; group_label: string | null } | null;
   }).classes;
 
-  // School fee structure for this class.
-  // Use order+limit (not maybeSingle) so a stray duplicate never blanks the page.
-  const { data: schoolRows } = await supabase
-    .from("fee_structures")
-    .select(STRUCT_SELECT)
-    .eq("school_id", schoolId)
-    .eq("academic_year", AY)
-    .eq("scope", "school")
-    .eq("class_id", student.class_id)
-    .order("created_at", { ascending: true })
-    .limit(1);
-  const schoolStruct = schoolRows?.[0] ?? null;
+  // Once `student` is in hand, the remaining four reads are independent of
+  // each other — fan them out in parallel instead of awaiting one after the
+  // other. On a warm path with ~150ms per Supabase roundtrip, this cuts ~450ms
+  // of latency off every Collect Fee open.
+  const primaryHostelKind = student.is_new_admission ? "new" : "old";
+  const fallbackHostelKind = primaryHostelKind === "new" ? "old" : "new";
+  const fetchHostel = (kind: "new" | "old") =>
+    supabase
+      .from("fee_structures")
+      .select(STRUCT_SELECT)
+      .eq("school_id", schoolId)
+      .eq("academic_year", AY)
+      .eq("scope", "hostel")
+      .eq("group_label", klass?.group_label ?? "__none__")
+      .eq("student_kind", kind)
+      .order("created_at", { ascending: true })
+      .limit(1);
 
-  // Hostel structure: available to ANY student whose class maps to a hostel
-  // group (not only those flagged as hostellers). Pick new/old by admission.
-  let hostelStruct = null;
-  if (klass?.group_label) {
-    const primaryKind = student.is_new_admission ? "new" : "old";
-    const fetchHostel = async (kind: "new" | "old") => {
-      const { data } = await supabase
+  const [schoolRowsRes, hostelPrimaryRes, hostelFallbackRes, paidRes, lateFeeSettings] =
+    await Promise.all([
+      supabase
         .from("fee_structures")
         .select(STRUCT_SELECT)
         .eq("school_id", schoolId)
         .eq("academic_year", AY)
-        .eq("scope", "hostel")
-        .eq("group_label", klass.group_label)
-        .eq("student_kind", kind)
+        .eq("scope", "school")
+        .eq("class_id", student.class_id)
         .order("created_at", { ascending: true })
-        .limit(1);
-      return data?.[0] ?? null;
-    };
-    hostelStruct =
-      (await fetchHostel(primaryKind)) ??
-      (await fetchHostel(primaryKind === "new" ? "old" : "new"));
-  }
+        .limit(1),
+      klass?.group_label
+        ? fetchHostel(primaryHostelKind)
+        : Promise.resolve({ data: null, error: null }),
+      klass?.group_label
+        ? fetchHostel(fallbackHostelKind)
+        : Promise.resolve({ data: null, error: null }),
+      supabase
+        .from("invoice_items")
+        .select("component_id, invoices!inner(student_id, academic_year, payment_status)")
+        .eq("school_id", schoolId)
+        .eq("invoices.student_id", studentId)
+        .eq("invoices.academic_year", AY)
+        .neq("invoices.payment_status", "void"),
+      getLateFeeSettings(schoolId),
+    ]);
 
-  // Already-paid components for this student in this AY.
-  const { data: paidItems } = await supabase
-    .from("invoice_items")
-    .select("component_id, invoices!inner(student_id, academic_year, payment_status)")
-    .eq("school_id", schoolId)
-    .eq("invoices.student_id", studentId)
-    .eq("invoices.academic_year", AY)
-    .neq("invoices.payment_status", "void");
+  if (schoolRowsRes.error) throw schoolRowsRes.error;
+  if (paidRes.error) throw paidRes.error;
+
+  // CollectForm expects its own (nullable) Structure shape; the Supabase
+  // generic infers a `Record` here so we cast to the form's expected type.
+  type StructRowAny = Parameters<typeof CollectForm>[0]["schoolStruct"];
+  const schoolStruct = (schoolRowsRes.data?.[0] ?? null) as StructRowAny;
+  // Pick the primary hostel structure if one matched; otherwise fall back to
+  // the other admission kind. Both queries already ran in parallel — we just
+  // pick the winner here.
+  const hostelStruct = (klass?.group_label
+    ? ((hostelPrimaryRes.data as unknown as Array<unknown> | null)?.[0] ??
+        (hostelFallbackRes.data as unknown as Array<unknown> | null)?.[0] ??
+        null)
+    : null) as StructRowAny;
 
   const paidComponentIds = new Set(
-    (paidItems ?? [])
+    (paidRes.data ?? [])
       .map((r) => (r as { component_id: string | null }).component_id)
       .filter(Boolean) as string[]
   );
-
-  // Late-fee settings. monthly_due_day may not exist yet (pre-migration);
-  // fall back gracefully so the page never crashes.
-  let lateFeeSettings = {
-    per_day_amount: 100,
-    grace_days: 0,
-    is_enabled: true,
-    monthly_due_day: 10,
-  };
-  const withDay = await supabase
-    .from("late_fee_settings")
-    .select("per_day_amount, grace_days, is_enabled, monthly_due_day")
-    .eq("school_id", schoolId)
-    .maybeSingle();
-  if (!withDay.error && withDay.data) {
-    lateFeeSettings = { ...lateFeeSettings, ...withDay.data };
-  } else {
-    const basic = await supabase
-      .from("late_fee_settings")
-      .select("per_day_amount, grace_days, is_enabled")
-      .eq("school_id", schoolId)
-      .maybeSingle();
-    if (basic.data) lateFeeSettings = { ...lateFeeSettings, ...basic.data };
-  }
 
   return (
     <div className="max-w-5xl">

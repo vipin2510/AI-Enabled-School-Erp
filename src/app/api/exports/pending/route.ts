@@ -47,6 +47,10 @@ export async function GET(req: Request) {
       .eq("invoices.academic_year", AY)
       .neq("invoices.payment_status", "void"),
   ]);
+  const firstErr = studentsRes.error ?? structRes.error ?? paidRes.error;
+  if (firstErr) {
+    return new Response(`Export failed: ${firstErr.message}`, { status: 500 });
+  }
 
   type StudentRow = {
     id: string;

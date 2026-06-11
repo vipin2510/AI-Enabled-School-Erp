@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { currentAcademicYear } from "@/lib/academic-year";
+import { getClasses, getFeeStructures } from "@/lib/cache";
 import BusFeeInline from "./bus-fee-inline";
 
 export const dynamic = "force-dynamic";
@@ -19,11 +20,9 @@ export default async function CollectFeePicker({
   const supabase = await createClient();
   const AY = currentAcademicYear();
 
-  const { data: classes } = await supabase
-    .from("classes")
-    .select("id, display_name, ordinal")
-    .eq("school_id", schoolId)
-    .order("ordinal");
+  // Cached: classes change a couple of times a year; no point re-fetching on
+  // every keystroke in the picker.
+  const classes = await getClasses(schoolId);
 
   let query = supabase
     .from("students")
@@ -40,7 +39,8 @@ export default async function CollectFeePicker({
   }
   if (class_id) query = query.eq("class_id", class_id);
 
-  const { data } = await query;
+  const { data, error: studentsErr } = await query;
+  if (studentsErr) throw studentsErr;
   const students = data ?? [];
 
   // Fee status (current AY, school scope): how many of the class's fee
@@ -147,20 +147,20 @@ async function computePaidStatus(
   const classIds = [...new Set(students.map((s) => s.class_id).filter(Boolean) as string[])];
   if (ids.length === 0) return result;
 
-  // Required school components per class (current AY).
+  // Required school components per class (current AY). Pulled from the cached
+  // fee-structures bundle so we don't pay for a fresh query on every Collect
+  // Fee picker render — the structures editor busts the tag on save.
   const requiredByClass = new Map<string, Set<string>>();
   if (classIds.length) {
-    const { data: structures } = await supabase
-      .from("fee_structures")
-      .select("class_id, fee_structure_components(id)")
-      .eq("school_id", schoolId)
-      .eq("academic_year", AY)
-      .eq("scope", "school")
-      .in("class_id", classIds);
-    for (const st of (structures ?? []) as {
-      class_id: string;
+    const classIdSet = new Set(classIds);
+    const structures = (await getFeeStructures(schoolId, AY)) as {
+      class_id: string | null;
+      scope: string;
       fee_structure_components: { id: string }[] | null;
-    }[]) {
+    }[];
+    for (const st of structures) {
+      if (st.scope !== "school") continue;
+      if (!st.class_id || !classIdSet.has(st.class_id)) continue;
       const set = requiredByClass.get(st.class_id) ?? new Set<string>();
       for (const c of st.fee_structure_components ?? []) set.add(c.id);
       requiredByClass.set(st.class_id, set);
@@ -169,13 +169,14 @@ async function computePaidStatus(
 
   // Paid (non-void) component ids per student this AY.
   const paidByStudent = new Map<string, Set<string>>();
-  const { data: items } = await supabase
+  const { data: items, error: itemsErr } = await supabase
     .from("invoice_items")
     .select("component_id, invoices!inner(student_id, academic_year, payment_status)")
     .eq("school_id", schoolId)
     .in("invoices.student_id", ids)
     .eq("invoices.academic_year", AY)
     .neq("invoices.payment_status", "void");
+  if (itemsErr) throw itemsErr;
   for (const it of (items ?? []) as unknown as {
     component_id: string | null;
     invoices: { student_id: string } | null;

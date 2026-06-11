@@ -52,7 +52,7 @@ export default async function ReceiptsPage({
     // Pull every monthly fee item for the chosen month, with its receipt +
     // student. One student paying three months = three rows (one per month),
     // and they appear here in whichever month they belong to.
-    const { data } = await supabase
+    const { data, error: monthErr } = await supabase
       .from("invoice_items")
       .select(
         "amount, invoices!inner(id, receipt_no, issued_at, payment_status, payment_mode, students(full_name, classes(display_name)))"
@@ -62,6 +62,7 @@ export default async function ReceiptsPage({
       .eq("period_index", monthNum)
       .neq("invoices.payment_status", "void")
       .limit(1000);
+    if (monthErr) throw monthErr;
 
     const raw = (data ?? []) as unknown as {
       amount: number;
@@ -112,6 +113,8 @@ export default async function ReceiptsPage({
         .order("issued_at", { ascending: false })
         .limit(100),
     ]);
+    if (byReceipt.error) throw byReceipt.error;
+    if (byName.error) throw byName.error;
 
     const merged = new Map<string, Row>();
     for (const r of [
@@ -124,12 +127,13 @@ export default async function ReceiptsPage({
       (a, b) => new Date(b.issued_at).getTime() - new Date(a.issued_at).getTime()
     );
   } else {
-    const { data } = await supabase
+    const { data, error: listErr } = await supabase
       .from("invoices")
       .select(SELECT)
       .eq("school_id", schoolId)
       .order("issued_at", { ascending: false })
       .limit(100);
+    if (listErr) throw listErr;
     rows = (data ?? []) as unknown as Row[];
   }
 

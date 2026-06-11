@@ -2,6 +2,8 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAnonClient } from "@/lib/supabase/anon";
+import { cached } from "@/lib/cache/index";
 import {
   COOKIE_DEPARTMENT,
   COOKIE_SCHOOL,
@@ -27,26 +29,41 @@ export type Profile = {
   is_active: boolean;
 };
 
-// The signed-in user's profile, or null. Memoized per render pass so multiple
-// callers in one request hit the DB once.
+// Pull the profile row for a known user id. Cached for 60s in the local store
+// keyed by user.id — so the profiles SELECT runs once per minute per user
+// (across all their nav clicks), not once per click. Mutations to the
+// profile row should bust `profile:<id>` if read-your-own-writes matter
+// (today the admin user editor doesn't, role/department changes propagate
+// within the TTL).
+async function loadProfileById(userId: string): Promise<Profile | null> {
+  return cached(`profile:${userId}`, [`profile:${userId}`], 60, async () => {
+    // Cookie-less client — `cached()` callbacks must not depend on request
+    // scope; RLS is permissive so a school-scoped row read here is fine.
+    const anon = createAnonClient();
+    const { data } = await anon
+      .from("profiles")
+      .select("id, email, phone, full_name, role, department, school_ids, is_active")
+      .eq("id", userId)
+      .single();
+    if (!data) return null;
+    const row = data as Omit<Profile, "school_ids"> & { school_ids: SchoolId[] | null };
+    if (!row.is_active) return null;
+    return { ...row, school_ids: row.school_ids ?? [] } as Profile;
+  });
+}
+
+// The signed-in user's profile, or null. Memoized per render pass (React
+// `cache()`) so the auth call only runs once per request, and the DB row
+// behind it is in the local LRU so subsequent requests within the TTL skip
+// it entirely. End result: a logged-in click that used to cost
+// `getUser()` + a profiles SELECT now costs `getUser()` + a Map hit.
 export const getProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
-
-  const { data } = await supabase
-    .from("profiles")
-    .select("id, email, phone, full_name, role, department, school_ids, is_active")
-    .eq("id", user.id)
-    .single();
-
-  if (!data || !data.is_active) return null;
-  return {
-    ...(data as Omit<Profile, "school_ids"> & { school_ids: SchoolId[] | null }),
-    school_ids: data.school_ids ?? [],
-  } as Profile;
+  return loadProfileById(user.id);
 });
 
 // Use in pages/actions that require a logged-in user. Redirects to /login.
