@@ -5,9 +5,11 @@
 // renders this in its place — the sidebar/topbar shell stays visible so the
 // user can navigate away or retry.
 //
-// Logging caveat: log to the browser console in dev only. In production we
-// rely on Vercel's server logs to capture the underlying exception (this
-// boundary only ever sees a digest, not the original error message).
+// The error message is shown to the user (in addition to the digest) so a
+// production incident can be diagnosed from a screenshot instead of a
+// Vercel log search. The trade-off is a one-line technical message leaking
+// to the UI, which is acceptable for an internal-tool ERP. Roll back if
+// PII ever leaks via these messages.
 
 import { useEffect } from "react";
 import Link from "next/link";
@@ -20,9 +22,10 @@ export default function RouteError({
   reset: () => void;
 }) {
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") {
-      console.error("[route-error]", error);
-    }
+    // Log to the browser console in every environment so a screen-recording
+    // captures the stack. Vercel's server-side log already has the full
+    // server-render trace, indexed by the digest below.
+    console.error("[route-error]", error);
   }, [error]);
 
   return (
@@ -38,8 +41,13 @@ export default function RouteError({
         </div>
         <p className="text-sm text-stone-600">
           Try again — most errors here are transient. If it keeps happening,
-          share the reference below with the admin.
+          share the details below with the admin.
         </p>
+        {error.message && (
+          <pre className="overflow-auto rounded-md border border-stone-200 bg-stone-50 p-3 text-xs text-stone-700 whitespace-pre-wrap break-words">
+            {error.message}
+          </pre>
+        )}
         {error.digest && (
           <p className="text-xs font-mono text-stone-400">
             Ref: {error.digest}

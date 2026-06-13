@@ -31,16 +31,30 @@ const schoolLabel = (id: string) =>
 export default async function UsersPage() {
   const me = await requireRole("admin");
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, email, phone, full_name, role, department, school_ids, is_active, created_at")
-    .order("created_at", { ascending: true });
 
-  // Surface load errors to the user instead of throwing — the form below can
-  // still be used to create a login even if the existing-users SELECT fails
-  // (e.g. transient Supabase blip during a multi-admin session).
-  const loadError = error?.message ?? null;
-  const users = (data ?? []) as ProfileRow[];
+  // Wrap the profiles read in try/catch so a Supabase-side blip (network,
+  // RLS surprise, project-shared schema change) renders a warm warning
+  // instead of crashing the whole page. Server-side console.error lands in
+  // Vercel logs with the request id so the actual cause is recoverable.
+  let users: ProfileRow[] = [];
+  let loadError: string | null = null;
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select(
+        "id, email, phone, full_name, role, department, school_ids, is_active, created_at",
+      )
+      .order("created_at", { ascending: true });
+    if (error) {
+      loadError = error.message;
+      console.error("[admin/users] profiles SELECT error:", error);
+    } else {
+      users = (data ?? []) as ProfileRow[];
+    }
+  } catch (e) {
+    loadError = e instanceof Error ? e.message : "Failed to load existing users.";
+    console.error("[admin/users] profiles SELECT threw:", e);
+  }
 
   return (
     <div className="max-w-5xl">
