@@ -42,6 +42,10 @@ yarn-error.log*
 # vendor mockup — kept locally for reference, never shipped or version-tracked
 reference/Pathshala Admin Demo.html
 
+# local diagnostic screenshots (WhatsApp dumps etc.) — not source
+WhatsApp*
+Screenshot*
+
 # onboarding requirements (CSVs, generated PDFs, archives)
 /requirements
 
