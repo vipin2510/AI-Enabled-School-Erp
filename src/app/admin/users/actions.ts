@@ -17,7 +17,12 @@ const CreateUserSchema = z
     full_name: z.string().trim().min(1, "Name is required."),
     role: z.enum(["admin", "manager", "staff"]),
     department: z.enum(["fees", "academics", "library", "results"]).nullable(),
-    school_ids: z.array(z.string().uuid()).min(1, "Select at least one school."),
+    // Don't use z.string().uuid() — Zod 4 enforces RFC 4122 versioned UUIDs
+    // (positions 13 and 17 must be 1-8 / 8-b). The seeded school ids are
+    // synthetic (00000000-…-000000000001) and don't satisfy that. The refine
+    // below against VALID_SCHOOL_IDS is the real check anyway: it pins the
+    // value to the known list, not just to "any UUID".
+    school_ids: z.array(z.string().min(1)).min(1, "Select at least one school."),
   })
   .refine((d) => d.role !== "staff" || d.department !== null, {
     message: "Staff must be assigned a department.",
