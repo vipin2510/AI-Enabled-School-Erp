@@ -31,11 +31,15 @@ const schoolLabel = (id: string) =>
 export default async function UsersPage() {
   const me = await requireRole("admin");
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select("id, email, phone, full_name, role, department, school_ids, is_active, created_at")
     .order("created_at", { ascending: true });
 
+  // Surface load errors to the user instead of throwing — the form below can
+  // still be used to create a login even if the existing-users SELECT fails
+  // (e.g. transient Supabase blip during a multi-admin session).
+  const loadError = error?.message ?? null;
   const users = (data ?? []) as ProfileRow[];
 
   return (
@@ -51,6 +55,13 @@ export default async function UsersPage() {
         <h2 className="font-medium mb-4">Create a new login</h2>
         <CreateUserForm />
       </section>
+
+      {loadError && (
+        <div className="card mb-6 border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Couldn’t load the existing-users list ({loadError}). You can still
+          create a new login above.
+        </div>
+      )}
 
       <section className="card p-0 overflow-hidden">
         <table className="w-full text-sm">
@@ -71,9 +82,9 @@ export default async function UsersPage() {
               <tr key={u.id} className="border-t border-stone-100">
                 <td className="px-4 py-2 font-medium">{u.full_name || "—"}</td>
                 <td className="px-4 py-2 text-stone-600">{u.phone || u.email || "—"}</td>
-                <td className="px-4 py-2">{ROLE_LABELS[u.role]}</td>
+                <td className="px-4 py-2">{ROLE_LABELS[u.role] ?? u.role ?? "—"}</td>
                 <td className="px-4 py-2">
-                  {u.department ? DEPARTMENT_LABELS[u.department] : "—"}
+                  {u.department ? (DEPARTMENT_LABELS[u.department] ?? u.department) : "—"}
                 </td>
                 <td className="px-4 py-2 text-stone-600">
                   {u.role === "admin"

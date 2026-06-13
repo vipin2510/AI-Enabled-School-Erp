@@ -55,15 +55,27 @@ async function loadProfileById(userId: string): Promise<Profile | null> {
 // The signed-in user's profile, or null. Memoized per render pass (React
 // `cache()`) so the auth call only runs once per request, and the DB row
 // behind it is in the local LRU so subsequent requests within the TTL skip
-// it entirely. End result: a logged-in click that used to cost
-// `getUser()` + a profiles SELECT now costs `getUser()` + a Map hit.
+// it entirely.
+//
+// Any auth failure here is treated as "logged out" rather than rethrown.
+// The Supabase SDK throws AuthApiError when the refresh token is invalid
+// (a routine condition: parallel tabs, post-deploy session resets, multi-
+// device logins). Letting that propagate would crash the page render and
+// trigger the route error boundary, which is wrong for what is just a
+// stale session — requireProfile() handles null by redirecting to /login,
+// which is the correct outcome. The proxy still clears the bad cookies
+// on the next request so the user doesn't loop.
 export const getProfile = cache(async (): Promise<Profile | null> => {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  return loadProfileById(user.id);
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+    return await loadProfileById(user.id);
+  } catch {
+    return null;
+  }
 });
 
 // Use in pages/actions that require a logged-in user. Redirects to /login.
