@@ -24,7 +24,17 @@ const StudentSchema = z.object({
   section: z.string().trim().nullable(),
   gender: z.string().trim().nullable(),
   father_name: z.string().trim().nullable(),
+  // Mobile numbers are optional; if provided, must be exactly 10 digits.
+  // Strip non-digits in `parse()` so users can paste "+91 98765 43210".
+  father_mobile: z
+    .string()
+    .regex(/^\d{10}$/, "Father's mobile must be 10 digits.")
+    .nullable(),
   mother_name: z.string().trim().nullable(),
+  mother_mobile: z
+    .string()
+    .regex(/^\d{10}$/, "Mother's mobile must be 10 digits.")
+    .nullable(),
   contact_number: z.string().trim().nullable(),
   address: z.string().trim().nullable(),
   is_hosteller: z.boolean(),
@@ -43,6 +53,12 @@ function parse(formData: FormData) {
   };
   const busRaw = blank("bus_fee_amount");
   const busNum = busRaw == null ? null : Number(busRaw);
+  // Phone fields: strip non-digits before validation so pasted formats like
+  // "+91 98765 43210" still pass the 10-digit check.
+  const mobile = (k: string) => {
+    const v = String(formData.get(k) ?? "").replace(/\D/g, "");
+    return v === "" ? null : v;
+  };
   return StudentSchema.safeParse({
     full_name: String(formData.get("full_name") ?? "").trim(),
     admission_no: blank("admission_no"),
@@ -50,7 +66,9 @@ function parse(formData: FormData) {
     section: blank("section"),
     gender: blank("gender"),
     father_name: blank("father_name"),
+    father_mobile: mobile("father_mobile"),
     mother_name: blank("mother_name"),
+    mother_mobile: mobile("mother_mobile"),
     contact_number: blank("contact_number"),
     address: blank("address"),
     is_hosteller: formData.get("is_hosteller") === "on",

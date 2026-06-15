@@ -11,7 +11,9 @@ export type StudentValues = {
   section: string;
   gender: string;
   father_name: string;
+  father_mobile: string;
   mother_name: string;
+  mother_mobile: string;
   contact_number: string;
   address: string;
   is_hosteller: boolean;
@@ -100,8 +102,30 @@ export default function StudentForm({
         <Field label="Father's name">
           <input name="father_name" defaultValue={initial?.father_name ?? ""} className={inputCls} />
         </Field>
+        <Field label="Father's mobile">
+          <input
+            name="father_mobile"
+            inputMode="numeric"
+            pattern="\d{10}"
+            maxLength={10}
+            placeholder="10-digit number"
+            defaultValue={initial?.father_mobile ?? ""}
+            className={inputCls}
+          />
+        </Field>
         <Field label="Mother's name">
           <input name="mother_name" defaultValue={initial?.mother_name ?? ""} className={inputCls} />
+        </Field>
+        <Field label="Mother's mobile">
+          <input
+            name="mother_mobile"
+            inputMode="numeric"
+            pattern="\d{10}"
+            maxLength={10}
+            placeholder="10-digit number"
+            defaultValue={initial?.mother_mobile ?? ""}
+            className={inputCls}
+          />
         </Field>
         <Field label="Status">
           <select name="status" defaultValue={initial?.status ?? "active"} className={inputCls}>
