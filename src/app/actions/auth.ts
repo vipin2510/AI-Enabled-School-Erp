@@ -39,10 +39,13 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
     return { error: "Enter your phone number or email and password." };
   }
 
+  // Phone logins go through Supabase's email provider via a synthetic email
+  // (<phone>@phone.local) so we don't need the Phone provider enabled in the
+  // Supabase dashboard. New phone accounts are created with this email set;
+  // legacy accounts are backfilled by scripts/backfill-phone-emails.ts.
   const supabase = await createClient();
-  const { error } = id.email
-    ? await supabase.auth.signInWithPassword({ email: id.email, password })
-    : await supabase.auth.signInWithPassword({ phone: id.phone!, password });
+  const signInEmail = id.email ?? `${id.phone!}@phone.local`;
+  const { error } = await supabase.auth.signInWithPassword({ email: signInEmail, password });
   if (error) {
     return { error: "Invalid credentials." };
   }

@@ -71,9 +71,14 @@ async function main() {
         },
       }
     : {
+        // Synthetic email lets sign-in use Supabase's email provider; the
+        // Phone provider is disabled in this project. Login action maps
+        // <phone> → <phone>@phone.local before calling signInWithPassword.
         phone: id.phone!,
+        email: `${id.phone!}@phone.local`,
         password,
         phone_confirm: true,
+        email_confirm: true,
         user_metadata: {
           full_name: fullName ?? "Administrator",
           role: "admin",

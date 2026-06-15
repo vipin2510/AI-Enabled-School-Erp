@@ -1,6 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+// Idle timeout: forced logout after 30 minutes without a request. Each
+// authenticated request resets the timer via the erp_last_active cookie.
+const IDLE_TIMEOUT_SECONDS = 30 * 60;
+const LAST_ACTIVE_COOKIE = "erp_last_active";
+
 // Next.js 16 renamed Middleware to Proxy (same mechanism). Two jobs:
 //   1. Keep the Supabase session alive (refresh the access token + refresh
 //      token cookie pair). This MUST live in middleware/proxy — server
@@ -36,16 +41,36 @@ export async function proxy(request: NextRequest) {
     return redirectToLogin(request, path);
   }
 
-  const expiresAt = decodeSessionExpiry(authCookies);
   const nowSeconds = Math.floor(Date.now() / 1000);
+
+  // Idle timeout: if the last-active stamp is older than 30 min, force a
+  // logout. Cookie absent → treat as "just signed in" and let the response
+  // below set it. Auth-cookie freshness is unrelated — Supabase tokens can
+  // still be valid long after the user walked away.
+  const lastActiveRaw = request.cookies.get(LAST_ACTIVE_COOKIE)?.value;
+  const lastActive = lastActiveRaw ? Number.parseInt(lastActiveRaw, 10) : null;
+  if (lastActive !== null && nowSeconds - lastActive > IDLE_TIMEOUT_SECONDS) {
+    const resp = isLogin ? passThrough(requestHeaders) : redirectToLogin(request, path);
+    clearAuthCookies(resp, authCookies);
+    resp.cookies.delete(LAST_ACTIVE_COOKIE);
+    return resp;
+  }
+
+  const expiresAt = decodeSessionExpiry(authCookies);
   // 60s headroom: if the token expires within a minute, refresh now so the
   // page-level supabase calls don't see a stale token mid-render.
   const tokenIsFresh = expiresAt !== null && expiresAt - nowSeconds > 60;
 
   if (tokenIsFresh) {
     // Fast path — no Supabase call. ~1-2ms total proxy work.
-    if (isLogin) return redirectHome(request);
-    return passThrough(requestHeaders);
+    if (isLogin) {
+      const resp = redirectHome(request);
+      setLastActive(resp, nowSeconds);
+      return resp;
+    }
+    const resp = passThrough(requestHeaders);
+    setLastActive(resp, nowSeconds);
+    return resp;
   }
 
   // Slow path — token expired (or unreadable). Run a real refresh through
@@ -85,7 +110,12 @@ export async function proxy(request: NextRequest) {
       return redirectToLogin(request, path);
     }
 
-    if (isLogin) return redirectHome(request);
+    if (isLogin) {
+      const resp = redirectHome(request);
+      setLastActive(resp, nowSeconds);
+      return resp;
+    }
+    setLastActive(response, nowSeconds);
     return response;
   } catch {
     // Refresh threw — almost always "Refresh Token Not Found" because the
@@ -122,6 +152,15 @@ function clearAuthCookies(
   for (const c of cookies) {
     response.cookies.delete(c.name);
   }
+}
+
+function setLastActive(response: NextResponse, nowSeconds: number) {
+  response.cookies.set(LAST_ACTIVE_COOKIE, String(nowSeconds), {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: IDLE_TIMEOUT_SECONDS,
+  });
 }
 
 // Decode the Supabase SSR auth cookie(s) and return `expires_at` (unix

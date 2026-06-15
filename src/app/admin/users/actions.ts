@@ -63,11 +63,16 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
   // Admin always sees every school regardless of what the form said.
   const finalSchoolIds = role === "admin" ? VALID_SCHOOL_IDS : school_ids;
 
+  // Set a synthetic email alongside the phone so sign-in can go through
+  // Supabase's email provider (the Phone provider is disabled at the project
+  // level). See src/app/actions/auth.ts for the matching login flow.
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.createUser({
     phone,
+    email: `${phone}@phone.local`,
     password,
     phone_confirm: true,
+    email_confirm: true,
     user_metadata: {
       full_name,
       role,
