@@ -40,6 +40,16 @@ export default async function SubjectsPage() {
         </p>
       </header>
 
+      {(classes ?? []).length === 0 && (
+        <div className="card p-4 text-sm text-stone-500">
+          No classes yet for this school. Add classes from{" "}
+          <a href="/academics/classes" className="text-accent hover:underline">
+            Classes &amp; Sections
+          </a>{" "}
+          first, then come back here to attach subjects.
+        </div>
+      )}
+
       <div className="space-y-3">
         {(classes ?? []).map((c) => {
           const list = byClass.get(c.id) ?? [];

@@ -4,6 +4,28 @@ import { revalidatePath } from "next/cache";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
+// Admin/manager only — adds a new class to the currently active school.
+// `code` is unique per school (see migration 0017). `ordinal` controls
+// sort order across the academics screens; the form defaults it to
+// max(existing) + 1 so adds land at the end.
+export async function addClass(formData: FormData) {
+  const profile = await requireDepartment("academics");
+  if (profile.role === "staff") return;
+  const schoolId = await getCurrentSchoolId(profile);
+  const code = String(formData.get("code") ?? "").trim().toUpperCase();
+  const display_name = String(formData.get("display_name") ?? "").trim();
+  const ordinalRaw = String(formData.get("ordinal") ?? "").trim();
+  const ordinal = ordinalRaw === "" ? null : Number.parseInt(ordinalRaw, 10);
+  if (!code || !display_name || ordinal == null || !Number.isFinite(ordinal)) return;
+
+  const supabase = await createClient();
+  await supabase
+    .from("classes")
+    .insert({ code, display_name, ordinal, school_id: schoolId });
+  revalidatePath("/academics/classes");
+  revalidatePath("/academics/subjects");
+}
+
 export async function addSection(formData: FormData) {
   const profile = await requireDepartment("academics");
   const schoolId = await getCurrentSchoolId(profile);
