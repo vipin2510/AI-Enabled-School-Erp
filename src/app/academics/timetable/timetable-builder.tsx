@@ -47,6 +47,10 @@ function rowsForClass(seeds: SubjectSeed[] | undefined): SubjectRow[] {
   );
 }
 
+// Sentinel for the "All classes" dropdown option — drives a school-wide
+// schedule (no section, manually-entered subjects).
+const ALL_CLASSES = "__all__";
+
 export default function TimetableBuilder({ classes, sectionsByClass, subjectsByClass }: Props) {
   const initialClassId = classes[0]?.id ?? "";
   const [classId, setClassId] = useState(initialClassId);
@@ -62,21 +66,31 @@ export default function TimetableBuilder({ classes, sectionsByClass, subjectsByC
   const [result, setResult] = useState<GenerateResult | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
 
+  const isAllClasses = classId === ALL_CLASSES;
+
   // Derived display name used as the timetable header and PDF filename.
   // Falls back to display_name alone when no section is picked.
   const klass = classes.find((c) => c.id === classId);
-  const className = klass
-    ? section
-      ? `${klass.display_name} — ${section}`
-      : klass.display_name
-    : "";
+  const className = isAllClasses
+    ? "All classes"
+    : klass
+      ? section
+        ? `${klass.display_name} — ${section}`
+        : klass.display_name
+      : "";
 
   function pickClass(newClassId: string) {
     setClassId(newClassId);
+    setResult(null);
+    if (newClassId === ALL_CLASSES) {
+      // School-wide schedule: no section, preserve current subject list so
+      // the user can build a cross-class plan without losing their edits.
+      setSection("");
+      return;
+    }
     const sects = sectionsByClass[newClassId] ?? [];
     setSection(sects[0] ?? "");
     setSubjects(rowsForClass(subjectsByClass[newClassId]));
-    setResult(null);
   }
 
   const input: TimetableInput = useMemo(
@@ -166,6 +180,7 @@ export default function TimetableBuilder({ classes, sectionsByClass, subjectsByC
               value={classId}
               onChange={(e) => pickClass(e.target.value)}
             >
+              <option value={ALL_CLASSES}>All classes</option>
               {classes.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.display_name}
@@ -174,7 +189,14 @@ export default function TimetableBuilder({ classes, sectionsByClass, subjectsByC
             </select>
           </Labeled>
           <Labeled label="Section">
-            {(sectionsByClass[classId] ?? []).length ? (
+            {isAllClasses ? (
+              <input
+                className={field + " text-stone-400"}
+                value="—"
+                disabled
+                aria-label="Section is not applicable for All classes"
+              />
+            ) : (sectionsByClass[classId] ?? []).length ? (
               <select
                 className={field}
                 value={section}
