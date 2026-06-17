@@ -15,6 +15,15 @@ const field =
 
 type SubjectRow = SubjectInput & { id: string };
 
+export type ClassOption = { id: string; display_name: string; ordinal: number };
+export type SubjectSeed = { name: string; kind: SubjectKind };
+
+type Props = {
+  classes: ClassOption[];
+  sectionsByClass: Record<string, string[]>;
+  subjectsByClass: Record<string, SubjectSeed[]>;
+};
+
 function newRow(seed: Partial<SubjectInput> = {}): SubjectRow {
   return {
     id: crypto.randomUUID(),
@@ -25,18 +34,23 @@ function newRow(seed: Partial<SubjectInput> = {}): SubjectRow {
   };
 }
 
-const DEFAULT_SUBJECTS: SubjectRow[] = [
-  newRow({ name: "English", periodsPerWeek: 6 }),
-  newRow({ name: "Hindi", periodsPerWeek: 5 }),
-  newRow({ name: "Mathematics", periodsPerWeek: 6 }),
-  newRow({ name: "Science", periodsPerWeek: 5 }),
-  newRow({ name: "Social Studies", periodsPerWeek: 4 }),
-  newRow({ name: "Computer", periodsPerWeek: 2, kind: "co_curricular" }),
-  newRow({ name: "PE / Games", periodsPerWeek: 2, kind: "co_curricular" }),
-];
+// Seed the subjects table from a class's stored subjects. Empty when the
+// class has no subjects yet — the Add subject button stays for ad-hoc rows.
+function rowsForClass(seeds: SubjectSeed[] | undefined): SubjectRow[] {
+  if (!seeds || seeds.length === 0) return [];
+  return seeds.map((s) =>
+    newRow({
+      name: s.name,
+      kind: s.kind,
+      periodsPerWeek: s.kind === "co_curricular" ? 2 : 5,
+    })
+  );
+}
 
-export default function TimetableBuilder() {
-  const [className, setClassName] = useState("Class 6 — A");
+export default function TimetableBuilder({ classes, sectionsByClass, subjectsByClass }: Props) {
+  const initialClassId = classes[0]?.id ?? "";
+  const [classId, setClassId] = useState(initialClassId);
+  const [section, setSection] = useState((sectionsByClass[initialClassId] ?? [])[0] ?? "");
   const [daysPerWeek, setDaysPerWeek] = useState<5 | 6>(6);
   const [periodsPerDay, setPeriodsPerDay] = useState(8);
   const [periodMinutes, setPeriodMinutes] = useState(40);
@@ -44,9 +58,26 @@ export default function TimetableBuilder() {
   const [lunchAfterPeriod, setLunchAfterPeriod] = useState(4);
   const [lunchMinutes, setLunchMinutes] = useState(30);
   const [totalTeachers, setTotalTeachers] = useState(12);
-  const [subjects, setSubjects] = useState<SubjectRow[]>(DEFAULT_SUBJECTS);
+  const [subjects, setSubjects] = useState<SubjectRow[]>(() => rowsForClass(subjectsByClass[initialClassId]));
   const [result, setResult] = useState<GenerateResult | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+
+  // Derived display name used as the timetable header and PDF filename.
+  // Falls back to display_name alone when no section is picked.
+  const klass = classes.find((c) => c.id === classId);
+  const className = klass
+    ? section
+      ? `${klass.display_name} — ${section}`
+      : klass.display_name
+    : "";
+
+  function pickClass(newClassId: string) {
+    setClassId(newClassId);
+    const sects = sectionsByClass[newClassId] ?? [];
+    setSection(sects[0] ?? "");
+    setSubjects(rowsForClass(subjectsByClass[newClassId]));
+    setResult(null);
+  }
 
   const input: TimetableInput = useMemo(
     () => ({
@@ -129,13 +160,41 @@ export default function TimetableBuilder() {
           1 · Class & schedule
         </h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Labeled label="Class name">
-            <input
+          <Labeled label="Class">
+            <select
               className={field}
-              value={className}
-              onChange={(e) => setClassName(e.target.value)}
-              placeholder="e.g. Class 6 — A"
-            />
+              value={classId}
+              onChange={(e) => pickClass(e.target.value)}
+            >
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.display_name}
+                </option>
+              ))}
+            </select>
+          </Labeled>
+          <Labeled label="Section">
+            {(sectionsByClass[classId] ?? []).length ? (
+              <select
+                className={field}
+                value={section}
+                onChange={(e) => setSection(e.target.value)}
+              >
+                <option value="">— None —</option>
+                {(sectionsByClass[classId] ?? []).map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className={field}
+                value={section}
+                onChange={(e) => setSection(e.target.value)}
+                placeholder="No sections defined"
+              />
+            )}
           </Labeled>
           <Labeled label="Days per week">
             <select
