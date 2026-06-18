@@ -52,7 +52,12 @@ export default async function Overview() {
       .eq("period_index", monthIndex)
       .eq("invoices.academic_year", AY)
       .neq("invoices.payment_status", "void"),
-    supabase.from("attendance").select("status").eq("school_id", schoolId).eq("date", today),
+    // Join students so we can split today's attendance by new-admission vs old.
+    supabase
+      .from("attendance")
+      .select("status, students!inner(is_new_admission)")
+      .eq("school_id", schoolId)
+      .eq("date", today),
     supabase.from("books").select("id", { count: "exact", head: true }).eq("school_id", schoolId),
     supabase.from("book_loans").select("id", { count: "exact", head: true }).eq("school_id", schoolId).is("returned_at", null),
     supabase.from("book_requests").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("status", "open"),
@@ -85,11 +90,22 @@ export default async function Overview() {
     .filter((s) => !paidSet.has(s.id))
     .reduce((sum, s) => sum + (s.class_id ? monthlyByClass.get(s.class_id) ?? 0 : 0), 0);
 
-  // Attendance today.
-  const attRows = (attendanceTodayRes.data ?? []) as { status: "present" | "absent" }[];
+  // Attendance today, split by new vs old admission so leadership can see at
+  // a glance whether new admits are showing up.
+  const attRows = (attendanceTodayRes.data ?? []) as unknown as {
+    status: "present" | "absent";
+    students: { is_new_admission: boolean | null };
+  }[];
   const presentToday = attRows.filter((r) => r.status === "present").length;
   const markedToday = attRows.length;
   const attRate = markedToday ? Math.round((presentToday / markedToday) * 100) : 0;
+
+  const newAdmitRows = attRows.filter((r) => r.students.is_new_admission === true);
+  const oldAdmitRows = attRows.filter((r) => r.students.is_new_admission !== true);
+  const newPresent = newAdmitRows.filter((r) => r.status === "present").length;
+  const oldPresent = oldAdmitRows.filter((r) => r.status === "present").length;
+  const newAbsent = newAdmitRows.length - newPresent;
+  const oldAbsent = oldAdmitRows.length - oldPresent;
 
   // Library + staff.
   const totalBooks = booksRes.count ?? 0;
@@ -132,6 +148,32 @@ export default async function Overview() {
           href="/academics"
         />
       </Section>
+
+      {markedToday > 0 && (
+        <section className="mb-8">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+              Attendance Breakdown · Today
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <AdmissionBreakdownCard
+              title="New Admissions"
+              icon="🆕"
+              total={newAdmitRows.length}
+              present={newPresent}
+              absent={newAbsent}
+            />
+            <AdmissionBreakdownCard
+              title="Existing Students"
+              icon="🎒"
+              total={oldAdmitRows.length}
+              present={oldPresent}
+              absent={oldAbsent}
+            />
+          </div>
+        </section>
+      )}
 
       <Section title="Fees" href="/fees">
         <StatCard
@@ -187,6 +229,53 @@ export default async function Overview() {
           href="/requests"
         />
       </Section>
+    </div>
+  );
+}
+
+function AdmissionBreakdownCard({
+  title,
+  icon,
+  total,
+  present,
+  absent,
+}: {
+  title: string;
+  icon: string;
+  total: number;
+  present: number;
+  absent: number;
+}) {
+  const rate = total ? Math.round((present / total) * 100) : 0;
+  return (
+    <div className="card p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span aria-hidden className="text-lg">{icon}</span>
+          <h3 className="text-sm font-semibold text-stone-800">{title}</h3>
+        </div>
+        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+          {total} marked
+        </span>
+      </div>
+      {total === 0 ? (
+        <p className="text-sm text-stone-500">No attendance marked yet.</p>
+      ) : (
+        <div className="grid grid-cols-3 gap-3 text-center">
+          <div>
+            <div className="text-2xl font-semibold tabular-nums text-emerald-700">{present}</div>
+            <div className="text-xs uppercase tracking-wide text-stone-500">Present</div>
+          </div>
+          <div>
+            <div className="text-2xl font-semibold tabular-nums text-rose-700">{absent}</div>
+            <div className="text-xs uppercase tracking-wide text-stone-500">Absent</div>
+          </div>
+          <div>
+            <div className="text-2xl font-semibold tabular-nums text-stone-800">{rate}%</div>
+            <div className="text-xs uppercase tracking-wide text-stone-500">Rate</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

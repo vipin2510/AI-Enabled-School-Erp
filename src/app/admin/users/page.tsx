@@ -90,8 +90,8 @@ async function UsersTable({ currentUserId }: { currentUserId: string }) {
   }
 
   return (
-    <section className="card p-0 overflow-hidden">
-      <table className="w-full text-sm">
+    <section className="card overflow-x-auto p-0">
+      <table className="w-full min-w-[1000px] text-sm">
         <thead className="bg-stone-50 text-stone-500 text-left">
           <tr>
             <th className="px-4 py-2 font-medium">Name</th>
@@ -101,7 +101,7 @@ async function UsersTable({ currentUserId }: { currentUserId: string }) {
             <th className="px-4 py-2 font-medium">Schools</th>
             <th className="px-4 py-2 font-medium">Created</th>
             <th className="px-4 py-2 font-medium">Status</th>
-            <th className="px-4 py-2"></th>
+            <th className="px-4 py-2 text-right font-medium whitespace-nowrap">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -147,7 +147,7 @@ async function UsersTable({ currentUserId }: { currentUserId: string }) {
                   <span className="text-stone-400">Inactive</span>
                 )}
               </td>
-              <td className="px-4 py-2 text-right">
+              <td className="px-4 py-2 text-right whitespace-nowrap">
                 {u.id === currentUserId ? (
                   <span className="text-xs text-stone-400">You</span>
                 ) : (

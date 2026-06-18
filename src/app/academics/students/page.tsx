@@ -104,6 +104,7 @@ export default async function StudentsAdminPage({
         <table className="w-full text-sm">
           <thead className="bg-stone-50 text-stone-500 text-left">
             <tr>
+              <th className="w-12 px-4 py-2 font-medium">S.No</th>
               <th className="px-4 py-2 font-medium">Name</th>
               <th className="px-4 py-2 font-medium">Class</th>
               <th className="px-4 py-2 font-medium">Father</th>
@@ -113,10 +114,11 @@ export default async function StudentsAdminPage({
             </tr>
           </thead>
           <tbody>
-            {(students ?? []).map((s) => {
+            {(students ?? []).map((s, i) => {
               const klass = (s as unknown as { classes: { display_name?: string } | null }).classes;
               return (
                 <tr key={s.id} className="border-t border-stone-100">
+                  <td className="px-4 py-2 tabular-nums text-stone-500">{from + i + 1}</td>
                   <td className="px-4 py-2 font-medium">
                     <Link href={`/academics/students/${s.id}`} className="text-stone-900 hover:text-accent hover:underline">
                       {s.full_name}
@@ -151,7 +153,7 @@ export default async function StudentsAdminPage({
             })}
             {!students?.length && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-stone-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-stone-500">
                   No students found.
                 </td>
               </tr>

@@ -83,11 +83,19 @@ export default async function StaffAttendancePage({
 
   return (
     <div className="max-w-5xl">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Staff Attendance</h1>
-        <p className="text-stone-500 text-sm">
-          Layer 2 &amp; Layer 3 mark themselves present from their device — {prettyDate(today)}.
-        </p>
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Staff Attendance</h1>
+          <p className="text-stone-500 text-sm">
+            Layer 2 &amp; Layer 3 mark themselves present from their device — {prettyDate(today)}.
+          </p>
+        </div>
+        <a
+          href="/api/admin/staff-attendance-export"
+          className="rounded-lg border border-stone-200 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-200"
+        >
+          ⤓ Export CSV
+        </a>
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -142,7 +150,12 @@ export default async function StaffAttendancePage({
                 return (
                   <tr key={s.id} className="border-t border-stone-100">
                     <td className="px-5 py-2">
-                      <div className="font-medium text-stone-800">{s.full_name || "—"}</div>
+                      <Link
+                        href={`/admin/staff/${s.id}`}
+                        className="font-medium text-stone-800 hover:text-accent hover:underline"
+                      >
+                        {s.full_name || "—"}
+                      </Link>
                       <div className="text-xs text-stone-400">{s.email}</div>
                     </td>
                     <td className="px-3 py-2 text-stone-600">{ROLE_LABELS[s.role]}</td>
