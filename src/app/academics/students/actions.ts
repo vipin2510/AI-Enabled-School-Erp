@@ -23,6 +23,9 @@ const StudentSchema = z.object({
   class_id: z.string().uuid().nullable(),
   section: z.string().trim().nullable(),
   gender: z.string().trim().nullable(),
+  blood_group: z.string().trim().nullable(),
+  // HTML date input emits YYYY-MM-DD; Postgres date column accepts that.
+  date_of_birth: z.string().trim().nullable(),
   father_name: z.string().trim().nullable(),
   // Mobile numbers are optional; if provided, must be exactly 10 digits.
   // Strip non-digits in `parse()` so users can paste "+91 98765 43210".
@@ -36,12 +39,13 @@ const StudentSchema = z.object({
     .regex(/^\d{10}$/, "Mother's mobile must be 10 digits.")
     .nullable(),
   contact_number: z.string().trim().nullable(),
+  alt_contact: z.string().trim().nullable(),
   address: z.string().trim().nullable(),
   is_hosteller: z.boolean(),
   is_new_admission: z.boolean(),
   status: z.enum(["active", "inactive", "alumni"]),
-  // bus_fee_amount is no longer set from the edit form — see
-  // setBusFeeAmount on the student profile's Bus Fee card.
+  // Per-month bus fee; null means student does not use the bus.
+  bus_fee_amount: z.number().int().nonnegative().nullable(),
 });
 
 export type StudentState = { error?: string } | undefined;
@@ -57,21 +61,27 @@ function parse(formData: FormData) {
     const v = String(formData.get(k) ?? "").replace(/\D/g, "");
     return v === "" ? null : v;
   };
+  const busRaw = blank("bus_fee_amount");
+  const busNum = busRaw == null ? null : Number(busRaw);
   return StudentSchema.safeParse({
     full_name: String(formData.get("full_name") ?? "").trim(),
     admission_no: blank("admission_no"),
     class_id: blank("class_id"),
     section: blank("section"),
     gender: blank("gender"),
+    blood_group: blank("blood_group"),
+    date_of_birth: blank("date_of_birth"),
     father_name: blank("father_name"),
     father_mobile: mobile("father_mobile"),
     mother_name: blank("mother_name"),
     mother_mobile: mobile("mother_mobile"),
     contact_number: blank("contact_number"),
+    alt_contact: blank("alt_contact"),
     address: blank("address"),
     is_hosteller: formData.get("is_hosteller") === "on",
     is_new_admission: formData.get("is_new_admission") === "on",
     status: String(formData.get("status") ?? "active"),
+    bus_fee_amount: busNum != null && Number.isFinite(busNum) ? busNum : null,
   });
 }
 
@@ -140,74 +150,6 @@ export async function updateStudent(
   revalidatePath("/academics/students");
   revalidatePath(`/academics/students/${id}`);
   redirect(`/academics/students/${id}`);
-}
-
-// Update the student's monthly bus fee amount. Wired into the bus fee
-// card on the student profile so admins can set/clear the amount without
-// leaving the page.
-export async function setBusFeeAmount(formData: FormData) {
-  const profile = await requireDepartment("academics");
-  const schoolId = await getCurrentSchoolId(profile);
-  const student_id = String(formData.get("student_id") ?? "");
-  const raw = String(formData.get("bus_fee_amount") ?? "").trim();
-  if (!student_id) return;
-
-  const n = raw === "" ? null : Number(raw);
-  const value = n != null && Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
-
-  const supabase = await createClient();
-  await supabase
-    .from("students")
-    .update({ bus_fee_amount: value })
-    .eq("school_id", schoolId)
-    .eq("id", student_id);
-
-  revalidatePath(`/academics/students/${student_id}`);
-}
-
-// Toggle a single bus-fee month for the current academic year. A row
-// existing in student_bus_fee_months means "paid"; toggling deletes it.
-// Caller is the academics dept (or admin/manager).
-export async function toggleBusFeeMonth(formData: FormData) {
-  const profile = await requireDepartment("academics");
-  const schoolId = await getCurrentSchoolId(profile);
-  const student_id = String(formData.get("student_id") ?? "");
-  const academic_year = String(formData.get("academic_year") ?? "").trim();
-  const monthRaw = String(formData.get("month_index") ?? "");
-  const month_index = Number.parseInt(monthRaw, 10);
-  const currentlyPaid = String(formData.get("currently_paid") ?? "") === "true";
-  if (
-    !student_id ||
-    !academic_year ||
-    !Number.isFinite(month_index) ||
-    month_index < 1 ||
-    month_index > 12
-  ) {
-    return;
-  }
-
-  const supabase = await createClient();
-  if (currentlyPaid) {
-    await supabase
-      .from("student_bus_fee_months")
-      .delete()
-      .eq("school_id", schoolId)
-      .eq("student_id", student_id)
-      .eq("academic_year", academic_year)
-      .eq("month_index", month_index);
-  } else {
-    await supabase
-      .from("student_bus_fee_months")
-      .insert({
-        school_id: schoolId,
-        student_id,
-        academic_year,
-        month_index,
-        marked_by: profile.id,
-      });
-  }
-
-  revalidatePath(`/academics/students/${student_id}`);
 }
 
 export async function deleteStudent(formData: FormData) {

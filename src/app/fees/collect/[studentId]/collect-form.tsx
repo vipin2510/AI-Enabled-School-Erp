@@ -36,6 +36,10 @@ type Props = {
   hostelStruct: Structure;
   hostelDefaultOpen: boolean;
   paidComponentIds: string[];
+  // Calendar-month indexes (1..12) that already have a paid bus-fee item
+  // for this student in the current AY — used to lock those months in the
+  // Bus Fees card.
+  paidBusMonths: number[];
   lateFeeSettings: {
     per_day_amount: number;
     grace_days: number;
@@ -43,11 +47,22 @@ type Props = {
     monthly_due_day: number;
   };
   isNewAdmission: boolean;
-  // Per-month bus fee from the student's profile. null = no bus service; the
-  // collect form adds a synthetic Bus Fee line that scales with the number of
-  // monthly slots the cashier selects.
+  // Per-month bus fee from the student's profile. null = no bus service.
   busFeeAmount: number | null;
 };
+
+// Synthetic component id prefix used for Bus Fee rows so they ride the
+// same `selected` state as real fee_structure_components. On submit we
+// translate these back to `component_id: null` items.
+const BUS_ID_PREFIX = "bus:";
+const isBusComponent = (c: Component) => c.id.startsWith(BUS_ID_PREFIX);
+
+// School-year order: Apr (4) → Mar (3) wrapping through the calendar year.
+const BUS_SCHOOL_YEAR = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3] as const;
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
 // Registration & new-admission charges only apply on a student's first year.
 // Once they're an existing ("old") student we hide them so they can never be
@@ -82,11 +97,8 @@ function todayLocalIso() {
 
 type SelectedItem = {
   component: Component;
-  scope: "school" | "hostel";
+  scope: "school" | "hostel" | "bus";
   waived: boolean;
-  // Per-month bus-fare add-on. Only meaningful when component.kind === "monthly"
-  // and the student has a positive bus_fee_amount on their profile.
-  withBus?: boolean;
 };
 
 export default function CollectForm({
@@ -97,18 +109,43 @@ export default function CollectForm({
   hostelStruct,
   hostelDefaultOpen,
   paidComponentIds,
+  paidBusMonths,
   lateFeeSettings,
   isNewAdmission,
   busFeeAmount,
 }: Props) {
   const router = useRouter();
   const paidSet = useMemo(() => new Set(paidComponentIds), [paidComponentIds]);
+  const paidBusSet = useMemo(() => new Set(paidBusMonths), [paidBusMonths]);
 
   const isApplicable = (c: Component) =>
     (isNewAdmission || !NEW_ADMISSION_ONLY_KINDS.has(c.kind)) && !isHiddenMonthly(c);
 
+  const busAvailable = busFeeAmount != null && busFeeAmount > 0;
+
+  // Synthetic Bus Fee components — one per school-year month, sourced from
+  // the per-student bus_fee_amount. They flow through the same `selected`
+  // state as real components; on submit we strip the synthetic id and send
+  // component_id: null. April is hidden via HIDDEN_MONTHLY_PERIODS just
+  // like school monthlies.
+  const busComponents = useMemo<Component[]>(() => {
+    if (!busAvailable) return [];
+    return BUS_SCHOOL_YEAR.map((m, i) => ({
+      id: `${BUS_ID_PREFIX}${m}`,
+      kind: "monthly" as FeeKind,
+      label: `Bus Fee — ${MONTH_NAMES[m - 1]}`,
+      period_index: m,
+      amount: busFeeAmount ?? 0,
+      due_date: null,
+      is_refundable: false,
+      is_one_time: false,
+      sort_order: i,
+    }));
+  }, [busAvailable, busFeeAmount]);
+
   const [selected, setSelected] = useState<Record<string, SelectedItem>>({});
   const [showHostel, setShowHostel] = useState(hostelDefaultOpen);
+  const [showBus, setShowBus] = useState(busAvailable);
   const [lateFeeWaived, setLateFeeWaived] = useState(false);
   const [waiverReason, setWaiverReason] = useState("");
   const [paymentMode, setPaymentMode] = useState("cash");
@@ -124,18 +161,13 @@ export default function CollectForm({
   // future, intentional second collection.
   const idempotencyKey = useRef<string>(newIdempotencyKey());
 
-  const busAvailable = busFeeAmount != null && busFeeAmount > 0;
-
-  // Adding a monthly slot auto-includes the bus add-on iff the student is on
-  // the bus. Cashier can untick the bus chip per month.
-  const newItem = (c: Component, scope: "school" | "hostel"): SelectedItem => ({
+  const newItem = (c: Component, scope: "school" | "hostel" | "bus"): SelectedItem => ({
     component: c,
     scope,
     waived: false,
-    withBus: c.kind === "monthly" && busAvailable ? true : undefined,
   });
 
-  const toggleItem = (c: Component, scope: "school" | "hostel") => {
+  const toggleItem = (c: Component, scope: "school" | "hostel" | "bus") => {
     setSelected((prev) => {
       const next = { ...prev };
       if (next[c.id]) delete next[c.id];
@@ -149,14 +181,6 @@ export default function CollectForm({
       const next = { ...prev };
       if (next[componentId]) next[componentId] = { ...next[componentId], waived: !next[componentId].waived };
       return next;
-    });
-  };
-
-  const toggleBusFor = (componentId: string) => {
-    setSelected((prev) => {
-      const item = prev[componentId];
-      if (!item || item.component.kind !== "monthly") return prev;
-      return { ...prev, [componentId]: { ...item, withBus: !item.withBus } };
     });
   };
 
@@ -188,6 +212,18 @@ export default function CollectForm({
     });
   };
 
+  const selectAllBusMonths = () => {
+    setSelected((prev) => {
+      const next = { ...prev };
+      for (const c of busComponents) {
+        if (paidBusSet.has(c.period_index ?? -1)) continue;
+        if (isHiddenMonthly(c)) continue;
+        if (!next[c.id]) next[c.id] = newItem(c, "bus");
+      }
+      return next;
+    });
+  };
+
   const clearAll = () => setSelected({});
 
   const toggleHostel = () => {
@@ -206,24 +242,37 @@ export default function CollectForm({
     });
   };
 
+  // Toggle the Bus Fees section. Closing drops any selected bus items so
+  // the payable total reflects what's visible — same pattern as hostel.
+  const toggleBus = () => {
+    setShowBus((open) => {
+      if (open) {
+        setSelected((prev) => {
+          const next = { ...prev };
+          for (const [id, item] of Object.entries(prev)) {
+            if (item.scope === "bus") delete next[id];
+          }
+          return next;
+        });
+      }
+      return !open;
+    });
+  };
+
   // --- Totals ---
   const today = new Date();
   const items = Object.values(selected);
-  const subtotalItems = items
+  const nonBusItems = items.filter((i) => !isBusComponent(i.component));
+  const busItems = items.filter((i) => isBusComponent(i.component));
+  const subtotalItems = nonBusItems
     .filter((i) => !i.waived)
     .reduce((s, i) => s + Number(i.component.amount), 0);
   const waiverAmount = items
     .filter((i) => i.waived)
     .reduce((s, i) => s + Number(i.component.amount), 0);
 
-  // Bus fee is now opt-in per month. Each selected, non-waived monthly slot
-  // can independently include its month's bus fare — the cashier ticks "+ Bus"
-  // on the months a student rode the bus for. The total bus charge is the
-  // sum across those months.
-  const busMonths = busAvailable
-    ? items.filter((i) => !i.waived && i.component.kind === "monthly" && i.withBus)
-    : [];
-  const busAmount = busAvailable ? busMonths.length * (busFeeAmount as number) : 0;
+  const busMonthsSelected = busItems.filter((i) => !i.waived);
+  const busAmount = busMonthsSelected.reduce((s, i) => s + Number(i.component.amount), 0);
   const subtotal = subtotalItems + busAmount;
 
   // Late fee: per-day from settings × days past due (only for items with a due_date that's past).
@@ -257,8 +306,11 @@ export default function CollectForm({
         waived: boolean;
         waiver_reason: string | null;
       };
+      // Bus items live as standalone invoice items (component_id: null) so
+      // they aren't tied to a fee_structure_components row. Real fee items
+      // pass through their component id unchanged.
       const apiItems: ApiItem[] = items.map((i) => ({
-        component_id: i.component.id,
+        component_id: isBusComponent(i.component) ? null : i.component.id,
         description: i.component.label,
         kind: i.component.kind,
         period_index: i.component.period_index,
@@ -266,19 +318,6 @@ export default function CollectForm({
         waived: i.waived,
         waiver_reason: i.waived ? waiverReason || null : null,
       }));
-      // Append one Bus Fee line per selected month — keeps the receipt /
-      // ledger month-attributable instead of one blended row.
-      for (const i of busMonths) {
-        apiItems.push({
-          component_id: null,
-          description: `Bus Fee — ${i.component.label}`,
-          kind: "monthly",
-          period_index: i.component.period_index,
-          amount: busFeeAmount as number,
-          waived: false,
-          waiver_reason: null,
-        });
-      }
       const res = await fetch("/api/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -374,8 +413,6 @@ export default function CollectForm({
             paidSet={paidSet}
             onToggle={toggleItem}
             onToggleWaiver={toggleWaiver}
-            onToggleBus={toggleBusFor}
-            busFeeAmount={busAvailable ? (busFeeAmount as number) : null}
             columns={3}
           />
         )}
@@ -410,6 +447,32 @@ export default function CollectForm({
               + Add hostel fees
             </Button>
           ))}
+
+        {busAvailable &&
+          (showBus ? (
+            <div className="space-y-2">
+              <BusFeesCard
+                components={busComponents}
+                selected={selected}
+                paidBusSet={paidBusSet}
+                busFeeAmount={busFeeAmount as number}
+                onToggle={(c) => toggleItem(c, "bus")}
+                onSelectAll={selectAllBusMonths}
+                isHidden={isHiddenMonthly}
+              />
+              <button
+                type="button"
+                onClick={toggleBus}
+                className="text-sm text-stone-500 hover:text-stone-900"
+              >
+                Remove bus fees
+              </button>
+            </div>
+          ) : (
+            <Button variant="secondary" type="button" onClick={toggleBus}>
+              + Add bus fees
+            </Button>
+          ))}
       </div>
 
       <aside className="space-y-4">
@@ -421,12 +484,12 @@ export default function CollectForm({
             {busAvailable && (
               <Row
                 label={
-                  busMonths.length > 0
-                    ? `Bus Fee (${busMonths.length} × ${inr(busFeeAmount as number)})`
+                  busMonthsSelected.length > 0
+                    ? `Bus Fee (${busMonthsSelected.length} × ${inr(busFeeAmount as number)})`
                     : "Bus Fee"
                 }
-                value={busMonths.length > 0 ? inr(busAmount) : "—"}
-                muted={busMonths.length === 0}
+                value={busMonthsSelected.length > 0 ? inr(busAmount) : "—"}
+                muted={busMonthsSelected.length === 0}
               />
             )}
             {waiverAmount > 0 && (
@@ -444,8 +507,8 @@ export default function CollectForm({
           <div className="pt-2 space-y-3">
             {busAvailable && (
               <p className="text-xs text-stone-500">
-                Bus ₹{busFeeAmount}/month — tick <strong>+ Bus</strong> on the
-                months this student rode for.
+                Bus ₹{busFeeAmount}/month — open <strong>Add bus fees</strong>{" "}
+                and tick the months this student rode for.
               </p>
             )}
 
@@ -555,23 +618,17 @@ function ComponentGroup({
   paidSet,
   onToggle,
   onToggleWaiver,
-  onToggleBus,
-  busFeeAmount,
   columns = 2,
 }: {
   label: string;
   components: Component[];
-  scope: "school" | "hostel";
+  scope: "school" | "hostel" | "bus";
   selected: Record<string, SelectedItem>;
   paidSet: Set<string>;
-  onToggle: (c: Component, scope: "school" | "hostel") => void;
+  onToggle: (c: Component, scope: "school" | "hostel" | "bus") => void;
   onToggleWaiver: (id: string) => void;
-  // Provided only for the Monthly group when the student is on the bus.
-  onToggleBus?: (id: string) => void;
-  busFeeAmount?: number | null;
   columns?: number;
 }) {
-  const showBusChip = busFeeAmount != null && busFeeAmount > 0 && !!onToggleBus;
   return (
     <div className="mb-4 last:mb-0">
       <div className="text-xs uppercase tracking-wide text-stone-500 mb-2">{label}</div>
@@ -620,22 +677,86 @@ function ComponentGroup({
                   >
                     {waived ? "Un-waive" : "Waive this item"}
                   </button>
-                  {showBusChip && c.kind === "monthly" && !waived && (
-                    <button
-                      type="button"
-                      onClick={() => onToggleBus!(c.id)}
-                      className={`rounded-full border px-2 py-0.5 transition ${
-                        selected[c.id]?.withBus
-                          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                          : "border-stone-300 bg-white text-stone-500 hover:border-stone-400"
-                      }`}
-                      title={`Add ${inr(busFeeAmount!)} bus fare for this month`}
-                    >
-                      {selected[c.id]?.withBus ? `✓ Bus +${inr(busFeeAmount!)}` : `+ Bus ${inr(busFeeAmount!)}`}
-                    </button>
-                  )}
                 </div>
               )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Dedicated Bus Fees card — mirrors the hostel section UX but uses
+// synthetic components built from the student's per-month bus_fee_amount.
+// April is hidden (rosters not finalised early in the AY); months with
+// already-paid bus invoices show as locked.
+function BusFeesCard({
+  components,
+  selected,
+  paidBusSet,
+  busFeeAmount,
+  onToggle,
+  onSelectAll,
+  isHidden,
+}: {
+  components: Component[];
+  selected: Record<string, SelectedItem>;
+  paidBusSet: Set<number>;
+  busFeeAmount: number;
+  onToggle: (c: Component) => void;
+  onSelectAll: () => void;
+  isHidden: (c: Component) => boolean;
+}) {
+  const visible = components.filter((c) => !isHidden(c));
+  return (
+    <div className="card p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="font-medium">Bus Fees</h3>
+          <p className="text-xs text-stone-500">
+            {inr(busFeeAmount)} / month — pick the months to collect for.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="secondary" type="button" onClick={onSelectAll}>
+            All months
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {visible.map((c) => {
+          const month = c.period_index as number;
+          const isPaid = paidBusSet.has(month);
+          const isSelected = !!selected[c.id];
+          return (
+            <div
+              key={c.id}
+              className={`rounded-lg border px-3 py-2 transition ${
+                isPaid
+                  ? "border-stone-200 bg-stone-50 text-stone-400"
+                  : isSelected
+                    ? "border-stone-900 bg-stone-50"
+                    : "border-stone-200 bg-white hover:border-stone-400"
+              }`}
+            >
+              <label className="flex items-center justify-between gap-2 cursor-pointer">
+                <span className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    disabled={isPaid}
+                    onChange={() => onToggle(c)}
+                    className="h-4 w-4 accent-stone-900"
+                  />
+                  <span className="text-sm">
+                    {MONTH_NAMES[month - 1]}
+                    {isPaid && <span className="ml-2 text-xs text-stone-400">(paid)</span>}
+                  </span>
+                </span>
+                <span className="text-sm font-medium">{inr(busFeeAmount)}</span>
+              </label>
             </div>
           );
         })}

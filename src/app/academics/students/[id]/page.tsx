@@ -4,10 +4,8 @@ import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { inr, formatDate } from "@/lib/utils";
 import { todayStr } from "@/lib/attendance";
-import { currentAcademicYear } from "@/lib/academic-year";
 import ProfilePhotos from "@/components/profile-photos";
 import { DownloadButton } from "@/components/ui/download-button";
-import { toggleBusFeeMonth, setBusFeeAmount } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -31,27 +29,6 @@ export default async function StudentProfilePage({
     .single();
 
   if (!student) notFound();
-
-  const academicYear = currentAcademicYear();
-  const { data: busFeeRows } = await supabase
-    .from("student_bus_fee_months")
-    .select("month_index")
-    .eq("school_id", schoolId)
-    .eq("student_id", id)
-    .eq("academic_year", academicYear);
-  const paidMonths = new Set(
-    ((busFeeRows ?? []) as { month_index: number }[]).map((r) => r.month_index)
-  );
-  // School-year order: Apr (4) → Mar (3) wrapping through the year.
-  const SCHOOL_YEAR_MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
-  const MONTH_SHORT = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-  ];
-  const busFeeMonthly = Number(student.bus_fee_amount ?? 0);
-  const paidCount = paidMonths.size;
-  const busFeePaid = paidCount * busFeeMonthly;
-  const busFeeDue = (12 - paidCount) * busFeeMonthly;
 
   const klass = (student as unknown as { classes: { display_name?: string } | null }).classes;
 
@@ -170,114 +147,6 @@ export default async function StudentProfilePage({
               />
             </dl>
           </div>
-
-          {busFeeMonthly > 0 ? (
-            <div className="card p-5">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold text-stone-800">
-                  Bus Fee · AY {academicYear}
-                </h2>
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <form action={setBusFeeAmount} className="flex items-center gap-1">
-                    <input type="hidden" name="student_id" value={student.id} />
-                    <span className="text-stone-500">₹</span>
-                    <input
-                      name="bus_fee_amount"
-                      type="number"
-                      min={0}
-                      step={1}
-                      defaultValue={busFeeMonthly}
-                      className="w-20 rounded border border-stone-300 bg-white px-2 py-0.5 text-xs"
-                      aria-label="Monthly bus fee amount"
-                    />
-                    <button className="rounded bg-stone-900 px-2 py-0.5 text-xs text-stone-50 hover:bg-stone-700">
-                      Save
-                    </button>
-                  </form>
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
-                    Paid {inr(busFeePaid)} ({paidCount}/12)
-                  </span>
-                  {busFeeDue > 0 && (
-                    <span className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
-                      Due {inr(busFeeDue)}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-6 gap-2 sm:grid-cols-12">
-                {SCHOOL_YEAR_MONTHS.map((m) => {
-                  const paid = paidMonths.has(m);
-                  return (
-                    <form
-                      key={m}
-                      action={toggleBusFeeMonth}
-                      className="contents"
-                    >
-                      <input type="hidden" name="student_id" value={student.id} />
-                      <input type="hidden" name="academic_year" value={academicYear} />
-                      <input type="hidden" name="month_index" value={m} />
-                      <input
-                        type="hidden"
-                        name="currently_paid"
-                        value={paid ? "true" : "false"}
-                      />
-                      <button
-                        type="submit"
-                        title={paid ? "Mark unpaid" : "Mark paid"}
-                        className={
-                          "flex flex-col items-center gap-1 rounded-md border px-1 py-1.5 text-xs transition " +
-                          (paid
-                            ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                            : "border-stone-200 bg-white text-stone-500 hover:border-stone-400 hover:text-stone-800")
-                        }
-                      >
-                        <span
-                          aria-hidden
-                          className={
-                            "flex h-4 w-4 items-center justify-center rounded border text-[10px] font-bold " +
-                            (paid
-                              ? "border-emerald-600 bg-emerald-600 text-white"
-                              : "border-stone-300 bg-white text-transparent")
-                          }
-                        >
-                          ✓
-                        </span>
-                        <span className="font-medium">{MONTH_SHORT[m - 1]}</span>
-                      </button>
-                    </form>
-                  );
-                })}
-              </div>
-              <p className="mt-3 text-xs text-stone-500">
-                Tap a month to toggle bus fee paid / unpaid. Amount is set on the student
-                edit form ({inr(busFeeMonthly)} / month).
-              </p>
-            </div>
-          ) : (
-            <div className="card p-5">
-              <h2 className="mb-2 text-sm font-semibold text-stone-800">Bus Fee</h2>
-              <p className="mb-3 text-sm text-stone-500">
-                This student is not on the bus. Set a monthly amount below to start
-                tracking which months have been paid.
-              </p>
-              <form action={setBusFeeAmount} className="flex items-center gap-2">
-                <input type="hidden" name="student_id" value={student.id} />
-                <span className="text-sm text-stone-500">₹</span>
-                <input
-                  name="bus_fee_amount"
-                  type="number"
-                  min={0}
-                  step={1}
-                  placeholder="e.g. 800"
-                  className="w-32 rounded border border-stone-300 bg-white px-2 py-1 text-sm"
-                  aria-label="Monthly bus fee amount"
-                />
-                <button className="rounded bg-stone-900 px-3 py-1 text-sm text-stone-50 hover:bg-stone-700">
-                  Set monthly amount
-                </button>
-              </form>
-            </div>
-          )}
 
           <div className="card p-5">
             <h2 className="mb-3 text-sm font-semibold text-stone-800">Attendance</h2>

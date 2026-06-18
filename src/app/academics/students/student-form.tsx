@@ -10,11 +10,14 @@ export type StudentValues = {
   class_id: string;
   section: string;
   gender: string;
+  blood_group: string;
+  date_of_birth: string; // YYYY-MM-DD
   father_name: string;
   father_mobile: string;
   mother_name: string;
   mother_mobile: string;
   contact_number: string;
+  alt_contact: string;
   address: string;
   is_hosteller: boolean;
   is_new_admission: boolean;
@@ -96,8 +99,37 @@ export default function StudentForm({
             <option value="Other">Other</option>
           </select>
         </Field>
+        <Field label="Date of birth">
+          <input
+            name="date_of_birth"
+            type="date"
+            defaultValue={initial?.date_of_birth ?? ""}
+            className={inputCls}
+          />
+        </Field>
+        <Field label="Blood group">
+          <select name="blood_group" defaultValue={initial?.blood_group ?? ""} className={inputCls}>
+            <option value="">—</option>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+          </select>
+        </Field>
         <Field label="Contact number">
           <input name="contact_number" defaultValue={initial?.contact_number ?? ""} className={inputCls} />
+        </Field>
+        <Field label="Alternate contact">
+          <input
+            name="alt_contact"
+            defaultValue={initial?.alt_contact ?? ""}
+            placeholder="Second phone number"
+            className={inputCls}
+          />
         </Field>
         <Field label="Father's name">
           <input name="father_name" defaultValue={initial?.father_name ?? ""} className={inputCls} />
@@ -160,8 +192,18 @@ export default function StudentForm({
         </label>
       </div>
 
-      {/* Bus fee amount + monthly tracking moved to the student profile —
-          set it there in the "Bus Fee" card alongside the month checkboxes. */}
+      <Field label="Bus fee (per month, ₹) — leave blank if student doesn't use bus">
+        <input
+          name="bus_fee_amount"
+          type="number"
+          min={0}
+          step={1}
+          inputMode="numeric"
+          placeholder="e.g. 800"
+          defaultValue={initial?.bus_fee_amount ?? ""}
+          className={inputCls}
+        />
+      </Field>
 
       <div>
         <div className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">Photos</div>

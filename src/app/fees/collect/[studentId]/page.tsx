@@ -54,7 +54,7 @@ export default async function CollectFeePage({
       .order("created_at", { ascending: true })
       .limit(1);
 
-  const [schoolRowsRes, hostelPrimaryRes, hostelFallbackRes, paidRes, lateFeeSettings] =
+  const [schoolRowsRes, hostelPrimaryRes, hostelFallbackRes, paidRes, busPaidRes, lateFeeSettings] =
     await Promise.all([
       supabase
         .from("fee_structures")
@@ -78,6 +78,18 @@ export default async function CollectFeePage({
         .eq("invoices.student_id", studentId)
         .eq("invoices.academic_year", AY)
         .neq("invoices.payment_status", "void"),
+      // Bus fee items live as standalone rows (component_id NULL,
+      // description "Bus Fee — <Month>"). Pull their period_index so the
+      // collect form can mark already-paid bus months as locked.
+      supabase
+        .from("invoice_items")
+        .select("period_index, invoices!inner(student_id, academic_year, payment_status)")
+        .eq("school_id", schoolId)
+        .eq("invoices.student_id", studentId)
+        .eq("invoices.academic_year", AY)
+        .neq("invoices.payment_status", "void")
+        .is("component_id", null)
+        .like("description", "Bus Fee%"),
       getLateFeeSettings(schoolId),
     ]);
 
@@ -102,6 +114,13 @@ export default async function CollectFeePage({
       .map((r) => (r as { component_id: string | null }).component_id)
       .filter(Boolean) as string[]
   );
+  const paidBusMonths = Array.from(
+    new Set(
+      ((busPaidRes.data ?? []) as { period_index: number | null }[])
+        .map((r) => r.period_index)
+        .filter((m): m is number => typeof m === "number")
+    )
+  );
 
   return (
     <div className="max-w-5xl">
@@ -123,6 +142,7 @@ export default async function CollectFeePage({
         hostelStruct={hostelStruct}
         hostelDefaultOpen={student.is_hosteller}
         paidComponentIds={Array.from(paidComponentIds)}
+        paidBusMonths={paidBusMonths}
         lateFeeSettings={lateFeeSettings}
         isNewAdmission={!!student.is_new_admission}
         busFeeAmount={student.bus_fee_amount ?? null}
