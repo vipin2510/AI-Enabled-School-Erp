@@ -100,3 +100,46 @@ export async function setUserActive(formData: FormData) {
   await admin.from("profiles").update({ is_active: active }).eq("id", id);
   revalidatePath("/admin/users");
 }
+
+// Hard-delete a login. The on_auth_user_created trigger inserts a profile
+// row on signup, but the FK cascade (profiles.id -> auth.users.id ON DELETE
+// CASCADE) removes the profile when we delete the auth user. We still nuke
+// the profile row explicitly first in case the cascade isn't set up on a
+// given environment.
+export async function deleteUser(formData: FormData) {
+  const me = await requireRole("admin");
+  const id = String(formData.get("id") ?? "");
+  if (!id || id === me.id) return; // never let admin delete themselves
+
+  const admin = createAdminClient();
+  await admin.from("profiles").delete().eq("id", id);
+  await admin.auth.admin.deleteUser(id);
+  revalidatePath("/admin/users");
+}
+
+// Reassign a user's department (staff only — admin/manager are cross-dept
+// so we coerce their department to null). Pass department="" to clear.
+export async function setUserDepartment(formData: FormData) {
+  await requireRole("admin");
+  const id = String(formData.get("id") ?? "");
+  const raw = String(formData.get("department") ?? "").trim();
+  if (!id) return;
+
+  const dept = raw === "" ? null : raw;
+  if (dept !== null && !["fees", "academics", "library", "results"].includes(dept)) {
+    return;
+  }
+
+  const admin = createAdminClient();
+  // Read role to enforce: only staff can have a department; admin/manager
+  // are cross-dept and their department must stay null.
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", id)
+    .maybeSingle();
+  const finalDept = profile?.role === "staff" ? dept : null;
+
+  await admin.from("profiles").update({ department: finalDept }).eq("id", id);
+  revalidatePath("/admin/users");
+}

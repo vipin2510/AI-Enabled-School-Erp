@@ -42,6 +42,76 @@ export async function addClass(formData: FormData) {
   revalidatePath("/academics/timetable");
 }
 
+// Edit a class's code / display name / ordinal. Admin/manager only.
+// Code is uppercased and trimmed; ordinal must be a positive integer.
+// Silently no-ops on duplicate code per school (the per-school unique
+// index from migration 0017 catches that).
+export async function updateClass(formData: FormData) {
+  const profile = await requireDepartment("academics");
+  if (profile.role === "staff") return;
+  const schoolId = await getCurrentSchoolId(profile);
+  const id = String(formData.get("id") ?? "");
+  const code = String(formData.get("code") ?? "").trim().toUpperCase();
+  const display_name = String(formData.get("display_name") ?? "").trim();
+  const ordinalRaw = String(formData.get("ordinal") ?? "").trim();
+  const ordinal = ordinalRaw === "" ? null : Number.parseInt(ordinalRaw, 10);
+  if (!id || !code || !display_name || ordinal == null || !Number.isFinite(ordinal)) return;
+
+  const supabase = await createClient();
+  await supabase
+    .from("classes")
+    .update({ code, display_name, ordinal })
+    .eq("school_id", schoolId)
+    .eq("id", id);
+
+  revalidatePath("/academics/classes");
+  revalidatePath("/academics/subjects");
+  revalidatePath("/fees/structures");
+  revalidatePath("/academics/timetable");
+}
+
+// Delete a class. Sections + subjects cascade (FK on delete cascade).
+// Students keep existing — their class_id is set to null (FK on delete
+// set null), so they remain visible in the All Students screen and can be
+// reassigned. Fee structures cascade.
+export async function removeClass(formData: FormData) {
+  const profile = await requireDepartment("academics");
+  if (profile.role === "staff") return;
+  const schoolId = await getCurrentSchoolId(profile);
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = await createClient();
+  await supabase
+    .from("classes")
+    .delete()
+    .eq("school_id", schoolId)
+    .eq("id", id);
+
+  revalidatePath("/academics/classes");
+  revalidatePath("/academics/subjects");
+  revalidatePath("/fees/structures");
+  revalidatePath("/academics/timetable");
+}
+
+// Rename a section. Scoped to the active school; class_id is preserved.
+export async function updateSection(formData: FormData) {
+  const profile = await requireDepartment("academics");
+  const schoolId = await getCurrentSchoolId(profile);
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!id || !name) return;
+
+  const supabase = await createClient();
+  await supabase
+    .from("sections")
+    .update({ name })
+    .eq("school_id", schoolId)
+    .eq("id", id);
+
+  revalidatePath("/academics/classes");
+}
+
 // Creates the school-scope fee_structure + skeleton components (all 0)
 // for a class in the current academic year. Mirrors the seed pattern from
 // migration 0002 so the Fee Structures editor finds the same component

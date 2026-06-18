@@ -160,18 +160,8 @@ export default function StudentForm({
         </label>
       </div>
 
-      <Field label="Bus fee (per month, ₹) — leave blank if student doesn't use bus">
-        <input
-          name="bus_fee_amount"
-          type="number"
-          min={0}
-          step={1}
-          inputMode="numeric"
-          placeholder="e.g. 800"
-          defaultValue={initial?.bus_fee_amount ?? ""}
-          className={inputCls}
-        />
-      </Field>
+      {/* Bus fee amount + monthly tracking moved to the student profile —
+          set it there in the "Bus Fee" card alongside the month checkboxes. */}
 
       <div>
         <div className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">Photos</div>

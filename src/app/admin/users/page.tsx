@@ -10,7 +10,8 @@ import {
 } from "@/lib/access";
 import { formatDate } from "@/lib/utils";
 import CreateUserForm from "./create-user-form";
-import { setUserActive } from "./actions";
+import DeleteUserButton from "./delete-user-button";
+import { setUserActive, setUserDepartment } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -110,7 +111,28 @@ async function UsersTable({ currentUserId }: { currentUserId: string }) {
               <td className="px-4 py-2 text-stone-600">{u.phone || u.email || "—"}</td>
               <td className="px-4 py-2">{ROLE_LABELS[u.role] ?? u.role ?? "—"}</td>
               <td className="px-4 py-2">
-                {u.department ? (DEPARTMENT_LABELS[u.department] ?? u.department) : "—"}
+                {u.role === "staff" && u.id !== currentUserId ? (
+                  <form action={setUserDepartment} className="inline-flex items-center gap-1">
+                    <input type="hidden" name="id" value={u.id} />
+                    <select
+                      name="department"
+                      defaultValue={u.department ?? ""}
+                      className="rounded border border-stone-300 bg-white px-1.5 py-0.5 text-xs"
+                      aria-label="Change department"
+                    >
+                      <option value="">—</option>
+                      <option value="fees">Fees</option>
+                      <option value="academics">Academics</option>
+                      <option value="library">Library</option>
+                      <option value="results">Results</option>
+                    </select>
+                    <button className="text-xs text-stone-500 hover:text-stone-900 hover:underline">
+                      Save
+                    </button>
+                  </form>
+                ) : (
+                  <span>{u.department ? (DEPARTMENT_LABELS[u.department] ?? u.department) : "—"}</span>
+                )}
               </td>
               <td className="px-4 py-2 text-stone-600">
                 {u.role === "admin"
@@ -129,13 +151,16 @@ async function UsersTable({ currentUserId }: { currentUserId: string }) {
                 {u.id === currentUserId ? (
                   <span className="text-xs text-stone-400">You</span>
                 ) : (
-                  <form action={setUserActive}>
-                    <input type="hidden" name="id" value={u.id} />
-                    <input type="hidden" name="active" value={u.is_active ? "false" : "true"} />
-                    <button className="text-stone-900 hover:underline">
-                      {u.is_active ? "Deactivate" : "Reactivate"}
-                    </button>
-                  </form>
+                  <div className="inline-flex items-center gap-3">
+                    <form action={setUserActive}>
+                      <input type="hidden" name="id" value={u.id} />
+                      <input type="hidden" name="active" value={u.is_active ? "false" : "true"} />
+                      <button className="text-xs text-stone-600 hover:text-stone-900 hover:underline">
+                        {u.is_active ? "Deactivate" : "Reactivate"}
+                      </button>
+                    </form>
+                    <DeleteUserButton userId={u.id} label={u.full_name || u.phone || u.email || "this user"} />
+                  </div>
                 )}
               </td>
             </tr>
