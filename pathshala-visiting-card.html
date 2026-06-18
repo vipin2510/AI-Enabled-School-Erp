@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pathshala ERP — Visiting Card (3.5 × 2 in)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --stone-50:  #fafaf9;
+      --stone-100: #f5f5f4;
+      --stone-200: #e7e5e4;
+      --stone-300: #d6d3d1;
+      --stone-400: #a8a29e;
+      --stone-500: #78716c;
+      --stone-600: #57534e;
+      --stone-700: #44403c;
+      --stone-800: #292524;
+      --stone-900: #1c1917;
+      --accent:    #ea580c;  /* same orange the ERP uses */
+      --accent-2:  #f97316;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ededec;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: var(--stone-900);
+    }
+
+    .page {
+      padding: 32px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 28px;
+      justify-content: center;
+    }
+
+    .card {
+      /* 3.5 in × 2 in — exact print dimensions */
+      width: 3.5in;
+      height: 2in;
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+      box-shadow:
+        0 8px 24px -8px rgba(28, 25, 23, 0.18),
+        0 2px 6px -2px rgba(28, 25, 23, 0.10);
+    }
+
+    .card .label {
+      position: absolute;
+      top: -22px;
+      left: 4px;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--stone-500);
+      font-weight: 500;
+    }
+
+    /* ─────────── FRONT ─────────── */
+    .front {
+      background: linear-gradient(180deg, #ffffff 0%, var(--stone-50) 100%);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: 0.22in 0.26in;
+    }
+
+    .front-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .mark {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      background: var(--stone-900);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 16px;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .mark::after {
+      content: '';
+      position: absolute;
+      right: -3px;
+      bottom: -3px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid var(--stone-50);
+    }
+
+    .mark-meta {
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--stone-500);
+      font-weight: 500;
+    }
+
+    .brand {
+      align-self: end;
+    }
+
+    .brand-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 30px;
+      line-height: 1;
+      letter-spacing: -0.01em;
+      color: var(--stone-900);
+    }
+
+    .brand-tagline {
+      margin-top: 5px;
+      font-size: 10.5px;
+      letter-spacing: 0.05em;
+      color: var(--stone-600);
+      font-weight: 500;
+    }
+    .brand-tagline .dot {
+      color: var(--accent);
+      margin: 0 6px;
+    }
+
+    .front-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 6px;
+      border-top: 1px solid var(--stone-200);
+    }
+
+    .phone-block {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .phone-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: grid;
+      place-items: center;
+      color: white;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+
+    .phone-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--stone-900);
+      letter-spacing: 0.02em;
+    }
+
+    .corner-stripe {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .corner-stripe span {
+      width: 14px;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--stone-300);
+    }
+    .corner-stripe span:last-child {
+      background: var(--accent);
+      width: 22px;
+    }
+
+    /* ─────────── BACK ─────────── */
+    .back {
+      background: var(--stone-900);
+      color: white;
+      padding: 0.22in 0.26in;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      position: relative;
+    }
+
+    .back::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 70%;
+      height: 100%;
+      background: radial-gradient(
+        ellipse at top right,
+        rgba(234, 88, 12, 0.18) 0%,
+        transparent 60%
+      );
+      pointer-events: none;
+    }
+
+    .back-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      position: relative;
+      z-index: 1;
+    }
+
+    .back-mark {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.02em;
+    }
+    .back-mark .accent-dot {
+      color: var(--accent-2);
+    }
+
+    .back-eyebrow {
+      font-size: 8.5px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--stone-400);
+      font-weight: 500;
+    }
+
+    .back-tagline {
+      font-family: 'Playfair Display', serif;
+      font-weight: 600;
+      font-size: 17.5px;
+      line-height: 1.18;
+      letter-spacing: -0.01em;
+      color: white;
+      position: relative;
+      z-index: 1;
+      align-self: center;
+      max-width: 100%;
+    }
+    .back-tagline em {
+      font-style: italic;
+      color: var(--accent-2);
+      font-weight: 600;
+    }
+
+    .modules {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 1;
+    }
+    .modules .pill {
+      font-size: 8.5px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--stone-300);
+      font-weight: 500;
+      padding: 3px 7px;
+      border: 1px solid var(--stone-700);
+      border-radius: 4px;
+    }
+    .modules .pill.accent {
+      color: var(--accent-2);
+      border-color: rgba(234, 88, 12, 0.4);
+    }
+
+    /* ─────────── Screen helpers ─────────── */
+    .legend {
+      width: 100%;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 32px;
+      font-size: 12px;
+      color: var(--stone-500);
+      text-align: center;
+    }
+    .legend h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      color: var(--stone-800);
+      margin: 18px 0 4px;
+      letter-spacing: -0.01em;
+    }
+    .legend p {
+      margin: 0 0 4px;
+    }
+
+    /* ─────────── Print: cut to exact 3.5x2 inch ─────────── */
+    @media print {
+      html, body {
+        background: white;
+      }
+      .legend,
+      .card .label {
+        display: none;
+      }
+      .page {
+        padding: 0;
+        gap: 0;
+        display: block;
+      }
+      .card {
+        box-shadow: none;
+        border-radius: 0;
+        page-break-inside: avoid;
+        margin: 0.25in auto;
+      }
+      @page {
+        size: 4in 2.5in;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="legend">
+    <h1>Pathshala ERP — Visiting Card</h1>
+    <p>3.5 in × 2 in · front &amp; back · print at 100% scale (no scaling)</p>
+  </div>
+
+  <div class="page">
+    <!-- ───────── FRONT ───────── -->
+    <div class="card front">
+      <span class="label">Front</span>
+
+      <div class="front-top">
+        <div class="mark">P</div>
+        <div class="mark-meta">School ERP Solution</div>
+      </div>
+
+      <div class="brand">
+        <div class="brand-name">Pathshala</div>
+        <div class="brand-tagline">
+          Fees<span class="dot">·</span>Academics<span class="dot">·</span>Library<span class="dot">·</span>Results
+        </div>
+      </div>
+
+      <div class="front-bottom">
+        <div class="phone-block">
+          <div class="phone-icon">✆</div>
+          <div class="phone-text">+91 91110 12558</div>
+        </div>
+        <div class="corner-stripe">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────── BACK ───────── -->
+    <div class="card back">
+      <span class="label">Back</span>
+
+      <div class="back-top">
+        <div class="back-mark">Pathshala<span class="accent-dot">.</span></div>
+        <div class="back-eyebrow">ERP Solution</div>
+      </div>
+
+      <div class="back-tagline">
+        Run your school. <em>Without the paperwork.</em>
+      </div>
+
+      <div class="modules">
+        <span class="pill accent">+91 91110 12558</span>
+        <span class="pill">Fees</span>
+        <span class="pill">Academics</span>
+        <span class="pill">Library</span>
+        <span class="pill">Results</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
