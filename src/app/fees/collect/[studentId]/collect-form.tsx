@@ -47,6 +47,11 @@ type Props = {
     monthly_due_day: number;
   };
   isNewAdmission: boolean;
+  // Drives auto-waive policy:
+  //   rte         → every selected item is auto-waived (receipt prints ₹0)
+  //   staff_child → only monthly (tuition) is charged; rest is auto-waived
+  //   regular     → no override; cashier toggles waivers manually
+  studentCategory: "regular" | "rte" | "staff_child";
   // Per-month bus fee from the student's profile. null = no bus service.
   busFeeAmount: number | null;
 };
@@ -112,8 +117,22 @@ export default function CollectForm({
   paidBusMonths,
   lateFeeSettings,
   isNewAdmission,
+  studentCategory,
   busFeeAmount,
 }: Props) {
+  // True for any item that's not chargeable for this student. RTE → all;
+  // staff child → everything except `monthly` (tuition); regular → none.
+  const isAutoWaived = (c: Component): boolean => {
+    if (studentCategory === "rte") return true;
+    if (studentCategory === "staff_child") return c.kind !== "monthly";
+    return false;
+  };
+  const autoWaiverReason =
+    studentCategory === "rte"
+      ? "RTE — no fee charged"
+      : studentCategory === "staff_child"
+        ? "Staff child — only tuition charged"
+        : null;
   const router = useRouter();
   const paidSet = useMemo(() => new Set(paidComponentIds), [paidComponentIds]);
   const paidBusSet = useMemo(() => new Set(paidBusMonths), [paidBusMonths]);
@@ -164,7 +183,7 @@ export default function CollectForm({
   const newItem = (c: Component, scope: "school" | "hostel" | "bus"): SelectedItem => ({
     component: c,
     scope,
-    waived: false,
+    waived: isAutoWaived(c),
   });
 
   const toggleItem = (c: Component, scope: "school" | "hostel" | "bus") => {
@@ -308,16 +327,20 @@ export default function CollectForm({
       };
       // Bus items live as standalone invoice items (component_id: null) so
       // they aren't tied to a fee_structure_components row. Real fee items
-      // pass through their component id unchanged.
-      const apiItems: ApiItem[] = items.map((i) => ({
-        component_id: isBusComponent(i.component) ? null : i.component.id,
-        description: i.component.label,
-        kind: i.component.kind,
-        period_index: i.component.period_index,
-        amount: Number(i.component.amount),
-        waived: i.waived,
-        waiver_reason: i.waived ? waiverReason || null : null,
-      }));
+      // pass through their component id unchanged. Auto-waive reason wins
+      // over the manual one so RTE/staff-child receipts always cite policy.
+      const apiItems: ApiItem[] = items.map((i) => {
+        const policyReason = isAutoWaived(i.component) ? autoWaiverReason : null;
+        return {
+          component_id: isBusComponent(i.component) ? null : i.component.id,
+          description: i.component.label,
+          kind: i.component.kind,
+          period_index: i.component.period_index,
+          amount: Number(i.component.amount),
+          waived: i.waived,
+          waiver_reason: i.waived ? policyReason ?? waiverReason ?? null : null,
+        };
+      });
       const res = await fetch("/api/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -330,7 +353,8 @@ export default function CollectForm({
           waiver_amount: waiverAmount,
           total,
           late_fee_waived: lateFeeWaived,
-          waiver_reason: waiverAmount > 0 ? waiverReason || null : null,
+          waiver_reason:
+            waiverAmount > 0 ? waiverReason || autoWaiverReason || null : null,
           payment_mode: paymentMode,
           payment_ref: paymentRef || null,
           notes: notes || null,
@@ -423,6 +447,26 @@ export default function CollectForm({
   return (
     <div className="grid lg:grid-cols-[1fr_360px] gap-6">
       <div className="space-y-6">
+        {studentCategory === "rte" && (
+          <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm">
+            <div className="font-semibold text-emerald-900">
+              RTE student — no fee charged.
+            </div>
+            <p className="mt-1 text-xs text-emerald-800">
+              Any item you tick is auto-waived. The receipt prints with all amounts at ₹0.
+            </p>
+          </div>
+        )}
+        {studentCategory === "staff_child" && (
+          <div className="rounded-lg border border-sky-300 bg-sky-50 px-4 py-3 text-sm">
+            <div className="font-semibold text-sky-900">
+              Staff child — only tuition (monthly) is collected.
+            </div>
+            <p className="mt-1 text-xs text-sky-800">
+              Registration, admission, caution and yearly are auto-waived when ticked.
+            </p>
+          </div>
+        )}
         {renderStruct(schoolStruct, "School Fees")}
         {!schoolStruct && (
           <div className="card p-5 text-sm text-stone-500">

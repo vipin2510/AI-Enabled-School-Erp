@@ -22,7 +22,7 @@ export default async function StudentProfilePage({
   const { data: student } = await supabase
     .from("students")
     .select(
-      "id, full_name, admission_no, section, gender, blood_group, date_of_birth, father_name, father_mobile, mother_name, mother_mobile, contact_number, alt_contact, address, is_hosteller, is_new_admission, status, student_photo_url, parent_photo_url, bus_fee_amount, classes(display_name)"
+      "id, full_name, admission_no, section, gender, blood_group, date_of_birth, father_name, father_mobile, mother_name, mother_mobile, contact_number, alt_contact, address, is_hosteller, is_new_admission, category, status, student_photo_url, parent_photo_url, bus_fee_amount, classes(display_name)"
     )
     .eq("school_id", schoolId)
     .eq("id", id)
@@ -137,6 +137,16 @@ export default async function StudentProfilePage({
               <Detail label="Mother's Name" value={student.mother_name} />
               <Detail label="Mother's Mobile" value={student.mother_mobile} />
               <Detail label="Address" value={student.address} />
+              <Detail
+                label="Category"
+                value={
+                  student.category === "rte"
+                    ? "RTE"
+                    : student.category === "staff_child"
+                      ? "Staff Child"
+                      : "Regular"
+                }
+              />
               <Detail
                 label="Flags"
                 value={

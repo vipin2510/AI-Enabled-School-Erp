@@ -21,6 +21,7 @@ export type StudentValues = {
   address: string;
   is_hosteller: boolean;
   is_new_admission: boolean;
+  category: "regular" | "rte" | "staff_child";
   status: string;
   student_photo_url: string;
   parent_photo_url: string;
@@ -158,6 +159,13 @@ export default function StudentForm({
             defaultValue={initial?.mother_mobile ?? ""}
             className={inputCls}
           />
+        </Field>
+        <Field label="Category">
+          <select name="category" defaultValue={initial?.category ?? "regular"} className={inputCls}>
+            <option value="regular">Regular</option>
+            <option value="rte">RTE (no fee)</option>
+            <option value="staff_child">Staff Child (only tuition)</option>
+          </select>
         </Field>
         <Field label="Status">
           <select name="status" defaultValue={initial?.status ?? "active"} className={inputCls}>

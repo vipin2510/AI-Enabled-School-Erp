@@ -43,6 +43,8 @@ const StudentSchema = z.object({
   address: z.string().trim().nullable(),
   is_hosteller: z.boolean(),
   is_new_admission: z.boolean(),
+  // Drives fee waiver policy at /fees/collect — see migration 0020.
+  category: z.enum(["regular", "rte", "staff_child"]),
   status: z.enum(["active", "inactive", "alumni"]),
   // Per-month bus fee; null means student does not use the bus.
   bus_fee_amount: z.number().int().nonnegative().nullable(),
@@ -80,6 +82,10 @@ function parse(formData: FormData) {
     address: blank("address"),
     is_hosteller: formData.get("is_hosteller") === "on",
     is_new_admission: formData.get("is_new_admission") === "on",
+    category: (() => {
+      const raw = String(formData.get("category") ?? "regular");
+      return raw === "rte" || raw === "staff_child" ? raw : "regular";
+    })(),
     status: String(formData.get("status") ?? "active"),
     bus_fee_amount: busNum != null && Number.isFinite(busNum) ? busNum : null,
   });

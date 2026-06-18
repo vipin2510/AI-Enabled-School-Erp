@@ -24,7 +24,7 @@ export default async function CollectFeePage({
   const { data: student } = await supabase
     .from("students")
     .select(
-      "id, full_name, section, father_name, contact_number, is_hosteller, is_new_admission, bus_fee_amount, class_id, classes(id, code, display_name, group_label, ordinal)"
+      "id, full_name, section, father_name, contact_number, is_hosteller, is_new_admission, category, bus_fee_amount, class_id, classes(id, code, display_name, group_label, ordinal)"
     )
     .eq("school_id", schoolId)
     .eq("id", studentId)
@@ -145,6 +145,7 @@ export default async function CollectFeePage({
         paidBusMonths={paidBusMonths}
         lateFeeSettings={lateFeeSettings}
         isNewAdmission={!!student.is_new_admission}
+        studentCategory={(student.category ?? "regular") as "regular" | "rte" | "staff_child"}
         busFeeAmount={student.bus_fee_amount ?? null}
       />
     </div>

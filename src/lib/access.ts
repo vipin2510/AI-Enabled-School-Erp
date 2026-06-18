@@ -14,7 +14,14 @@ export type School = {
   id: SchoolId;
   code: string;           // url-safe slug, also used as the cookie value
   name: string;
+  // Short location ("Kondagaon, Chhattisgarh") — shown under the school
+  // name on header banners.
   location: string;
+  // Full address line for printable docs (ID cards, letterhead).
+  addressLine?: string;
+  pinCode?: string;
+  mobile?: string;
+  email?: string;
   board?: string;
   boardCode?: string;
   parentNote?: string;
@@ -26,6 +33,10 @@ export const SCHOOLS: School[] = [
     code: "kondagaon",
     name: "Adeshwar Public School",
     location: "Kondagaon, Chhattisgarh",
+    addressLine: "Kondagaon, Dist- Kondagaon (C.G)",
+    pinCode: "494226",
+    mobile: "9111005303",
+    email: "apskondagaon@gmail.com",
     board: "CISCE",
     boardCode: "CG 024",
   },
@@ -34,6 +45,12 @@ export const SCHOOLS: School[] = [
     code: "pharasgaon",
     name: "Adeshwar Public School",
     location: "Pharasgaon, Chhattisgarh",
+    addressLine: "Pharasgaon, Dist- Kondagaon (C.G)",
+    pinCode: "494226",
+    mobile: "9111005303",
+    email: "apskondagaon@gmail.com",
+    board: "CISCE",
+    boardCode: "CG 024",
     parentNote: "A Unit of Adeshwar Public School, Kondagaon, C.G.",
   },
   {
@@ -41,6 +58,12 @@ export const SCHOOLS: School[] = [
     code: "chipawand",
     name: "Adeshwar Public School",
     location: "Chipawand, Chhattisgarh",
+    addressLine: "Chipawand, Dist- Kondagaon (C.G)",
+    pinCode: "494226",
+    mobile: "9111005303",
+    email: "apskondagaon@gmail.com",
+    board: "CISCE",
+    boardCode: "CG 024",
     parentNote: "A Unit of Adeshwar Public School, Kondagaon, C.G.",
   },
 ];

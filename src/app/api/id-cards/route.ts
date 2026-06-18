@@ -4,23 +4,31 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole, getCurrentSchoolId } from "@/lib/auth";
+import { findSchool } from "@/lib/access";
 import { currentAcademicYear } from "@/lib/results";
-import { IdCardSheet, CM, type IdCardStudent } from "@/components/id-card-pdf";
+import {
+  IdCardSheet,
+  CM,
+  type IdCardStudent,
+  type IdCardSchool,
+} from "@/components/id-card-pdf";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const STUDENT_SELECT =
-  "id, full_name, section, date_of_birth, blood_group, father_name, contact_number, address, student_photo_url, classes(display_name)";
+  "id, full_name, admission_no, section, date_of_birth, blood_group, father_name, contact_number, address, category, student_photo_url, classes(display_name)";
 
 type Row = {
   full_name: string;
+  admission_no: string | null;
   section: string | null;
   date_of_birth: string | null;
   blood_group: string | null;
   father_name: string | null;
   contact_number: string | null;
   address: string | null;
+  category: "regular" | "rte" | "staff_child" | null;
   student_photo_url: string | null;
   classes: { display_name: string } | null;
 };
@@ -28,12 +36,14 @@ type Row = {
 function toCard(r: Row): IdCardStudent {
   return {
     full_name: r.full_name,
-    className: `${r.classes?.display_name ?? ""}${r.section ? ` "${r.section}"` : ""}`.trim(),
+    admission_no: r.admission_no,
+    className: `${r.classes?.display_name ?? ""}${r.section ? `-'${r.section}'` : ""}`.trim(),
     date_of_birth: r.date_of_birth,
     blood_group: r.blood_group,
     father_name: r.father_name,
     contact_number: r.contact_number,
     address: r.address,
+    category: r.category ?? "regular",
     photoUrl: r.student_photo_url,
   };
 }
@@ -87,10 +97,25 @@ export async function GET(req: Request) {
   const logoPath = path.join(process.cwd(), "public", "letterhead", "aps-logo.jpeg");
   const logoDataUrl = `data:image/jpeg;base64,${(await fs.readFile(logoPath)).toString("base64")}`;
 
+  // Header info for the card — driven by the active school so each branch
+  // prints its own identity (Kondagaon / Pharasgaon / Chipawand).
+  const meta = findSchool(schoolId);
+  const school: IdCardSchool = {
+    name: meta?.name ?? "Adeshwar Public School",
+    cityLine: meta?.location?.split(",")[0] ?? "Kondagaon",
+    affiliation: meta?.board ? `Affiliated to ${meta.board}, New Delhi` : undefined,
+    schoolCode: meta?.boardCode,
+    addressLine: meta?.addressLine ?? meta?.location,
+    pinCode: meta?.pinCode,
+    mobile: meta?.mobile,
+    email: meta?.email,
+  };
+
   const buf = await renderToBuffer(
     IdCardSheet({
       students: rows.map(toCard),
       session: currentAcademicYear(),
+      school,
       logoDataUrl,
       cardW: wCm * CM,
       cardH: hCm * CM,
