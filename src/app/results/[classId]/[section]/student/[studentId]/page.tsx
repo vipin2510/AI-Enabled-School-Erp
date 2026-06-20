@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { currentAcademicYear, markKey, type MarksMap } from "@/lib/results";
 import { saveStudentMarks } from "@/app/results/actions";
 import StudentMarksForm from "./marks-form";
+import { DownloadButton } from "@/components/ui/download-button";
+import { PreviewButton } from "@/components/ui/preview-button";
 
 export const dynamic = "force-dynamic";
 
@@ -68,16 +70,33 @@ export default async function StudentMarksPage({
 
   return (
     <div className="mx-auto max-w-4xl">
-      <header className="mb-6">
-        <Link href={backHref} className="text-sm text-stone-500 hover:underline">
-          ← {klass?.display_name ?? "Class"} · Section {section}
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">{student.full_name}</h1>
-        <p className="mt-1 text-sm text-stone-500">
-          {student.admission_no ? `Adm. ${student.admission_no} · ` : ""}
-          {student.father_name ? `Father: ${student.father_name} · ` : ""}
-          Academic Year {academicYear}
-        </p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Link href={backHref} className="text-sm text-stone-500 hover:underline">
+            ← {klass?.display_name ?? "Class"} · Section {section}
+          </Link>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">{student.full_name}</h1>
+          <p className="mt-1 text-sm text-stone-500">
+            {student.admission_no ? `Adm. ${student.admission_no} · ` : ""}
+            {student.father_name ? `Father: ${student.father_name} · ` : ""}
+            Academic Year {academicYear}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <PreviewButton
+            url={`/api/results/zip?classId=${classId}&section=${encodeURIComponent(section)}&studentId=${studentId}`}
+            className="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+          >
+            👁 Preview result card
+          </PreviewButton>
+          <DownloadButton
+            url={`/api/results/zip?classId=${classId}&section=${encodeURIComponent(section)}&studentId=${studentId}`}
+            filename={`result-${student.full_name.replace(/[^a-z0-9]+/gi, "-")}.pdf`}
+            className="rounded-lg border border-stone-200 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-200"
+          >
+            ⤓ Download
+          </DownloadButton>
+        </div>
       </header>
 
       {subjects.length === 0 && coCurricular.length === 0 ? (

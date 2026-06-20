@@ -12,9 +12,11 @@ import { createZip, type ZipEntry } from "@/lib/zip";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// GET /api/results/zip?classId=&section=
-// Renders one report-card PDF per student in the class-section and bundles them
-// into a ZIP for download.
+// GET /api/results/zip?classId=&section=                  → ZIP of every student
+// GET /api/results/zip?classId=&section=&studentId=...    → single inline PDF
+// Single-student mode is used by the per-student result page's
+// Preview / Download buttons so a teacher can check a card before
+// printing the full batch.
 export async function GET(req: Request) {
   const profile = await requireDepartment("results");
   const schoolId = await getCurrentSchoolId(profile);
@@ -22,6 +24,7 @@ export async function GET(req: Request) {
   const classId = url.searchParams.get("classId") ?? "";
   const section = url.searchParams.get("section") ?? "";
   const term = url.searchParams.get("term"); // "1" → Term 1 only; else overall
+  const singleStudentId = url.searchParams.get("studentId");
   if (!classId || !section) {
     return NextResponse.json({ error: "Missing classId or section" }, { status: 400 });
   }
@@ -90,6 +93,27 @@ export async function GET(req: Request) {
     while (used.has(name)) name = `${safe(s.admission_no || s.full_name)}-${n++}.pdf`;
     used.add(name);
     entries.push({ name, data: new Uint8Array(buf) });
+  }
+
+  // Single-student mode: pick the rendered entry and return as inline PDF.
+  if (singleStudentId) {
+    const student = students.find((s) => s.id === singleStudentId);
+    if (!student) {
+      return NextResponse.json({ error: "Student not in this section" }, { status: 404 });
+    }
+    const idx = students.indexOf(student);
+    const entry = entries[idx];
+    if (!entry) {
+      return NextResponse.json({ error: "Failed to render result card" }, { status: 500 });
+    }
+    const termPart = term === "1" ? "term1-" : "";
+    const filename = `result-${termPart}${safe(student.full_name)}-${academicYear}.pdf`;
+    return new NextResponse(entry.data as unknown as BodyInit, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="${filename}"`,
+      },
+    });
   }
 
   const zip = createZip(entries);

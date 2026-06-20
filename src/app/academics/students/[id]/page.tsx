@@ -6,18 +6,31 @@ import { inr, formatDate } from "@/lib/utils";
 import { todayStr } from "@/lib/attendance";
 import ProfilePhotos from "@/components/profile-photos";
 import { DownloadButton } from "@/components/ui/download-button";
+import { PreviewButton } from "@/components/ui/preview-button";
 
 export const dynamic = "force-dynamic";
 
 export default async function StudentProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ q?: string; class?: string; page?: string }>;
 }) {
   const profile = await requireDepartment("academics");
   const schoolId = await getCurrentSchoolId(profile);
   const { id } = await params;
+  const { q, class: classFilter, page: pageParam } = await searchParams;
   const supabase = await createClient();
+
+  // Pass list-page filter (?q=&class=&page=) straight through so "← Students"
+  // returns the user to the exact view they came from.
+  const backQuery = new URLSearchParams();
+  if (q) backQuery.set("q", q);
+  if (classFilter) backQuery.set("class", classFilter);
+  if (pageParam) backQuery.set("page", pageParam);
+  const backHref =
+    backQuery.toString() === "" ? "/academics/students" : `/academics/students?${backQuery}`;
 
   const { data: student } = await supabase
     .from("students")
@@ -80,7 +93,7 @@ export default async function StudentProfilePage({
     <div className="mx-auto max-w-5xl">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Link href="/academics/students" className="text-sm text-stone-500 hover:underline">
+          <Link href={backHref} className="text-sm text-stone-500 hover:underline">
             ← Students
           </Link>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">{student.full_name}</h1>
@@ -100,6 +113,12 @@ export default async function StudentProfilePage({
           </p>
         </div>
         <div className="flex gap-2">
+          <PreviewButton
+            url={`/api/id-cards?studentId=${student.id}`}
+            className="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+          >
+            👁 Preview ID
+          </PreviewButton>
           <DownloadButton
             url={`/api/id-cards?studentId=${student.id}`}
             filename={`id-card-${student.full_name.replace(/[^a-z0-9]+/gi, "-")}.pdf`}
@@ -131,11 +150,12 @@ export default async function StudentProfilePage({
               <Detail label="Date of Birth" value={student.date_of_birth ? formatDate(student.date_of_birth) : null} />
               <Detail label="Blood Group" value={student.blood_group} />
               <Detail label="Gender" value={student.gender} />
-              <Detail label="Contact" value={student.contact_number} />
               <Detail label="Father's Name" value={student.father_name} />
-              <Detail label="Father's Mobile" value={student.father_mobile} />
               <Detail label="Mother's Name" value={student.mother_name} />
+              <Detail label="Father's Mobile" value={student.father_mobile} />
               <Detail label="Mother's Mobile" value={student.mother_mobile} />
+              <Detail label="Alternate Contact" value={student.alt_contact} />
+              <Detail label="Contact" value={student.contact_number} />
               <Detail label="Address" value={student.address} />
               <Detail
                 label="Category"

@@ -54,7 +54,7 @@ export default async function CollectFeePage({
       .order("created_at", { ascending: true })
       .limit(1);
 
-  const [schoolRowsRes, hostelPrimaryRes, hostelFallbackRes, paidRes, busPaidRes, lateFeeSettings] =
+  const [schoolRowsRes, hostelPrimaryRes, hostelFallbackRes, paidRes, busPaidRes, invoicesRes, lateFeeSettings] =
     await Promise.all([
       supabase
         .from("fee_structures")
@@ -90,6 +90,15 @@ export default async function CollectFeePage({
         .neq("invoices.payment_status", "void")
         .is("component_id", null)
         .like("description", "Bus Fee%"),
+      // For the header totals: sum across this student's non-void invoices
+      // in the current academic year.
+      supabase
+        .from("invoices")
+        .select("amount_paid")
+        .eq("school_id", schoolId)
+        .eq("student_id", studentId)
+        .eq("academic_year", AY)
+        .neq("payment_status", "void"),
       getLateFeeSettings(schoolId),
     ]);
 
@@ -122,16 +131,58 @@ export default async function CollectFeePage({
     )
   );
 
+  // Header totals for this student in the current AY.
+  //   • paid    = sum of every non-void invoice's amount_paid
+  //   • annual  = school structure total + hostel structure total (if a
+  //               hosteller) + 11 × bus rate (April is hidden from the
+  //               collect screen so it doesn't count here)
+  //   • due     = max(0, annual − paid)
+  // The annual figure ignores whether a one-time/new-admission component
+  // actually applies — admin can override on the form. The collect form
+  // itself still drives accurate per-receipt totals.
+  const paidThisAY = (
+    (invoicesRes.data ?? []) as { amount_paid: number | string }[]
+  ).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
+  const schoolAnnual = Number(schoolStruct?.total_amount ?? 0);
+  const hostelAnnual = student.is_hosteller ? Number(hostelStruct?.total_amount ?? 0) : 0;
+  const busAnnual = student.bus_fee_amount ? Number(student.bus_fee_amount) * 11 : 0;
+  const annualTotal = schoolAnnual + hostelAnnual + busAnnual;
+  const outstanding = Math.max(0, annualTotal - paidThisAY);
+  const inr = (n: number) =>
+    `₹${Math.round(n).toLocaleString("en-IN")}`;
+
   return (
     <div className="max-w-5xl">
-      <header className="mb-6">
-        <div className="text-xs text-stone-500">Collect Fee</div>
-        <h1 className="text-2xl font-semibold tracking-tight">{student.full_name}</h1>
-        <p className="text-stone-500 text-sm">
-          {klass?.display_name ?? "—"}{student.section ? ` · Section ${student.section}` : ""}
-          {student.is_hosteller ? " · Hosteller" : ""}
-          {student.is_new_admission ? " · New Admission" : ""}
-        </p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-xs text-stone-500">Collect Fee</div>
+          <h1 className="text-2xl font-semibold tracking-tight">{student.full_name}</h1>
+          <p className="text-stone-500 text-sm">
+            {klass?.display_name ?? "—"}{student.section ? ` · Section ${student.section}` : ""}
+            {student.is_hosteller ? " · Hosteller" : ""}
+            {student.is_new_admission ? " · New Admission" : ""}
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-right text-xs">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+            <div className="text-[10px] uppercase tracking-wide text-emerald-700">Paid this session</div>
+            <div className="mt-0.5 text-base font-semibold tabular-nums text-emerald-800">
+              {inr(paidThisAY)}
+            </div>
+          </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            <div className="text-[10px] uppercase tracking-wide text-amber-700">Outstanding</div>
+            <div className="mt-0.5 text-base font-semibold tabular-nums text-amber-800">
+              {annualTotal > 0 ? inr(outstanding) : "—"}
+            </div>
+          </div>
+          <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
+            <div className="text-[10px] uppercase tracking-wide text-stone-500">Session total</div>
+            <div className="mt-0.5 text-base font-semibold tabular-nums text-stone-700">
+              {annualTotal > 0 ? inr(annualTotal) : "—"}
+            </div>
+          </div>
+        </div>
       </header>
 
       <CollectForm

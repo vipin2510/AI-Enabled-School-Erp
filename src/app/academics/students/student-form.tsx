@@ -121,19 +121,11 @@ export default function StudentForm({
             <option value="O-">O-</option>
           </select>
         </Field>
-        <Field label="Contact number">
-          <input name="contact_number" defaultValue={initial?.contact_number ?? ""} className={inputCls} />
-        </Field>
-        <Field label="Alternate contact">
-          <input
-            name="alt_contact"
-            defaultValue={initial?.alt_contact ?? ""}
-            placeholder="Second phone number"
-            className={inputCls}
-          />
-        </Field>
         <Field label="Father's name">
           <input name="father_name" defaultValue={initial?.father_name ?? ""} className={inputCls} />
+        </Field>
+        <Field label="Mother's name">
+          <input name="mother_name" defaultValue={initial?.mother_name ?? ""} className={inputCls} />
         </Field>
         <Field label="Father's mobile">
           <input
@@ -146,9 +138,6 @@ export default function StudentForm({
             className={inputCls}
           />
         </Field>
-        <Field label="Mother's name">
-          <input name="mother_name" defaultValue={initial?.mother_name ?? ""} className={inputCls} />
-        </Field>
         <Field label="Mother's mobile">
           <input
             name="mother_mobile"
@@ -159,6 +148,17 @@ export default function StudentForm({
             defaultValue={initial?.mother_mobile ?? ""}
             className={inputCls}
           />
+        </Field>
+        <Field label="Alternate contact">
+          <input
+            name="alt_contact"
+            defaultValue={initial?.alt_contact ?? ""}
+            placeholder="Second phone number"
+            className={inputCls}
+          />
+        </Field>
+        <Field label="Contact number">
+          <input name="contact_number" defaultValue={initial?.contact_number ?? ""} className={inputCls} />
         </Field>
         <Field label="Category">
           <select name="category" defaultValue={initial?.category ?? "regular"} className={inputCls}>

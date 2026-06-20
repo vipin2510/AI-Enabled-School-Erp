@@ -59,6 +59,17 @@ export default async function StudentsAdminPage({
     return qs ? `/academics/students?${qs}` : "/academics/students";
   };
 
+  // Profile link forwards the active filter so its "← Students" lands back
+  // on the same filtered page.
+  const profileQs = (() => {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (classFilter) p.set("class", classFilter);
+    if (page > 1) p.set("page", String(page));
+    const qs = p.toString();
+    return qs ? `?${qs}` : "";
+  })();
+
   return (
     <div className="max-w-6xl">
       <header className="flex items-center justify-between mb-6">
@@ -120,7 +131,7 @@ export default async function StudentsAdminPage({
                 <tr key={s.id} className="border-t border-stone-100">
                   <td className="px-4 py-2 tabular-nums text-stone-500">{from + i + 1}</td>
                   <td className="px-4 py-2 font-medium">
-                    <Link href={`/academics/students/${s.id}`} className="text-stone-900 hover:text-accent hover:underline">
+                    <Link href={`/academics/students/${s.id}${profileQs}`} className="text-stone-900 hover:text-accent hover:underline">
                       {s.full_name}
                     </Link>
                   </td>

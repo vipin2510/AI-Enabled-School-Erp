@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { DownloadButton } from "@/components/ui/download-button";
+import { PreviewButton } from "@/components/ui/preview-button";
 
 type Props = {
   classes: { id: string; display_name: string }[];
@@ -99,14 +100,23 @@ export default function IdCardForm({ classes, sectionsByClass }: Props) {
         <p className="text-xs text-stone-400">
           Default: 6 cards/page · 6cm × 9cm. Opens a print-ready PDF.
         </p>
-        <DownloadButton
-          url={downloadUrl}
-          filename="id-cards.pdf"
-          disabled={!classId}
-          className="rounded-lg bg-stone-900 px-5 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
-        >
-          ⤓ Generate ID cards
-        </DownloadButton>
+        <div className="flex flex-wrap gap-2">
+          <PreviewButton
+            url={downloadUrl}
+            disabled={!classId}
+            className="rounded-lg border border-stone-200 bg-white px-5 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+          >
+            👁 Preview
+          </PreviewButton>
+          <DownloadButton
+            url={downloadUrl}
+            filename="id-cards.pdf"
+            disabled={!classId}
+            className="rounded-lg bg-stone-900 px-5 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
+          >
+            ⤓ Generate ID cards
+          </DownloadButton>
+        </div>
       </div>
     </div>
   );

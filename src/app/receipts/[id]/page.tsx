@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { inr, formatDate } from "@/lib/utils";
 import ReceiptStatus from "./receipt-status";
+import { DownloadButton } from "@/components/ui/download-button";
+import { PreviewButton } from "@/components/ui/preview-button";
 
 export const dynamic = "force-dynamic";
 
@@ -59,14 +61,19 @@ export default async function ReceiptPage({
             status={invoice.payment_status}
             paymentMode={invoice.payment_mode}
           />
-          <a
-            href={`/api/receipts/${invoice.id}/pdf`}
-            className="rounded-lg bg-stone-900 px-4 py-2 text-sm text-stone-50"
-            target="_blank"
-            rel="noreferrer"
+          <PreviewButton
+            url={`/api/receipts/${invoice.id}/pdf`}
+            className="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
           >
-            Download PDF
-          </a>
+            👁 Preview
+          </PreviewButton>
+          <DownloadButton
+            url={`/api/receipts/${invoice.id}/pdf`}
+            filename={`${invoice.receipt_no || "receipt"}.pdf`}
+            className="rounded-lg bg-stone-900 px-4 py-2 text-sm text-stone-50 hover:bg-stone-800"
+          >
+            ⤓ Download PDF
+          </DownloadButton>
         </div>
       </div>
 
