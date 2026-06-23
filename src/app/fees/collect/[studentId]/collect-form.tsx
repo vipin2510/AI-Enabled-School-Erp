@@ -77,10 +77,11 @@ const NEW_ADMISSION_ONLY_KINDS = new Set<FeeKind>([
   "admission_one_time",
 ]);
 
-// The session opens fees collection from May onward — April's monthly slot is
-// hidden because rosters aren't finalised yet at the start of the academic
-// year. (period_index uses calendar months: 4 = April.)
-const HIDDEN_MONTHLY_PERIODS = new Set<number>([4]);
+// Fee year runs April → March. May is skipped (school holiday / summer
+// break) so its monthly slot never appears as collectible. April is kept
+// in — it's the first chargeable month of the session.
+// (period_index uses calendar months: 5 = May.)
+const HIDDEN_MONTHLY_PERIODS = new Set<number>([5]);
 const isHiddenMonthly = (c: Component) =>
   c.kind === "monthly" && c.period_index !== null && HIDDEN_MONTHLY_PERIODS.has(c.period_index);
 
@@ -145,7 +146,7 @@ export default function CollectForm({
   // Synthetic Bus Fee components — one per school-year month, sourced from
   // the per-student bus_fee_amount. They flow through the same `selected`
   // state as real components; on submit we strip the synthetic id and send
-  // component_id: null. April is hidden via HIDDEN_MONTHLY_PERIODS just
+  // component_id: null. May is hidden via HIDDEN_MONTHLY_PERIODS just
   // like school monthlies.
   const busComponents = useMemo<Component[]>(() => {
     if (!busAvailable) return [];
@@ -733,8 +734,8 @@ function ComponentGroup({
 
 // Dedicated Bus Fees card — mirrors the hostel section UX but uses
 // synthetic components built from the student's per-month bus_fee_amount.
-// April is hidden (rosters not finalised early in the AY); months with
-// already-paid bus invoices show as locked.
+// May is hidden (summer break) so it never appears as collectible;
+// months with already-paid bus invoices show as locked.
 function BusFeesCard({
   components,
   selected,
