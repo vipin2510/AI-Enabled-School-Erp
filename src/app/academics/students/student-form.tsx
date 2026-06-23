@@ -242,6 +242,12 @@ export default function StudentForm({
   );
 }
 
+// Hard cap on uploaded photos. Anything larger than this surfaces an inline
+// error and the file input is cleared so the form can't be submitted with
+// an oversized payload (the server action would otherwise hit Next's body
+// limit and crash with a generic 500).
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+
 function PhotoField({
   name,
   label,
@@ -252,6 +258,7 @@ function PhotoField({
   current?: string;
 }) {
   const [preview, setPreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const src = preview ?? current ?? null;
   return (
     <div className="flex items-center gap-3 rounded-lg border border-stone-200 p-3">
@@ -272,12 +279,33 @@ function PhotoField({
           name={name}
           accept="image/*"
           onChange={(e) => {
-            const f = e.target.files?.[0];
-            setPreview(f ? URL.createObjectURL(f) : null);
+            const input = e.target;
+            const f = input.files?.[0];
+            if (!f) {
+              setPreview(null);
+              setError(null);
+              return;
+            }
+            if (f.size > MAX_PHOTO_BYTES) {
+              // Reject before the form ever posts — phone photos can be 3-8 MB
+              // and Next's server-action body limit is far smaller.
+              setError("Max 2 MB allowed. Please pick a smaller image.");
+              setPreview(null);
+              input.value = "";
+              return;
+            }
+            setError(null);
+            setPreview(URL.createObjectURL(f));
           }}
           className="mt-1 w-full text-xs file:mr-2 file:rounded-md file:border-0 file:bg-stone-900 file:px-2 file:py-1 file:text-xs file:text-white"
         />
-        {current && !preview && <p className="mt-1 text-[10px] text-stone-400">Current photo shown.</p>}
+        {error ? (
+          <p className="mt-1 text-[11px] font-medium text-red-600">{error}</p>
+        ) : current && !preview ? (
+          <p className="mt-1 text-[10px] text-stone-400">Current photo shown.</p>
+        ) : (
+          <p className="mt-1 text-[10px] text-stone-400">JPG or PNG · up to 2 MB</p>
+        )}
       </div>
     </div>
   );
