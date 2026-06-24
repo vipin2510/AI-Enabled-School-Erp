@@ -7,6 +7,8 @@ import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { currentAcademicYear, computeResult, examsForTerm } from "@/lib/results";
 import { loadClassSection, loadMarksByStudent, loadGradesByStudent } from "@/app/results/shared";
 import { ResultCardPdf } from "@/components/result-card-pdf";
+import { ResultCardFromTemplate } from "@/components/result-card-from-template";
+import { buildTemplateData, chooseTemplate } from "@/app/results/template-renderer";
 import { createZip, type ZipEntry } from "@/lib/zip";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +27,7 @@ export async function GET(req: Request) {
   const section = url.searchParams.get("section") ?? "";
   const term = url.searchParams.get("term"); // "1" → Term 1 only; else overall
   const singleStudentId = url.searchParams.get("studentId");
+  const paramTemplateId = url.searchParams.get("templateId");
   if (!classId || !section) {
     return NextResponse.json({ error: "Missing classId or section" }, { status: 400 });
   }
@@ -56,6 +59,11 @@ export async function GET(req: Request) {
   const logoPath = path.join(process.cwd(), "public", "letterhead", "aps-logo.jpeg");
   const logoDataUrl = `data:image/jpeg;base64,${(await fs.readFile(logoPath)).toString("base64")}`;
 
+  // Pick the active template once for the whole batch. If no editable
+  // template is configured (or the layout is empty), `template` is null
+  // and we render with the legacy hardcoded ResultCardPdf.
+  const template = await chooseTemplate(paramTemplateId);
+
   const safe = (s: string) => s.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
   const entries: ZipEntry[] = [];
   const used = new Set<string>();
@@ -63,29 +71,62 @@ export async function GET(req: Request) {
   for (const s of students) {
     const result = computeResult(subjects, marksByStudent[s.id] ?? {}, exams);
     const grades = gradesByStudent[s.id] ?? {};
-    const buf = await renderToBuffer(
-      ResultCardPdf({
-        data: {
-          student: {
-            full_name: s.full_name,
-            admission_no: s.admission_no,
-            father_name: s.father_name,
-            mother_name: motherById.get(s.id) ?? null,
-          },
-          className: klass.display_name,
-          section,
-          academicYear,
-          exams,
-          termLabel,
-          subjects: result.subjects,
-          coCurricular: coCurricular.map((c) => ({ name: c.name, grade: grades[c.id] ?? null })),
-          total: result.total,
-          max: result.max,
-          percent: result.percent,
-        },
+    const coCurricularGrades = coCurricular.map((c) => ({
+      name: c.name,
+      grade: grades[c.id] ?? null,
+    }));
+    let buf: Buffer;
+    if (template) {
+      const data = buildTemplateData({
+        schoolId,
         logoDataUrl,
-      }) as never
-    );
+        student: {
+          full_name: s.full_name,
+          admission_no: s.admission_no,
+          father_name: s.father_name,
+          mother_name: motherById.get(s.id) ?? null,
+        },
+        className: klass.display_name,
+        section,
+        academicYear,
+        termLabel: termLabel ?? "",
+        exams,
+        subjects,
+        marks: marksByStudent[s.id] ?? {},
+        coCurricular: coCurricularGrades,
+      });
+      buf = await renderToBuffer(
+        ResultCardFromTemplate({
+          layout: template.layout,
+          data,
+          pageSize: template.page_size,
+        }) as never
+      );
+    } else {
+      buf = await renderToBuffer(
+        ResultCardPdf({
+          data: {
+            student: {
+              full_name: s.full_name,
+              admission_no: s.admission_no,
+              father_name: s.father_name,
+              mother_name: motherById.get(s.id) ?? null,
+            },
+            className: klass.display_name,
+            section,
+            academicYear,
+            exams,
+            termLabel,
+            subjects: result.subjects,
+            coCurricular: coCurricularGrades,
+            total: result.total,
+            max: result.max,
+            percent: result.percent,
+          },
+          logoDataUrl,
+        }) as never
+      );
+    }
 
     // Keep filenames unique (two students can share a name).
     let name = `${safe(s.admission_no || s.full_name)}.pdf`;

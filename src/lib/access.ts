@@ -133,7 +133,10 @@ export const DEPARTMENT_NAV: Record<Department, NavItem[]> = {
     { href: "/library/barcodes", label: "Print Labels" },
     { href: "/library/settings", label: "Settings" },
   ],
-  results: [{ href: "/results", label: "Results" }],
+  results: [
+    { href: "/results", label: "Results" },
+    { href: "/results/templates", label: "Templates", leaderOnly: true },
+  ],
 };
 
 // Who marks their own daily attendance from their device (Layer 2 + Layer 3);
