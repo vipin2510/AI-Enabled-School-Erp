@@ -171,7 +171,7 @@ async function seedSchoolFeeStructure(classId: string, schoolId: string) {
       sort_order: 2, school_id: schoolId,
     },
     {
-      structure_id: fs.id, kind: "yearly", label: "Yearly Fee (Books/Dev)",
+      structure_id: fs.id, kind: "yearly", label: "Annual Activities & Development Fee",
       period_index: null, amount: 0, is_refundable: false, is_one_time: true,
       sort_order: 3, school_id: schoolId,
     },

@@ -203,7 +203,12 @@ export default function StructuresEditor({ structures }: { structures: Structure
                 <th className="px-4 py-2 font-medium">Class</th>
                 <th className="px-4 py-2 font-medium text-right">Reg.</th>
                 <th className="px-4 py-2 font-medium text-right">New Adm.</th>
-                <th className="px-4 py-2 font-medium text-right">Yearly</th>
+                <th
+                  className="px-4 py-2 font-medium text-right"
+                  title="Annual Activities & Development Fee — covers ID card, sports activity, culture programme, other activities and development"
+                >
+                  Activities &amp; Dev.
+                </th>
                 <th className="px-4 py-2 font-medium text-right">Monthly</th>
                 <th className="px-4 py-2 font-medium text-right">Caution</th>
                 <th className="px-4 py-2 font-medium text-right">Annual Total</th>

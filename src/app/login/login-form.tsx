@@ -6,11 +6,18 @@ import { login, type LoginState } from "@/app/actions/auth";
 
 export default function LoginForm() {
   const [state, action, pending] = useActionState<LoginState, FormData>(login, undefined);
-  const next = useSearchParams().get("next") ?? "/";
+  const params = useSearchParams();
+  const next = params.get("next") ?? "/";
+  const reason = params.get("reason");
 
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="next" value={next} />
+      {reason === "idle" && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          You were signed out after 15 minutes of inactivity. Please sign in again.
+        </p>
+      )}
       <div>
         <label htmlFor="identifier" className="block text-sm font-medium text-stone-700 mb-1">
           Phone or email

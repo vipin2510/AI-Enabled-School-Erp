@@ -43,48 +43,97 @@ type Invoice = {
 
 const MONTH_ABBR = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
-// Receipt prints two A6-sized copies (school + student) side-by-side in the top
-// half of an A4 sheet — each copy is a quarter of the page, so the bottom half
-// stays blank for cutting and the same form factor fits a stapled office file.
+// One A4 sheet = two A5-landscape halves stacked vertically. Top half is
+// the school copy, bottom half is the student copy. A dashed cut line
+// across the middle is the cut guide. Each half is a complete receipt.
+//
+// At A4 the page is 210 × 297 mm. Each half is 210 × ~148.5 mm of usable
+// space — A5 landscape. We keep a small horizontal margin and stamp the
+// dashed cut at the exact midpoint.
 const styles = StyleSheet.create({
-  page: { padding: 16, fontSize: 7.5, fontFamily: "Helvetica" },
-  topRow: { flexDirection: "row", alignItems: "stretch" },
-  copy: { flex: 1, paddingHorizontal: 8 },
-  cutCol: { width: 0, borderLeftWidth: 1, borderLeftColor: "#a8a29e", borderStyle: "dashed" },
+  page: {
+    fontFamily: "Helvetica",
+    fontSize: 9,
+    flexDirection: "column",
+  },
+  // Each half fills exactly 50% of the page height. We pin a fixed height
+  // so the cut line never drifts when content is short — the contained
+  // copy itself is flex so its own column lays out top-down.
+  half: {
+    height: "50%",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    flexDirection: "column",
+  },
+  // Dashed border on the top half's bottom edge gives a single cut guide
+  // exactly at the centre fold.
+  topHalf: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#a8a29e",
+    borderStyle: "dashed",
+  },
 
-  copyTag: { alignSelf: "flex-end", fontSize: 6, fontWeight: 700, color: "#78716c", letterSpacing: 1, marginBottom: 2 },
+  copyTag: {
+    alignSelf: "flex-end",
+    fontSize: 7,
+    fontWeight: 700,
+    color: "#78716c",
+    letterSpacing: 1.5,
+    marginBottom: 3,
+  },
+
   headerRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: "#a8a29e",
-    paddingBottom: 4,
-    marginBottom: 4,
+    paddingBottom: 5,
+    marginBottom: 6,
     alignItems: "center",
   },
-  logo: { width: 26, height: 26, marginRight: 6 },
-  schoolName: { fontSize: 10, fontWeight: 700 },
-  schoolSub: { fontSize: 5.5, color: "#57534e" },
-  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
-  receiptLabel: { fontSize: 5.5, color: "#78716c", letterSpacing: 1 },
-  receiptNo: { fontSize: 9, fontWeight: 700 },
+  logo: { width: 36, height: 36, marginRight: 9 },
+  schoolName: { fontSize: 14, fontWeight: 700 },
+  schoolSub: { fontSize: 7.5, color: "#57534e" },
 
-  grid: { flexDirection: "row", flexWrap: "wrap", marginBottom: 4 },
-  field: { width: "50%", marginBottom: 2, paddingRight: 4 },
-  fieldLabel: { fontSize: 5.5, color: "#78716c" },
-  fieldValue: { fontSize: 7, fontWeight: 700 },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 5,
+  },
+  receiptLabel: { fontSize: 7, color: "#78716c", letterSpacing: 1.2 },
+  receiptNo: { fontSize: 12, fontWeight: 700 },
 
+  // Two rows × three cells. Wider than the old 50% layout so labels fit.
+  grid: { flexDirection: "row", flexWrap: "wrap", marginBottom: 6 },
+  field: { width: "33.333%", marginBottom: 3, paddingRight: 6 },
+  fieldLabel: { fontSize: 7, color: "#78716c" },
+  fieldValue: { fontSize: 9, fontWeight: 700 },
+
+  // Items table.
   table: { borderWidth: 1, borderColor: "#e7e5e4" },
   thead: { flexDirection: "row", backgroundColor: "#f5f5f4" },
   tr: { flexDirection: "row", borderTopWidth: 1, borderTopColor: "#e7e5e4" },
-  th: { padding: 2.5, fontWeight: 700, fontSize: 6.5 },
-  td: { padding: 2.5, fontSize: 6.5 },
+  th: { padding: 4, fontWeight: 700, fontSize: 8 },
+  td: { padding: 4, fontSize: 8 },
   colDesc: { flex: 3 },
   colAmt: { flex: 1, textAlign: "right" },
   totalRow: { backgroundColor: "#f5f5f4", fontWeight: 700 },
-  meta: { fontSize: 6, color: "#57534e", marginTop: 2 },
-  sigRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 12 },
-  sigBox: { width: 90, borderTopWidth: 1, borderTopColor: "#78716c", paddingTop: 2, fontSize: 6 },
   strike: { textDecoration: "line-through", color: "#a8a29e" },
+
+  meta: { fontSize: 7, color: "#57534e", marginTop: 3 },
+  sigRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: "auto", // pin signatures to the bottom of the half
+    paddingTop: 14,
+  },
+  sigBox: {
+    width: 130,
+    borderTopWidth: 1,
+    borderTopColor: "#78716c",
+    paddingTop: 3,
+    fontSize: 7,
+  },
 });
 
 function inr(n: number | string) {
@@ -136,7 +185,7 @@ function ReceiptCopy({
   const s = invoice.students;
   const lines = displayLines(invoice.invoice_items);
   return (
-    <View style={styles.copy}>
+    <>
       <Text style={styles.copyTag}>{copyTag}</Text>
       <View style={styles.headerRow}>
         <Image src={logoDataUrl} style={styles.logo} />
@@ -217,7 +266,7 @@ function ReceiptCopy({
         <Text style={styles.sigBox}>Signature (Parent)</Text>
         <Text style={[styles.sigBox, { textAlign: "right" }]}>Authorised Signatory</Text>
       </View>
-    </View>
+    </>
   );
 }
 
@@ -231,9 +280,10 @@ export function ReceiptPdf({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.topRow}>
+        <View style={[styles.half, styles.topHalf]}>
           <ReceiptCopy invoice={invoice} logoDataUrl={logoDataUrl} copyTag="SCHOOL COPY" />
-          <View style={styles.cutCol} />
+        </View>
+        <View style={styles.half}>
           <ReceiptCopy invoice={invoice} logoDataUrl={logoDataUrl} copyTag="STUDENT COPY" />
         </View>
       </Page>

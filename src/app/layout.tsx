@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Sidebar, { type NavGroup } from "@/components/sidebar";
 import Topbar from "@/components/topbar";
+import IdleWatcher from "@/components/idle-watcher";
 import { getProfile, getCurrentDepartment, getCurrentSchool } from "@/lib/auth";
 import { getStaffAttendanceMarkedAt } from "@/lib/cache";
 import { todayStr } from "@/lib/attendance";
@@ -119,6 +120,7 @@ async function AppShell({
         />
         <main className="flex-1 px-6 py-6 md:px-10">{children}</main>
       </div>
+      <IdleWatcher />
     </div>
   );
 }
