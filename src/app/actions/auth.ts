@@ -72,6 +72,16 @@ export async function logout() {
   redirect("/login");
 }
 
+// Idle auto-logout. Same as logout() but lands on /login?reason=idle so the
+// login page can explain why the user was signed out. signOut() clears the
+// sb-* auth cookies, so the proxy then treats the request as anonymous and
+// lets it stay on /login instead of bouncing a still-valid session home.
+export async function idleLogout() {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/login?reason=idle");
+}
+
 // Switch the active department (admin/manager only). Validates against the
 // caller's allowed departments before writing the cookie.
 export async function setDepartment(formData: FormData) {

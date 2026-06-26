@@ -4,6 +4,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile, getCurrentSchoolId } from "@/lib/auth";
+import { getFeePrintLayout } from "@/lib/cache";
 import { ReceiptPdf } from "@/components/receipt-pdf";
 
 export const dynamic = "force-dynamic";
@@ -36,8 +37,12 @@ export async function GET(
   const logoBytes = await fs.readFile(logoPath);
   const logoDataUrl = `data:image/jpeg;base64,${logoBytes.toString("base64")}`;
 
+  // School-wide print layout (orientation + copies per page). Falls back to
+  // the historic 2-up portrait if unset or the table isn't migrated yet.
+  const layout = await getFeePrintLayout(schoolId);
+
   const buf = await renderToBuffer(
-    ReceiptPdf({ invoice: invoice as never, logoDataUrl }) as never
+    ReceiptPdf({ invoice: invoice as never, logoDataUrl, layout }) as never
   );
 
   return new NextResponse(buf as unknown as BodyInit, {

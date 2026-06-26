@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { idleLogout } from "@/app/actions/auth";
 
 // Real-inactivity logout. The server-side proxy keeps a 30-min ceiling
 // based on request cadence (`erp_last_active` cookie), but that misses the
@@ -44,6 +45,9 @@ export default function IdleWatcher({ windowMs = 15 * 60 * 1000 }: Props) {
   // Date.now() inline in the component body).
   const lastActivityRef = useRef<number>(0);
   const lastPingRef = useRef<number>(0);
+  // Latches once we've started logging out so the 30 s watchdog doesn't fire
+  // the server action again on its next tick before the redirect lands.
+  const loggingOutRef = useRef<boolean>(false);
 
   useEffect(() => {
     lastActivityRef.current = Date.now();
@@ -72,9 +76,13 @@ export default function IdleWatcher({ windowMs = 15 * 60 * 1000 }: Props) {
     const watchdog = window.setInterval(() => {
       const idleFor = Date.now() - lastActivityRef.current;
       if (idleFor < windowMs) return;
-      // Hard navigation so the proxy clears the session cookies on the
-      // way to /login. `reason=idle` lets the login page show a hint.
-      window.location.href = "/login?reason=idle";
+      if (loggingOutRef.current) return;
+      loggingOutRef.current = true;
+      // Actually terminate the session. A bare navigation to /login leaves the
+      // still-valid sb-* cookies intact, so the proxy would bounce us back
+      // home; signOut() in this action clears them first, then redirects to
+      // /login?reason=idle. The login page reads `reason` to show a hint.
+      void idleLogout();
     }, CHECK_INTERVAL_MS);
 
     return () => {

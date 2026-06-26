@@ -7,6 +7,11 @@ import {
   StyleSheet,
   Image,
 } from "@react-pdf/renderer";
+import {
+  type FeePrintLayout as ReceiptLayout,
+  computeTiling,
+  PT_PER_MM,
+} from "@/lib/fee-print-layout";
 
 type Item = {
   description: string;
@@ -43,98 +48,121 @@ type Invoice = {
 
 const MONTH_ABBR = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
-// One A4 sheet = two A5-landscape halves stacked vertically. Top half is
-// the school copy, bottom half is the student copy. A dashed cut line
-// across the middle is the cut guide. Each half is a complete receipt.
-//
-// At A4 the page is 210 × 297 mm. Each half is 210 × ~148.5 mm of usable
-// space — A5 landscape. We keep a small horizontal margin and stamp the
-// dashed cut at the exact midpoint.
-const styles = StyleSheet.create({
-  page: {
-    fontFamily: "Helvetica",
-    fontSize: 9,
-    flexDirection: "column",
-  },
-  // Each half fills exactly 50% of the page height. We pin a fixed height
-  // so the cut line never drifts when content is short — the contained
-  // copy itself is flex so its own column lays out top-down.
-  half: {
-    height: "50%",
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    flexDirection: "column",
-  },
-  // Dashed border on the top half's bottom edge gives a single cut guide
-  // exactly at the centre fold.
-  topHalf: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#a8a29e",
-    borderStyle: "dashed",
-  },
+// Print layout — set school-wide in Fees ▸ Settings ▸ Print Layout and read
+// from `fee_print_settings`. Boxes of the configured mm size tile each sheet;
+// each box is one receipt copy and the copy types cycle School → Student to
+// fill the page. The geometry (cols/rows/scale) is computed by
+// `computeTiling` so the live preview and this renderer never drift.
+export type { ReceiptLayout };
 
-  copyTag: {
-    alignSelf: "flex-end",
-    fontSize: 7,
-    fontWeight: 700,
-    color: "#78716c",
-    letterSpacing: 1.5,
-    marginBottom: 3,
-  },
+export const DEFAULT_RECEIPT_LAYOUT: ReceiptLayout = {
+  orientation: "portrait",
+  box_width_mm: 198,
+  box_height_mm: 140,
+  page_margin_mm: 6,
+  box_gap_mm: 0,
+  school_binding_mm: 0,
+};
 
-  headerRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#a8a29e",
-    paddingBottom: 5,
-    marginBottom: 6,
-    alignItems: "center",
-  },
-  logo: { width: 36, height: 36, marginRight: 9 },
-  schoolName: { fontSize: 14, fontWeight: 700 },
-  schoolSub: { fontSize: 7.5, color: "#57534e" },
+// Base horizontal padding inside a box at scale 1.0 — mirrors the `box`
+// style's paddingHorizontal so the School-Copy gutter can extend it.
+const BOX_PAD_X = 18;
 
-  titleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 5,
-  },
-  receiptLabel: { fontSize: 7, color: "#78716c", letterSpacing: 1.2 },
-  receiptNo: { fontSize: 12, fontWeight: 700 },
+// All sizes are derived from `scale` so denser grids shrink uniformly.
+// Border widths stay at 1 (hairlines) — scaling them below 1 makes the cut
+// guides vanish on print.
+function makeStyles(scale: number) {
+  const u = (n: number) => n * scale;
+  return StyleSheet.create({
+    page: {
+      fontFamily: "Helvetica",
+      fontSize: u(9),
+      flexDirection: "column",
+    },
+    // Grid container fills the sheet; boxes wrap row-major into it. Page
+    // margin (padding) and box gap are stamped inline per layout.
+    sheet: {
+      width: "100%",
+      height: "100%",
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignContent: "flex-start",
+    },
+    // One receipt copy. Height/width are stamped inline per grid shape so the
+    // boxes tile exactly. `overflow: hidden` keeps a long receipt from
+    // bleeding across the dashed cut line into the neighbouring copy.
+    box: {
+      paddingHorizontal: u(18),
+      paddingVertical: u(12),
+      flexDirection: "column",
+      overflow: "hidden",
+    },
+    cut: { borderColor: "#a8a29e", borderStyle: "dashed" },
 
-  // Two rows × three cells. Wider than the old 50% layout so labels fit.
-  grid: { flexDirection: "row", flexWrap: "wrap", marginBottom: 6 },
-  field: { width: "33.333%", marginBottom: 3, paddingRight: 6 },
-  fieldLabel: { fontSize: 7, color: "#78716c" },
-  fieldValue: { fontSize: 9, fontWeight: 700 },
+    copyTag: {
+      alignSelf: "flex-end",
+      fontSize: u(7),
+      fontWeight: 700,
+      color: "#78716c",
+      letterSpacing: u(1.5),
+      marginBottom: u(3),
+    },
 
-  // Items table.
-  table: { borderWidth: 1, borderColor: "#e7e5e4" },
-  thead: { flexDirection: "row", backgroundColor: "#f5f5f4" },
-  tr: { flexDirection: "row", borderTopWidth: 1, borderTopColor: "#e7e5e4" },
-  th: { padding: 4, fontWeight: 700, fontSize: 8 },
-  td: { padding: 4, fontSize: 8 },
-  colDesc: { flex: 3 },
-  colAmt: { flex: 1, textAlign: "right" },
-  totalRow: { backgroundColor: "#f5f5f4", fontWeight: 700 },
-  strike: { textDecoration: "line-through", color: "#a8a29e" },
+    headerRow: {
+      flexDirection: "row",
+      borderBottomWidth: 1,
+      borderBottomColor: "#a8a29e",
+      paddingBottom: u(5),
+      marginBottom: u(6),
+      alignItems: "center",
+    },
+    logo: { width: u(36), height: u(36), marginRight: u(9) },
+    schoolName: { fontSize: u(14), fontWeight: 700 },
+    schoolSub: { fontSize: u(7.5), color: "#57534e" },
 
-  meta: { fontSize: 7, color: "#57534e", marginTop: 3 },
-  sigRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: "auto", // pin signatures to the bottom of the half
-    paddingTop: 14,
-  },
-  sigBox: {
-    width: 130,
-    borderTopWidth: 1,
-    borderTopColor: "#78716c",
-    paddingTop: 3,
-    fontSize: 7,
-  },
-});
+    titleRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: u(5),
+    },
+    receiptLabel: { fontSize: u(7), color: "#78716c", letterSpacing: u(1.2) },
+    receiptNo: { fontSize: u(12), fontWeight: 700 },
+
+    fieldGrid: { flexDirection: "row", flexWrap: "wrap", marginBottom: u(6) },
+    field: { width: "33.333%", marginBottom: u(3), paddingRight: u(6) },
+    fieldLabel: { fontSize: u(7), color: "#78716c" },
+    fieldValue: { fontSize: u(9), fontWeight: 700 },
+
+    // Items table.
+    table: { borderWidth: 1, borderColor: "#e7e5e4" },
+    thead: { flexDirection: "row", backgroundColor: "#f5f5f4" },
+    tr: { flexDirection: "row", borderTopWidth: 1, borderTopColor: "#e7e5e4" },
+    th: { padding: u(4), fontWeight: 700, fontSize: u(8) },
+    td: { padding: u(4), fontSize: u(8) },
+    colDesc: { flex: 3 },
+    colAmt: { flex: 1, textAlign: "right" },
+    totalRow: { backgroundColor: "#f5f5f4", fontWeight: 700 },
+    strike: { textDecoration: "line-through", color: "#a8a29e" },
+
+    meta: { fontSize: u(7), color: "#57534e", marginTop: u(3) },
+    sigRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginTop: "auto", // pin signatures to the bottom of the box
+      paddingTop: u(14),
+    },
+    sigBox: {
+      width: u(130),
+      borderTopWidth: 1,
+      borderTopColor: "#78716c",
+      paddingTop: u(3),
+      fontSize: u(7),
+    },
+  });
+}
+
+type Styles = ReturnType<typeof makeStyles>;
 
 function inr(n: number | string) {
   const v = typeof n === "string" ? Number(n) : n;
@@ -177,10 +205,12 @@ function ReceiptCopy({
   invoice,
   logoDataUrl,
   copyTag,
+  styles,
 }: {
   invoice: Invoice;
   logoDataUrl: string;
   copyTag: string;
+  styles: Styles;
 }) {
   const s = invoice.students;
   const lines = displayLines(invoice.invoice_items);
@@ -208,16 +238,17 @@ function ReceiptCopy({
         <Text style={styles.fieldValue}>{fmtDate(invoice.issued_at)}</Text>
       </View>
 
-      <View style={styles.grid}>
-        <Field label="Student" value={s.full_name} />
+      <View style={styles.fieldGrid}>
+        <Field styles={styles} label="Student" value={s.full_name} />
         <Field
+          styles={styles}
           label="Class"
           value={`${s.classes?.display_name ?? "—"}${s.section ? ` · ${s.section}` : ""}`}
         />
-        <Field label="Academic Year" value={invoice.academic_year} />
-        <Field label="Father's Name" value={s.father_name ?? "—"} />
-        <Field label="Contact" value={s.contact_number ?? "—"} />
-        <Field label="Mode" value={invoice.payment_mode ?? "—"} />
+        <Field styles={styles} label="Academic Year" value={invoice.academic_year} />
+        <Field styles={styles} label="Father's Name" value={s.father_name ?? "—"} />
+        <Field styles={styles} label="Contact" value={s.contact_number ?? "—"} />
+        <Field styles={styles} label="Mode" value={invoice.payment_mode ?? "—"} />
       </View>
 
       <View style={styles.table}>
@@ -270,28 +301,80 @@ function ReceiptCopy({
   );
 }
 
+const COPY_TAGS = ["SCHOOL COPY", "STUDENT COPY"] as const;
+
 export function ReceiptPdf({
   invoice,
   logoDataUrl,
+  layout = DEFAULT_RECEIPT_LAYOUT,
 }: {
   invoice: Invoice;
   logoDataUrl: string;
+  layout?: ReceiptLayout;
 }) {
+  const t = computeTiling(layout);
+  const { cols, rows, perPage, scale } = t;
+  const styles = makeStyles(scale);
+
+  // We always print both the School and Student copy. Fill one full page of
+  // `perPage` boxes by cycling the two tags (so a roomy page isn't left
+  // half-empty); a 1-box page falls back to two pages — School then Student.
+  const totalCopies = Math.max(perPage, COPY_TAGS.length);
+  const tags = Array.from({ length: totalCopies }, (_, i) => COPY_TAGS[i % COPY_TAGS.length]);
+  const pages: (typeof COPY_TAGS[number])[][] = [];
+  for (let i = 0; i < tags.length; i += perPage) {
+    pages.push(tags.slice(i, i + perPage));
+  }
+
+  const boxWpt = t.boxWmm * PT_PER_MM;
+  const boxHpt = t.boxHmm * PT_PER_MM;
+  const marginPt = t.marginMm * PT_PER_MM;
+  const gapPt = t.gapMm * PT_PER_MM;
+  // School Copy gets an extra blank gutter on its left for hole-punching, on
+  // top of the box's normal padding. Student Copy keeps the plain padding.
+  const bindingPt = Math.max(0, layout.school_binding_mm || 0) * PT_PER_MM;
+
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
-        <View style={[styles.half, styles.topHalf]}>
-          <ReceiptCopy invoice={invoice} logoDataUrl={logoDataUrl} copyTag="SCHOOL COPY" />
-        </View>
-        <View style={styles.half}>
-          <ReceiptCopy invoice={invoice} logoDataUrl={logoDataUrl} copyTag="STUDENT COPY" />
-        </View>
-      </Page>
+      {pages.map((pageTags, pi) => (
+        <Page key={pi} size="A4" orientation={layout.orientation} style={styles.page}>
+          <View style={[styles.sheet, { padding: marginPt }]}>
+            {pageTags.map((tag, ci) => {
+              const row = Math.floor(ci / cols);
+              const col = ci % cols;
+              // Internal dashed cut guides + gap; no border/gap past the grid.
+              const spacing = {
+                ...(col < cols - 1 ? { marginRight: gapPt, borderRightWidth: 1 } : {}),
+                ...(row < rows - 1 ? { marginBottom: gapPt, borderBottomWidth: 1 } : {}),
+              };
+              // paddingLeft override extends the box's base padding by the
+              // binding gutter — School Copy only.
+              const gutter =
+                tag === "SCHOOL COPY" && bindingPt > 0
+                  ? { paddingLeft: BOX_PAD_X * scale + bindingPt }
+                  : {};
+              return (
+                <View
+                  key={ci}
+                  style={[styles.box, styles.cut, spacing, gutter, { width: boxWpt, height: boxHpt }]}
+                >
+                  <ReceiptCopy
+                    invoice={invoice}
+                    logoDataUrl={logoDataUrl}
+                    copyTag={tag}
+                    styles={styles}
+                  />
+                </View>
+              );
+            })}
+          </View>
+        </Page>
+      ))}
     </Document>
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value, styles }: { label: string; value: string; styles: Styles }) {
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>

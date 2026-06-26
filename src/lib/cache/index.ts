@@ -63,6 +63,7 @@ export const tagFor = {
   classes: (schoolId: string) => `s:${schoolId}:classes`,
   feeStructures: (schoolId: string) => `s:${schoolId}:fee_structures`,
   lateFeeSettings: (schoolId: string) => `s:${schoolId}:late_fee_settings`,
+  feePrintSettings: (schoolId: string) => `s:${schoolId}:fee_print_settings`,
   subjects: (schoolId: string) => `s:${schoolId}:subjects`,
   librarySettings: (schoolId: string) => `s:${schoolId}:library_settings`,
   staffAttendance: (schoolId: string, profileId: string, date: string) =>

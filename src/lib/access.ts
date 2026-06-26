@@ -116,6 +116,7 @@ export const DEPARTMENT_NAV: Record<Department, NavItem[]> = {
     { href: "/fees/expenses", label: "Expenses" },
     { href: "/receipts", label: "Receipts" },
     { href: "/settings/late-fee", label: "Settings", leaderOnly: true },
+    { href: "/settings/fees-print-layout", label: "Print Layout", leaderOnly: true },
   ],
   academics: [
     { href: "/academics", label: "Dashboard" },

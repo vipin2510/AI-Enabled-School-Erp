@@ -1,5 +1,6 @@
 import { cached, tagFor } from "@/lib/cache/index";
 import { createAnonClient } from "@/lib/supabase/anon";
+import type { FeePrintLayout } from "@/lib/fee-print-layout";
 
 // Re-export the tag builders so existing callers (`@/lib/cache`) keep working
 // after the move from `unstable_cache` to the local store.
@@ -107,6 +108,50 @@ export function getLateFeeSettings(schoolId: string): Promise<LateFeeSettings> {
       return basic.data
         ? { ...LATE_FEE_DEFAULTS, ...(basic.data as Partial<LateFeeSettings>) }
         : LATE_FEE_DEFAULTS;
+    },
+  );
+}
+
+// Fee-receipt print layout — one row per school, set once and rarely
+// touched. Read on every receipt PDF render, so cache for 30 min; the
+// settings page busts the tag from `app/settings/fees-print-layout/actions.ts`.
+// All sizes are millimetres on A4 (210 × 297 mm). The `FeePrintLayout` shape
+// lives in `@/lib/fee-print-layout` (shared with the client preview).
+export type { FeePrintLayout };
+// Defaults reproduce the historic half-A4 stacked copy: full A4 width minus
+// margins, half the height → two boxes (School + Student) per portrait page.
+export const FEE_PRINT_DEFAULTS: FeePrintLayout = {
+  orientation: "portrait",
+  box_width_mm: 198,
+  box_height_mm: 140,
+  page_margin_mm: 6,
+  box_gap_mm: 0,
+  school_binding_mm: 0,
+};
+export function getFeePrintLayout(schoolId: string): Promise<FeePrintLayout> {
+  return cached(
+    `fee_print_settings:${schoolId}`,
+    [tagFor.feePrintSettings(schoolId)],
+    1800,
+    async () => {
+      const supabase = createAnonClient();
+      // Table may not exist yet on pre-migration deployments — swallow the
+      // error and fall back to the historic stacked layout.
+      const { data, error } = await supabase
+        .from("fee_print_settings")
+        .select("orientation, box_width_mm, box_height_mm, page_margin_mm, box_gap_mm, school_binding_mm")
+        .eq("school_id", schoolId)
+        .maybeSingle();
+      if (error || !data) return FEE_PRINT_DEFAULTS;
+      const d = data as Partial<FeePrintLayout>;
+      return {
+        orientation: d.orientation ?? FEE_PRINT_DEFAULTS.orientation,
+        box_width_mm: Number(d.box_width_mm ?? FEE_PRINT_DEFAULTS.box_width_mm),
+        box_height_mm: Number(d.box_height_mm ?? FEE_PRINT_DEFAULTS.box_height_mm),
+        page_margin_mm: Number(d.page_margin_mm ?? FEE_PRINT_DEFAULTS.page_margin_mm),
+        box_gap_mm: Number(d.box_gap_mm ?? FEE_PRINT_DEFAULTS.box_gap_mm),
+        school_binding_mm: Number(d.school_binding_mm ?? FEE_PRINT_DEFAULTS.school_binding_mm),
+      };
     },
   );
 }
