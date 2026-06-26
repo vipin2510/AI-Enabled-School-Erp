@@ -211,18 +211,26 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // Pull existing codes for this school so a re-run skips dupes silently
-  // instead of failing on the global UNIQUE(books.code) constraint.
+  // Pull existing codes so a re-run skips dupes silently instead of failing
+  // on the global UNIQUE(books.code) constraint. The `code` column is unique
+  // across ALL schools, so we must check every existing code, not just this
+  // school's — and we paginate because PostgREST caps a select at 1000 rows.
   console.log("\nFetching existing book codes…");
-  const { data: existingRaw, error: exErr } = await supabase
-    .from("books")
-    .select("code")
-    .eq("school_id", KONDAGAON_SCHOOL_ID);
-  if (exErr) {
-    console.error("listing existing books failed:", exErr.message);
-    process.exit(1);
+  const existingCodes = new Set<string>();
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error: exErr } = await supabase
+      .from("books")
+      .select("code")
+      .range(from, from + PAGE - 1);
+    if (exErr) {
+      console.error("listing existing books failed:", exErr.message);
+      process.exit(1);
+    }
+    for (const r of data ?? []) existingCodes.add(r.code);
+    if (!data || data.length < PAGE) break;
   }
-  const existingCodes = new Set((existingRaw ?? []).map((r) => r.code));
+  console.log(`  existing codes in catalogue: ${existingCodes.size}`);
   const fresh = all.filter((b) => !existingCodes.has(b.code));
   console.log(`  already in DB: ${all.length - fresh.length}`);
   console.log(`  to insert:     ${fresh.length}`);
@@ -241,7 +249,12 @@ async function main() {
       category: b.category,
       status: "active",
     }));
-    const { error } = await supabase.from("books").insert(payload);
+    // Upsert with ignoreDuplicates so a single code that already exists (e.g.
+    // a row the pre-fetch missed, or a cross-school collision) is skipped
+    // rather than aborting the whole 200-row batch.
+    const { error } = await supabase
+      .from("books")
+      .upsert(payload, { onConflict: "code", ignoreDuplicates: true });
     if (error) {
       console.error(`  ! chunk ${i / CHUNK + 1} failed: ${error.message}`);
       continue;
