@@ -1,9 +1,9 @@
 // Single source of truth for the Results module's assessment scheme.
-// The school runs four Unit Tests (25 marks each) plus a Terminal Examination
-// (100 marks). Change the EXAMS array here and every screen, CSV template,
-// import parser and report card follows automatically.
+// The school runs four Unit Tests (25 marks each) plus three Terminal
+// Examinations (100 marks each). Change the EXAMS array here and every screen,
+// CSV template, import parser and report card follows automatically.
 
-export type ExamKey = "ut1" | "ut2" | "ut3" | "ut4" | "terminal" | "terminal2";
+export type ExamKey = "ut1" | "ut2" | "ut3" | "ut4" | "terminal" | "terminal2" | "terminal3";
 
 export type Exam = {
   key: ExamKey;
@@ -13,16 +13,25 @@ export type Exam = {
   weight: number; // share of the final percentage (sums to 100 across full scheme)
 };
 
-// Unit tests count for 10% each, terminals for 30% each — final % is a weighted
-// blend so a partial entry (e.g. UT1 + UT2 only) can never inflate to 80%.
+// Final aggregate (matches the school marksheet): Unit Tests together count for
+// 20%, Terminal I + II together for 30%, Terminal III for 50%. Spread evenly:
+// each UT = 5, each of Terminal I/II = 15, Terminal III = 50 → sums to 100.
 export const EXAMS: Exam[] = [
-  { key: "ut1", label: "Unit Test I", short: "UT I", max: 25, weight: 10 },
-  { key: "ut2", label: "Unit Test II", short: "UT II", max: 25, weight: 10 },
-  { key: "ut3", label: "Unit Test III", short: "UT III", max: 25, weight: 10 },
-  { key: "ut4", label: "Unit Test IV", short: "UT IV", max: 25, weight: 10 },
-  { key: "terminal", label: "Terminal Examination I", short: "Terminal I", max: 100, weight: 30 },
-  { key: "terminal2", label: "Terminal Examination II", short: "Terminal II", max: 100, weight: 30 },
+  { key: "ut1", label: "Unit Test I", short: "UT I", max: 25, weight: 5 },
+  { key: "ut2", label: "Unit Test II", short: "UT II", max: 25, weight: 5 },
+  { key: "ut3", label: "Unit Test III", short: "UT III", max: 25, weight: 5 },
+  { key: "ut4", label: "Unit Test IV", short: "UT IV", max: 25, weight: 5 },
+  { key: "terminal", label: "Terminal Examination I", short: "Terminal I", max: 100, weight: 15 },
+  { key: "terminal2", label: "Terminal Examination II", short: "Terminal II", max: 100, weight: 15 },
+  { key: "terminal3", label: "Terminal Examination III", short: "Terminal III", max: 100, weight: 50 },
 ];
+
+// The marksheet groups the exams into three column blocks.
+export const UT_KEYS: ExamKey[] = ["ut1", "ut2", "ut3", "ut4"];
+export const TERMINAL_KEYS: ExamKey[] = ["terminal", "terminal2", "terminal3"];
+
+// Aggregate block weights (the % each block contributes to the final 100).
+export const AGGREGATE_WEIGHTS = { ut: 20, termI_II: 30, termIII: 50 } as const;
 
 // Co-curricular subjects are graded once per year, not scored per exam.
 export const CO_CURRICULAR_GRADES = ["A", "B", "C", "D", "E"] as const;
@@ -147,4 +156,60 @@ export function computeResult(
     percent,
     grade: gradeFor(percent),
   };
+}
+
+// Per-subject aggregate split for the marksheet's right-hand block: the UT
+// total scaled to 20, Terminal I+II to 30, Terminal III to 50, summed to a
+// /100 subject aggregate. Treats a missing exam as 0 (matches the school's
+// printed sheet, where un-entered exams show 0.00).
+export type SubjectAggregate = { ut: number; termI_II: number; termIII: number; total: number };
+
+const UT_MAX = UT_KEYS.reduce((s, k) => s + (examByKey(k)?.max ?? 0), 0); // 100
+const TERM_I_II_MAX =
+  (examByKey("terminal")?.max ?? 0) + (examByKey("terminal2")?.max ?? 0); // 200
+const TERM_III_MAX = examByKey("terminal3")?.max ?? 0; // 100
+
+export function aggregateForSubject(obtained: Record<ExamKey, number | null>): SubjectAggregate {
+  const n = (v: number | null | undefined) => v ?? 0;
+  const utObt = UT_KEYS.reduce((s, k) => s + n(obtained[k]), 0);
+  const i_ii = n(obtained.terminal) + n(obtained.terminal2);
+  const iii = n(obtained.terminal3);
+  const ut = UT_MAX ? (utObt / UT_MAX) * AGGREGATE_WEIGHTS.ut : 0;
+  const termI_II = TERM_I_II_MAX ? (i_ii / TERM_I_II_MAX) * AGGREGATE_WEIGHTS.termI_II : 0;
+  const termIII = TERM_III_MAX ? (iii / TERM_III_MAX) * AGGREGATE_WEIGHTS.termIII : 0;
+  return { ut, termI_II, termIII, total: ut + termI_II + termIII };
+}
+
+// ── Extra (non-scholastic) report-card rows ───────────────────────────────
+// Captured per student, per exam in the `report_extras` table. `marks` rows
+// carry a numeric out of `max`; `grade` rows an A–E letter; `count` rows an
+// integer (attendance days). The marksheet renders one row per field with a
+// cell under every exam column.
+export type ExtraKind = "marks" | "grade" | "count";
+export type ExtraField = { key: string; label: string; kind: ExtraKind; max?: number };
+
+export const EXTRA_FIELDS: ExtraField[] = [
+  { key: "eng_dictation", label: "English Dictation", kind: "marks", max: 10 },
+  { key: "eng_handwriting", label: "English Hand Writing", kind: "marks", max: 5 },
+  { key: "hin_dictation", label: "Hindi Dictation", kind: "marks", max: 5 },
+  { key: "hin_handwriting", label: "Hindi Hand Writing", kind: "marks", max: 5 },
+  { key: "moral_science", label: "Moral Science", kind: "grade" },
+  { key: "drawing", label: "Drawing", kind: "grade" },
+  { key: "supw", label: "SUPW", kind: "grade" },
+  { key: "working_days", label: "No of Working Days", kind: "count" },
+  { key: "days_present", label: "No of Days Present", kind: "count" },
+];
+
+export const EXTRA_FIELD_KEYS = EXTRA_FIELDS.map((f) => f.key);
+export function isExtraField(v: string): boolean {
+  return EXTRA_FIELD_KEYS.includes(v);
+}
+export function extraByKey(key: string): ExtraField | undefined {
+  return EXTRA_FIELDS.find((f) => f.key === key);
+}
+
+// Extras lookup keyed "field:exam" → stored string value (or undefined).
+export type ExtrasMap = Record<string, string>;
+export function extraKey(field: string, exam: string): string {
+  return `${field}:${exam}`;
 }

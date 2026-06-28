@@ -1,252 +1,264 @@
-/* eslint-disable jsx-a11y/alt-text */
-import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
-import { gradeFor, passMark, type Exam, type ExamKey, type SubjectResult } from "@/lib/results";
+import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 
-export type ResultCardData = {
-  student: {
-    full_name: string;
-    admission_no: string | null;
-    father_name: string | null;
-    mother_name: string | null;
-  };
-  className: string;
-  section: string;
-  academicYear: string;
-  exams: Exam[];
-  termLabel?: string;
-  subjects: SubjectResult[];
-  coCurricular: { name: string; grade: string | null }[];
-  total: number;
-  max: number;
-  percent: number;
+// Fixed school marksheet — a wide landscape grid: each subject scored across
+// four Unit Tests and three Terminal Examinations, plus a weighted Aggregate
+// block (UT 20% + Terminal I&II 30% + Terminal III 50%). Everything below the
+// subject table (grand total, percentage, dictation/handwriting, grades,
+// rank, result, attendance days …) is a `GenericRow` the route fills, so this
+// component stays a dumb renderer of one fixed layout.
+
+export type SubjectRow = {
+  name: string;
+  utMax: number;
+  utMin: number;
+  terminalMax: number;
+  ut: (number | null)[]; // [ut1, ut2, ut3, ut4]
+  utTotal: number | null;
+  terminal: (number | null)[]; // [t1, t2, t3]
+  agg: { ut: number; iII: number; iii: number; total: number };
 };
 
+// A row in the block below the subjects. Any cell may be null/blank. `maxCell`
+// spans the Max+Min columns (used by the extra-assessment rows that carry a
+// single max, e.g. "English Dictation / 10").
+export type GenericRow = {
+  label: string;
+  bold?: boolean;
+  // Either a single spanning Max cell (extras, e.g. "10"), or explicit UT
+  // Max/Min cells (the GRAND TOTAL row). If neither is set, both are blank.
+  maxCell?: string | null;
+  utMaxCell?: string | number | null;
+  utMinCell?: string | number | null;
+  tMaxCell?: string | number | null; // explicit Terminal Max (GRAND TOTAL)
+  ut?: (string | number | null)[]; // up to 4
+  utTotal?: string | number | null;
+  terminal?: (string | number | null)[]; // up to 3
+  agg?: (string | number | null)[]; // up to 4 (UT, I+II, III, Total)
+};
+
+export type MarksheetData = {
+  schoolName: string;
+  academicYear: string;
+  className: string;
+  section: string;
+  studentName: string;
+  subjects: SubjectRow[];
+  rows: GenericRow[];
+};
+
+// Back-compat alias — the route used to pass `ResultCardData`.
+export type ResultCardData = MarksheetData;
+
+// 17 columns. Flex weights tuned so the subject name is wide and the score
+// columns stay legible on A4 landscape.
+const F = {
+  name: 3.4,
+  utMax: 0.9,
+  utMin: 0.9,
+  ut: 0.82,
+  utTotal: 0.95,
+  tMax: 0.9,
+  tMin: 0.9,
+  t: 0.95,
+  agg: 0.92,
+};
+const UT_BLOCK = F.utMax + F.utMin + F.ut * 4 + F.utTotal;
+const T_BLOCK = F.tMax + F.tMin + F.t * 3;
+const AGG_BLOCK = F.agg * 4;
+
 const styles = StyleSheet.create({
-  page: { padding: 28, fontSize: 9, fontFamily: "Helvetica", color: "#1c1917" },
-  headerRow: {
+  page: { padding: 18, fontSize: 7.5, fontFamily: "Helvetica", color: "#111827" },
+  outer: { borderWidth: 1, borderColor: "#111827" },
+
+  titleRow: {
     flexDirection: "row",
-    borderBottomWidth: 2,
-    borderBottomColor: "#0f172a",
-    paddingBottom: 8,
-    marginBottom: 10,
-    alignItems: "center",
-  },
-  logo: { width: 52, height: 52, marginRight: 12 },
-  schoolName: { fontSize: 17, fontWeight: 700 },
-  schoolSub: { fontSize: 8, color: "#57534e" },
-  title: {
-    textAlign: "center",
-    fontSize: 11,
-    fontWeight: 700,
-    letterSpacing: 1,
-    backgroundColor: "#f5f5f4",
+    justifyContent: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#111827",
     paddingVertical: 4,
-    marginBottom: 10,
-    borderRadius: 3,
   },
-  grid: { flexDirection: "row", flexWrap: "wrap", marginBottom: 10 },
-  field: { width: "33.33%", marginBottom: 5, paddingRight: 8 },
-  fieldLabel: { fontSize: 7, color: "#78716c", textTransform: "uppercase" },
-  fieldValue: { fontSize: 10, fontWeight: 700 },
+  title: { fontSize: 11, fontWeight: 700, letterSpacing: 0.3 },
 
-  table: { borderWidth: 1, borderColor: "#d6d3d1", borderRadius: 3, overflow: "hidden" },
-  thead: { flexDirection: "row", backgroundColor: "#0f172a" },
-  th: { padding: 5, fontWeight: 700, fontSize: 8, color: "#ffffff", textAlign: "center" },
-  tr: { flexDirection: "row", borderTopWidth: 1, borderTopColor: "#e7e5e4" },
-  trAlt: { backgroundColor: "#fafaf9" },
-  td: { padding: 5, fontSize: 8, textAlign: "center" },
-  subjectCell: { flex: 2.4, textAlign: "left", fontWeight: 700 },
-  examCell: { flex: 1 },
-  totalCell: { flex: 1.1, fontWeight: 700 },
-  gradeCell: { flex: 0.9, fontWeight: 700 },
-  footRow: { flexDirection: "row", backgroundColor: "#f5f5f4", borderTopWidth: 1, borderTopColor: "#d6d3d1" },
-  footLabel: { flex: 2.4, padding: 5, fontSize: 8, fontWeight: 700, textAlign: "right" },
-
-  summaryRow: { flexDirection: "row", marginTop: 12, gap: 10 },
-  summaryBox: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#d6d3d1",
-    borderRadius: 4,
-    padding: 8,
-    alignItems: "center",
-  },
-  summaryLabel: { fontSize: 7, color: "#78716c", textTransform: "uppercase" },
-  summaryValue: { fontSize: 14, fontWeight: 700, marginTop: 2 },
-  resultPass: { color: "#15803d" },
-  resultFail: { color: "#b91c1c" },
-
-  coHeading: { marginTop: 14, marginBottom: 4, fontSize: 9, fontWeight: 700, textTransform: "uppercase", color: "#57534e" },
-  coGrid: { flexDirection: "row", flexWrap: "wrap" },
-  coItem: {
-    width: "32%",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: "#e7e5e4",
-    borderRadius: 3,
-    paddingVertical: 4,
+  infoRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#111827" },
+  nameCell: {
+    flexGrow: 1,
+    flexBasis: 0,
     paddingHorizontal: 6,
-    marginBottom: 4,
-    marginRight: "1%",
+    paddingVertical: 5,
+    fontSize: 9,
+    fontWeight: 700,
+    borderRightWidth: 1,
+    borderRightColor: "#111827",
   },
-  coName: { fontSize: 8 },
-  coGrade: { fontSize: 8, fontWeight: 700 },
+  classCell: { width: 150, paddingHorizontal: 6, paddingVertical: 5, fontSize: 11, fontWeight: 700 },
 
-  sigRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 44 },
-  sigBox: { width: 150, borderTopWidth: 1, borderTopColor: "#78716c", paddingTop: 4, fontSize: 8, textAlign: "center" },
+  row: { flexDirection: "row", alignItems: "stretch" },
+  cell: {
+    borderRightWidth: 1,
+    borderRightColor: "#111827",
+    borderBottomWidth: 1,
+    borderBottomColor: "#111827",
+    paddingVertical: 2.5,
+    paddingHorizontal: 2,
+    textAlign: "center",
+    justifyContent: "center",
+  },
+  headCell: { backgroundColor: "#f3f4f6", fontWeight: 700, fontSize: 6.8 },
+  groupCell: { backgroundColor: "#e5e7eb", fontWeight: 700, fontSize: 8, letterSpacing: 0.3 },
+  nameColCell: { textAlign: "left", paddingLeft: 5 },
+  bold: { fontWeight: 700 },
+
+  sigRow: { flexDirection: "row", justifyContent: "space-between", paddingTop: 18, paddingHorizontal: 8 },
+  sig: { fontSize: 8, fontWeight: 700 },
 });
 
-function fmt(v: number | null): string {
-  if (v === null || v === undefined) return "—";
-  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+function fmt(v: number | string | null | undefined): string {
+  if (v === null || v === undefined || v === "") return "";
+  if (typeof v === "string") return v;
+  return Number.isInteger(v) ? String(v) : v.toFixed(2);
 }
 
-export function ResultCardPdf({ data, logoDataUrl }: { data: ResultCardData; logoDataUrl: string }) {
-  const passed = data.percent >= 33;
+// One table cell.
+function Cell({
+  children,
+  flex,
+  style,
+}: {
+  children?: React.ReactNode;
+  flex: number;
+  style?: object;
+}) {
+  return (
+    <View style={[styles.cell, { flexGrow: flex, flexBasis: 0 }, style ?? {}] as never}>
+      <Text>{children}</Text>
+    </View>
+  );
+}
+
+export function ResultCardPdf({ data }: { data: MarksheetData; logoDataUrl?: string }) {
+  const subjFlexes = [
+    F.utMax, F.utMin, F.ut, F.ut, F.ut, F.ut, F.utTotal,
+    F.tMax, F.tMin, F.t, F.t, F.t,
+    F.agg, F.agg, F.agg, F.agg,
+  ];
+
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
-        <View style={styles.headerRow}>
-          <Image src={logoDataUrl} style={styles.logo} />
-          <View>
-            <Text style={styles.schoolName}>ADESHWAR PUBLIC SCHOOL</Text>
-            <Text style={styles.schoolSub}>
-              Affiliated to CISCE Board, New Delhi · Kondagaon, Dist. Kondagaon (C.G.)
-            </Text>
-            <Text style={styles.schoolSub}>
-              School Code: CG024 · Mob: 9111005301, 9111005303 · apskondagaon@gmail.com
+      <Page size="A4" orientation="landscape" style={styles.page}>
+        <View style={styles.outer}>
+          {/* School title */}
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>
+              {data.schoolName}  {data.academicYear}
             </Text>
           </View>
-        </View>
 
-        <Text style={styles.title}>
-          REPORT CARD{data.termLabel ? ` · ${data.termLabel}` : ""} · {data.academicYear}
-        </Text>
-
-        <View style={styles.grid}>
-          <Field label="Student Name" value={data.student.full_name} />
-          <Field label="Class & Section" value={`${data.className} · ${data.section}`} />
-          <Field label="Admission No." value={data.student.admission_no ?? "—"} />
-          <Field label="Father's Name" value={data.student.father_name ?? "—"} />
-          <Field label="Mother's Name" value={data.student.mother_name ?? "—"} />
-        </View>
-
-        <View style={styles.table}>
-          <View style={styles.thead}>
-            <Text style={[styles.th, styles.subjectCell]}>Subject</Text>
-            {data.exams.map((e) => (
-              <Text key={e.key} style={[styles.th, styles.examCell]}>
-                {e.short}{"\n"}({e.max})
-              </Text>
-            ))}
-            <Text style={[styles.th, styles.totalCell]}>Total{"\n"}(/{schemeMax(data.exams)})</Text>
-            <Text style={[styles.th, styles.gradeCell]}>Grade</Text>
+          {/* Name + Class */}
+          <View style={styles.infoRow}>
+            <Text style={styles.nameCell}>NAME : {data.studentName}</Text>
+            <Text style={styles.classCell}>
+              CLASS : {data.className} {data.section ? `'${data.section}'` : ""}
+            </Text>
           </View>
 
-          {data.subjects.map((s, i) => (
-            <View key={s.subjectId} style={[styles.tr, i % 2 ? styles.trAlt : {}]}>
-              <Text style={[styles.td, styles.subjectCell]}>{s.name}</Text>
-              {data.exams.map((e) => (
-                <Text key={e.key} style={[styles.td, styles.examCell]}>
-                  {fmt(s.obtained[e.key])}
-                </Text>
-              ))}
-              <Text style={[styles.td, styles.totalCell]}>
-                {fmt(s.total)}/{s.max || 0}
-              </Text>
-              <Text style={[styles.td, styles.gradeCell]}>
-                {s.max ? gradeFor(s.percent) : "—"}
-              </Text>
-            </View>
+          {/* Group header */}
+          <View style={styles.row}>
+            <Cell flex={F.name} style={[styles.groupCell, styles.nameColCell]}>MAIN SUBJECT</Cell>
+            <Cell flex={UT_BLOCK} style={styles.groupCell}>UNIT-TEST {data.academicYear}</Cell>
+            <Cell flex={T_BLOCK} style={styles.groupCell}>TERMINAL EXAMINATION</Cell>
+            <Cell flex={AGG_BLOCK} style={[styles.groupCell, { borderRightWidth: 0 }]}>AGGREGATE</Cell>
+          </View>
+
+          {/* Sub header */}
+          <View style={styles.row}>
+            <Cell flex={F.name} style={[styles.headCell, styles.nameColCell]}> </Cell>
+            <Cell flex={F.utMax} style={styles.headCell}>Max{"\n"}Marks</Cell>
+            <Cell flex={F.utMin} style={styles.headCell}>Min{"\n"}Marks</Cell>
+            <Cell flex={F.ut} style={styles.headCell}>I</Cell>
+            <Cell flex={F.ut} style={styles.headCell}>II</Cell>
+            <Cell flex={F.ut} style={styles.headCell}>III</Cell>
+            <Cell flex={F.ut} style={styles.headCell}>IV</Cell>
+            <Cell flex={F.utTotal} style={styles.headCell}>UT{"\n"}TOTAL</Cell>
+            <Cell flex={F.tMax} style={styles.headCell}>Max{"\n"}Marks</Cell>
+            <Cell flex={F.tMin} style={styles.headCell}>Min{"\n"}Marks</Cell>
+            <Cell flex={F.t} style={styles.headCell}>I</Cell>
+            <Cell flex={F.t} style={styles.headCell}>II</Cell>
+            <Cell flex={F.t} style={styles.headCell}>III</Cell>
+            <Cell flex={F.agg} style={styles.headCell}>UT{"\n"}20%</Cell>
+            <Cell flex={F.agg} style={styles.headCell}>I+II{"\n"}30%</Cell>
+            <Cell flex={F.agg} style={styles.headCell}>III{"\n"}50%</Cell>
+            <Cell flex={F.agg} style={[styles.headCell, { borderRightWidth: 0 }]}>TOTAL{"\n"}100%</Cell>
+          </View>
+
+          {/* Subject rows */}
+          {data.subjects.map((s, i) => {
+            const cells = [
+              fmt(s.utMax), fmt(s.utMin),
+              fmt(s.ut[0]), fmt(s.ut[1]), fmt(s.ut[2]), fmt(s.ut[3]), fmt(s.utTotal),
+              fmt(s.terminalMax), "",
+              fmt(s.terminal[0]), fmt(s.terminal[1]), fmt(s.terminal[2]),
+              fmt(s.agg.ut), fmt(s.agg.iII), fmt(s.agg.iii), fmt(s.agg.total),
+            ];
+            return (
+              <View key={i} style={styles.row}>
+                <Cell flex={F.name} style={[styles.nameColCell, styles.bold]}>{s.name}</Cell>
+                {cells.map((c, j) => (
+                  <Cell key={j} flex={subjFlexes[j]} style={j === cells.length - 1 ? { borderRightWidth: 0 } : {}}>
+                    {c}
+                  </Cell>
+                ))}
+              </View>
+            );
+          })}
+
+          {/* Generic rows below the subjects */}
+          {data.rows.map((r, i) => (
+            <GenericRowView key={i} row={r} />
           ))}
-
-          <View style={styles.footRow}>
-            <Text style={styles.footLabel}>Grand Total</Text>
-            {data.exams.map((e) => (
-              <Text key={e.key} style={[styles.td, styles.examCell, { fontWeight: 700 }]}>
-                {fmt(examColumnTotal(data.subjects, e.key))}
-              </Text>
-            ))}
-            <Text style={[styles.td, styles.totalCell]}>
-              {fmt(data.total)}/{data.max}
-            </Text>
-            <Text style={[styles.td, styles.gradeCell]} />
-          </View>
         </View>
 
-        <View style={styles.summaryRow}>
-          <Summary label="Total Marks" value={`${fmt(data.total)} / ${data.max}`} />
-          <Summary label="Percentage" value={`${data.percent.toFixed(2)}%`} />
-          <Summary label="Grade" value={gradeFor(data.percent)} />
-          <View style={styles.summaryBox}>
-            <Text style={styles.summaryLabel}>Result</Text>
-            <Text style={[styles.summaryValue, passed ? styles.resultPass : styles.resultFail]}>
-              {passed ? "PASS" : "FAIL"}
-            </Text>
-          </View>
-        </View>
-
-        {data.coCurricular.length > 0 && (
-          <>
-            <Text style={styles.coHeading}>Co-Curricular</Text>
-            <View style={styles.coGrid}>
-              {data.coCurricular.map((c) => (
-                <View key={c.name} style={styles.coItem}>
-                  <Text style={styles.coName}>{c.name}</Text>
-                  <Text style={styles.coGrade}>{c.grade ?? "—"}</Text>
-                </View>
-              ))}
-            </View>
-          </>
-        )}
-
-        <Text style={{ fontSize: 7, color: "#78716c", marginTop: 8 }}>
-          Pass mark per subject is {Math.round(0.33 * 100)}% of its total (e.g. {passMark(100)}/100).
-          Grades: A1 ≥91, A2 ≥81, B1 ≥71, B2 ≥61, C1 ≥51, C2 ≥41, D ≥33, E below.
-        </Text>
-
+        {/* Signatures */}
         <View style={styles.sigRow}>
-          <Text style={styles.sigBox}>Class Teacher</Text>
-          <Text style={styles.sigBox}>Examiner</Text>
-          <Text style={styles.sigBox}>Principal</Text>
+          <Text style={styles.sig}>Signature of Class Teacher</Text>
+          <Text style={styles.sig}>Signature of Examination Incharge</Text>
+          <Text style={styles.sig}>Signature of Principal</Text>
         </View>
       </Page>
     </Document>
   );
 }
 
-function schemeMax(exams: Exam[]): number {
-  return exams.reduce((a, e) => a + e.max, 0);
-}
-
-function examColumnTotal(subjects: SubjectResult[], key: ExamKey) {
-  let total = 0;
-  let any = false;
-  for (const s of subjects) {
-    const v = s.obtained[key];
-    if (v !== null && v !== undefined) {
-      total += v;
-      any = true;
-    }
-  }
-  return any ? total : null;
-}
-
-function Field({ label, value }: { label: string; value: string }) {
+function GenericRowView({ row }: { row: GenericRow }) {
+  const ut = row.ut ?? [];
+  const terminal = row.terminal ?? [];
+  const agg = row.agg ?? [];
+  const cellStyle = row.bold ? styles.bold : {};
   return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <Text style={styles.fieldValue}>{value}</Text>
-    </View>
-  );
-}
-
-function Summary({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.summaryBox}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={styles.summaryValue}>{value}</Text>
+    <View style={styles.row}>
+      <Cell flex={F.name} style={[styles.nameColCell, cellStyle]}>{row.label}</Cell>
+      {/* Max/Min area — a single spanning cell when the row carries a max. */}
+      {row.maxCell !== undefined ? (
+        <Cell flex={F.utMax + F.utMin} style={cellStyle}>{fmt(row.maxCell)}</Cell>
+      ) : (
+        <>
+          <Cell flex={F.utMax} style={cellStyle}>{fmt(row.utMaxCell)}</Cell>
+          <Cell flex={F.utMin} style={cellStyle}>{fmt(row.utMinCell)}</Cell>
+        </>
+      )}
+      <Cell flex={F.ut} style={cellStyle}>{fmt(ut[0])}</Cell>
+      <Cell flex={F.ut} style={cellStyle}>{fmt(ut[1])}</Cell>
+      <Cell flex={F.ut} style={cellStyle}>{fmt(ut[2])}</Cell>
+      <Cell flex={F.ut} style={cellStyle}>{fmt(ut[3])}</Cell>
+      <Cell flex={F.utTotal} style={cellStyle}>{fmt(row.utTotal)}</Cell>
+      <Cell flex={F.tMax} style={cellStyle}>{fmt(row.tMaxCell)}</Cell>
+      <Cell flex={F.tMin} style={cellStyle}>{""}</Cell>
+      <Cell flex={F.t} style={cellStyle}>{fmt(terminal[0])}</Cell>
+      <Cell flex={F.t} style={cellStyle}>{fmt(terminal[1])}</Cell>
+      <Cell flex={F.t} style={cellStyle}>{fmt(terminal[2])}</Cell>
+      <Cell flex={F.agg} style={cellStyle}>{fmt(agg[0])}</Cell>
+      <Cell flex={F.agg} style={cellStyle}>{fmt(agg[1])}</Cell>
+      <Cell flex={F.agg} style={cellStyle}>{fmt(agg[2])}</Cell>
+      <Cell flex={F.agg} style={[cellStyle, { borderRightWidth: 0 }]}>{fmt(agg[3])}</Cell>
     </View>
   );
 }

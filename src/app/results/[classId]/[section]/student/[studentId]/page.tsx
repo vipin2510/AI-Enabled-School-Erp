@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { currentAcademicYear, markKey, type MarksMap } from "@/lib/results";
+import { currentAcademicYear, markKey, extraKey, type MarksMap, type ExtrasMap } from "@/lib/results";
 import { saveStudentMarks } from "@/app/results/actions";
 import StudentMarksForm from "./marks-form";
 import { DownloadButton } from "@/components/ui/download-button";
@@ -23,8 +23,14 @@ export default async function StudentMarksPage({
 
   const academicYear = currentAcademicYear();
 
-  const [{ data: student }, { data: subjectRows }, { data: klass }, { data: marks }, { data: grades }] =
-    await Promise.all([
+  const [
+    { data: student },
+    { data: subjectRows },
+    { data: klass },
+    { data: marks },
+    { data: grades },
+    { data: extrasRows },
+  ] = await Promise.all([
       supabase
         .from("students")
         .select("id, full_name, admission_no, father_name")
@@ -42,6 +48,13 @@ export default async function StudentMarksPage({
       supabase
         .from("co_curricular_grades")
         .select("subject_id, grade")
+        .eq("school_id", schoolId)
+        .eq("student_id", studentId)
+        .eq("academic_year", academicYear),
+      // Extras table may not be migrated yet — a null result is handled below.
+      supabase
+        .from("report_extras")
+        .select("exam, field, value")
         .eq("school_id", schoolId)
         .eq("student_id", studentId)
         .eq("academic_year", academicYear),
@@ -63,6 +76,11 @@ export default async function StudentMarksPage({
   const gradeMap: Record<string, string> = {};
   for (const g of (grades ?? []) as { subject_id: string; grade: string | null }[]) {
     if (g.grade) gradeMap[g.subject_id] = g.grade;
+  }
+
+  const extrasMap: ExtrasMap = {};
+  for (const e of (extrasRows ?? []) as { exam: string; field: string; value: string | null }[]) {
+    if (e.value != null && e.value !== "") extrasMap[extraKey(e.field, e.exam)] = e.value;
   }
 
   const backHref = `/results/${classId}/${encodeURIComponent(section)}`;
@@ -114,6 +132,7 @@ export default async function StudentMarksPage({
           coCurricular={coCurricular}
           initial={marksMap}
           initialGrades={gradeMap}
+          initialExtras={extrasMap}
           backHref={backHref}
         />
       )}

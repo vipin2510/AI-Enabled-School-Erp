@@ -10,6 +10,8 @@ import {
   examByKey,
   examColumnHeader,
   isExamKey,
+  isExtraField,
+  extraByKey,
   isCoCurricularGrade,
   currentAcademicYear,
 } from "@/lib/results";
@@ -36,6 +38,46 @@ function parseMarkField(name: string): { subjectId: string; exam: string } | nul
   const [, subjectId, exam] = parts;
   if (!subjectId || !isExamKey(exam)) return null;
   return { subjectId, exam };
+}
+
+// Parse one "x_<field>_<exam>" extras field. Field keys contain underscores
+// (e.g. "eng_dictation") and exam keys never do, so the exam is the segment
+// after the last underscore and the field is everything before it.
+function parseExtraFieldName(name: string): { field: string; exam: string } | null {
+  if (!name.startsWith("x_")) return null;
+  const rest = name.slice(2);
+  const i = rest.lastIndexOf("_");
+  if (i < 0) return null;
+  const field = rest.slice(0, i);
+  const exam = rest.slice(i + 1);
+  if (!isExtraField(field) || !isExamKey(exam)) return null;
+  return { field, exam };
+}
+
+type ExtraRow = {
+  student_id: string;
+  school_id: string;
+  academic_year: string;
+  exam: string;
+  field: string;
+  value: string | null;
+  updated_at: string;
+};
+
+// Read + validate an extras value by its field kind. Stored as text.
+function readExtra(raw: string, field: ReturnType<typeof extraByKey>): { value: string | null; error?: string } {
+  const t = raw.trim();
+  if (t === "" || !field) return { value: t === "" ? null : t };
+  if (field.kind === "grade") {
+    if (!isCoCurricularGrade(t)) return { value: null, error: `${field.label}: invalid grade "${t}"` };
+    return { value: t };
+  }
+  const n = Number(t);
+  if (!Number.isFinite(n) || n < 0) return { value: null, error: `${field.label}: "${raw}" is not valid` };
+  if (field.kind === "marks" && field.max != null && n > field.max) {
+    return { value: null, error: `${field.label}: ${n} exceeds the maximum of ${field.max}` };
+  }
+  return { value: t };
 }
 
 // Read + validate a marks value against an exam's maximum.
@@ -82,8 +124,26 @@ export async function saveStudentMarks(
     updated_at: string;
     school_id: string;
   }[] = [];
+  const extraRows: ExtraRow[] = [];
 
   for (const [name, raw] of formData.entries()) {
+    // Extra assessment: "x_<field>_<exam>".
+    const extra = parseExtraFieldName(name);
+    if (extra) {
+      const field = extraByKey(extra.field);
+      const { value, error } = readExtra(String(raw), field);
+      if (error) return { error };
+      extraRows.push({
+        student_id: studentId,
+        school_id: schoolId,
+        academic_year: academicYear,
+        exam: extra.exam,
+        field: extra.field,
+        value,
+        updated_at: now,
+      });
+      continue;
+    }
     // Scholastic marks: "m_<subjectId>_<exam>".
     const field = parseMarkField(name);
     if (field) {
@@ -130,6 +190,15 @@ export async function saveStudentMarks(
       .from("co_curricular_grades")
       .upsert(gradeRows, { onConflict: "student_id,subject_id,academic_year" });
     if (error) return { error: error.message };
+  }
+  if (extraRows.length) {
+    const { error } = await supabase
+      .from("report_extras")
+      .upsert(extraRows, { onConflict: "student_id,academic_year,exam,field" });
+    // Tolerate the table not being migrated yet — marks/grades still saved.
+    if (error && !/relation .*report_extras|does not exist/.test(error.message)) {
+      return { error: error.message };
+    }
   }
 
   revalidatePath(`/results/${classId}/${section}`);

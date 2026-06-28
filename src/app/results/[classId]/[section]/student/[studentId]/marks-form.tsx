@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
-import { EXAMS, CO_CURRICULAR_GRADES, markKey, gradeFor, type MarksMap } from "@/lib/results";
+import {
+  EXAMS,
+  CO_CURRICULAR_GRADES,
+  EXTRA_FIELDS,
+  markKey,
+  extraKey,
+  gradeFor,
+  type MarksMap,
+  type ExtrasMap,
+} from "@/lib/results";
 import type { SaveState } from "@/app/results/actions";
 
 type Subject = { id: string; name: string };
@@ -13,6 +22,7 @@ type Props = {
   coCurricular: Subject[];
   initial: MarksMap;
   initialGrades: Record<string, string>;
+  initialExtras: ExtrasMap;
   backHref: string;
 };
 
@@ -22,6 +32,7 @@ export default function StudentMarksForm({
   coCurricular,
   initial,
   initialGrades,
+  initialExtras,
   backHref,
 }: Props) {
   const [state, formAction, pending] = useActionState<SaveState, FormData>(action, undefined);
@@ -175,6 +186,71 @@ export default function StudentMarksForm({
           </div>
         </div>
       )}
+
+      {/* Extra assessments — one value per exam, mirrors the marksheet rows. */}
+      <div className="card mt-6 overflow-x-auto p-0">
+        <div className="px-4 pt-4">
+          <h2 className="text-sm font-semibold text-stone-800">Extra assessments</h2>
+          <p className="mt-1 text-xs text-stone-500">
+            Dictation / handwriting marks, moral-science / drawing / SUPW grades, and
+            attendance days — entered per exam, shown below the subjects on the marksheet.
+          </p>
+        </div>
+        <table className="mt-3 w-full text-sm">
+          <thead className="bg-stone-50 text-xs uppercase tracking-wide text-stone-500">
+            <tr>
+              <th className="px-4 py-3 text-left font-medium">Item</th>
+              {EXAMS.map((e) => (
+                <th key={e.key} className="px-2 py-3 text-center font-medium">{e.short}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {EXTRA_FIELDS.map((f) => (
+              <tr key={f.key} className="border-t border-stone-100">
+                <td className="px-4 py-2 font-medium text-stone-800">
+                  {f.label}
+                  {f.max != null && <span className="ml-1 text-xs text-stone-400">/{f.max}</span>}
+                </td>
+                {EXAMS.map((e) => {
+                  const key = extraKey(f.key, e.key);
+                  const cls =
+                    "w-16 rounded-md border border-stone-300 bg-white px-2 py-1 text-center text-sm outline-none focus:border-stone-900 focus:ring-1 focus:ring-stone-900";
+                  return (
+                    <td key={e.key} className="px-2 py-2 text-center">
+                      {f.kind === "grade" ? (
+                        <select
+                          name={`x_${f.key}_${e.key}`}
+                          defaultValue={initialExtras[key] ?? ""}
+                          className={cls}
+                          aria-label={`${f.label} ${e.short}`}
+                        >
+                          <option value="">—</option>
+                          {CO_CURRICULAR_GRADES.map((g) => (
+                            <option key={g} value={g}>{g}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="number"
+                          name={`x_${f.key}_${e.key}`}
+                          min={0}
+                          max={f.kind === "marks" ? f.max : undefined}
+                          step={f.kind === "count" ? 1 : "0.5"}
+                          inputMode="decimal"
+                          defaultValue={initialExtras[key] ?? ""}
+                          className={cls}
+                          aria-label={`${f.label} ${e.short}`}
+                        />
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {state?.error && <p className="mt-3 text-sm text-red-600">{state.error}</p>}
 

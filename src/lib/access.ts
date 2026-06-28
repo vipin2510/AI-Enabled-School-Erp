@@ -136,7 +136,6 @@ export const DEPARTMENT_NAV: Record<Department, NavItem[]> = {
   ],
   results: [
     { href: "/results", label: "Results" },
-    { href: "/results/templates", label: "Templates", leaderOnly: true },
   ],
 };
 

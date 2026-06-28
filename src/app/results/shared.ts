@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { markKey, type MarksMap } from "@/lib/results";
+import { markKey, extraKey, type MarksMap, type ExtrasMap } from "@/lib/results";
 
 export type StudentRow = {
   id: string;
@@ -94,6 +94,39 @@ export async function loadMarksByStudent(
   }[]) {
     (result[row.student_id] ??= {})[markKey(row.subject_id, row.exam)] =
       row.marks_obtained;
+  }
+  return result;
+}
+
+// Extra report-card values (dictation/handwriting marks, moral-science /
+// drawing / SUPW grades, attendance days) for a set of students in one year,
+// as student_id → ExtrasMap keyed "field:exam". Tolerant of the table not
+// being migrated yet — returns empty maps rather than throwing.
+export async function loadExtrasByStudent(
+  studentIds: string[],
+  academicYear: string,
+  schoolId: string
+): Promise<Record<string, ExtrasMap>> {
+  const result: Record<string, ExtrasMap> = {};
+  if (studentIds.length === 0) return result;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("report_extras")
+    .select("student_id, exam, field, value")
+    .eq("school_id", schoolId)
+    .in("student_id", studentIds)
+    .eq("academic_year", academicYear);
+  if (error || !data) return result;
+
+  for (const row of data as {
+    student_id: string;
+    exam: string;
+    field: string;
+    value: string | null;
+  }[]) {
+    if (row.value === null || row.value === "") continue;
+    (result[row.student_id] ??= {})[extraKey(row.field, row.exam)] = row.value;
   }
   return result;
 }
