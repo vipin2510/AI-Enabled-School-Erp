@@ -5,6 +5,9 @@ import Sidebar, { type NavGroup } from "@/components/sidebar";
 import Topbar from "@/components/topbar";
 import IdleWatcher from "@/components/idle-watcher";
 import { getProfile, getCurrentDepartment, getCurrentSchool } from "@/lib/auth";
+import { getLocale, getT } from "@/lib/i18n/server";
+import { I18nProvider } from "@/lib/i18n/client";
+import type { Locale } from "@/lib/i18n/config";
 import { getStaffAttendanceMarkedAt } from "@/lib/cache";
 import { todayStr } from "@/lib/attendance";
 import { redirect } from "next/navigation";
@@ -28,18 +31,20 @@ export const metadata: Metadata = {
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const profile = await getProfile();
+  const [profile, locale] = await Promise.all([getProfile(), getLocale()]);
 
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang={locale} className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full">
-        {profile ? (
-          <AppShell profile={profile}>{children}</AppShell>
-        ) : (
-          // Logged out: the only page reachable (per proxy.ts) is /login,
-          // which renders bare without the sidebar/topbar shell.
-          children
-        )}
+        <I18nProvider locale={locale}>
+          {profile ? (
+            <AppShell profile={profile} locale={locale}>{children}</AppShell>
+          ) : (
+            // Logged out: the only page reachable (per proxy.ts) is /login,
+            // which renders bare without the sidebar/topbar shell.
+            children
+          )}
+        </I18nProvider>
       </body>
     </html>
   );
@@ -47,11 +52,14 @@ export default async function RootLayout({
 
 async function AppShell({
   profile,
+  locale,
   children,
 }: {
   profile: NonNullable<Awaited<ReturnType<typeof getProfile>>>;
+  locale: Locale;
   children: React.ReactNode;
 }) {
+  const t = await getT();
   const department = await getCurrentDepartment(profile);
   const allowed = allowedDepartments(profile.role, profile.department);
   const isLeader = profile.role === "admin" || profile.role === "manager";
@@ -76,23 +84,25 @@ async function AppShell({
   const groups: NavGroup[] = [];
 
   if (isLeader) {
-    groups.push({ items: [{ href: "/", label: "Overview" }] });
+    groups.push({ items: [{ href: "/", label: t("Overview") }] });
   }
 
-  const deptItems = DEPARTMENT_NAV[department].filter((n) => isLeader || !n.leaderOnly);
-  groups.push({ label: DEPARTMENT_LABELS[department], items: deptItems });
+  const deptItems = DEPARTMENT_NAV[department]
+    .filter((n) => isLeader || !n.leaderOnly)
+    .map((n) => ({ ...n, label: t(n.label) }));
+  groups.push({ label: t(DEPARTMENT_LABELS[department]), items: deptItems });
 
   if (profile.role === "admin") {
     groups.push({
-      label: "Administration",
+      label: t("Administration"),
       items: [
-        { href: "/admin/users", label: "Users & Logins" },
-        { href: "/admin/staff-attendance", label: "Staff Attendance" },
+        { href: "/admin/users", label: t("Users & Logins") },
+        { href: "/admin/staff-attendance", label: t("Staff Attendance") },
       ],
     });
   }
 
-  groups.push({ items: [{ href: "/requests", label: "Change Requests" }] });
+  groups.push({ items: [{ href: "/requests", label: t("Change Requests") }] });
 
   // Layer 2/3 mark their own attendance from the topbar; surface whether
   // they've already done so today. Cached for 60s per (school, profile, date)
@@ -117,6 +127,7 @@ async function AppShell({
           allowedSchools={schools}
           canMarkAttendance={marksOwnAttendance(profile.role)}
           markedAt={markedAt}
+          locale={locale}
         />
         <main className="flex-1 px-6 py-6 md:px-10">{children}</main>
       </div>

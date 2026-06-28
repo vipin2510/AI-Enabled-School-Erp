@@ -2,8 +2,11 @@
 
 import { useRef, useState, useTransition } from "react";
 import { setDepartment, setSchool, logout } from "@/app/actions/auth";
+import { setLocale } from "@/app/actions/i18n";
 import { markStaffAttendance } from "@/app/actions/staff-attendance";
 import { formatTime } from "@/lib/utils";
+import { useT } from "@/lib/i18n/client";
+import { LOCALES, LOCALE_LABELS, type Locale } from "@/lib/i18n/config";
 import {
   DEPARTMENT_LABELS,
   ROLE_LABELS,
@@ -22,6 +25,7 @@ type Props = {
   allowedSchools: School[];
   canMarkAttendance: boolean;
   markedAt: string | null;
+  locale: Locale;
 };
 
 export default function Topbar({
@@ -34,7 +38,9 @@ export default function Topbar({
   allowedSchools,
   canMarkAttendance,
   markedAt,
+  locale,
 }: Props) {
+  const t = useT();
   const deptFormRef = useRef<HTMLFormElement>(null);
   const schoolFormRef = useRef<HTMLFormElement>(null);
   const canSwitchDept = role !== "staff" && allowed.length > 1;
@@ -44,7 +50,7 @@ export default function Topbar({
     <header className="flex items-center justify-between gap-4 border-b border-[color:var(--border)] bg-[color:var(--card)] px-6 py-3">
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-3">
-          <span className="text-xs uppercase tracking-wide text-stone-400">School</span>
+          <span className="text-xs uppercase tracking-wide text-stone-400">{t("School")}</span>
           {canSwitchSchool ? (
             <form ref={schoolFormRef} action={setSchool}>
               <input type="hidden" name="next" value="/" />
@@ -73,7 +79,7 @@ export default function Topbar({
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-xs uppercase tracking-wide text-stone-400">Department</span>
+          <span className="text-xs uppercase tracking-wide text-stone-400">{t("Department")}</span>
           {canSwitchDept ? (
             // Switching submits the server action, which sets the cookie; the
             // action's revalidation re-renders the shell + page for the new dept.
@@ -86,28 +92,29 @@ export default function Topbar({
               >
                 {allowed.map((d) => (
                   <option key={d} value={d}>
-                    {DEPARTMENT_LABELS[d]}
+                    {t(DEPARTMENT_LABELS[d])}
                   </option>
                 ))}
               </select>
             </form>
           ) : (
             <span className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-medium">
-              {DEPARTMENT_LABELS[department]}
+              {t(DEPARTMENT_LABELS[department])}
             </span>
           )}
         </div>
       </div>
 
       <div className="flex items-center gap-4">
+        <LangToggle current={locale} />
         {canMarkAttendance && <MarkAttendanceButton initialMarkedAt={markedAt} />}
         <div className="text-right leading-tight">
           <div className="text-sm font-medium">{fullName || email}</div>
-          <div className="text-xs text-stone-500">{ROLE_LABELS[role]}</div>
+          <div className="text-xs text-stone-500">{t(ROLE_LABELS[role])}</div>
         </div>
         <form action={logout}>
           <button className="rounded-lg border border-stone-200 bg-stone-100 px-3 py-1.5 text-sm text-stone-900 hover:bg-stone-200">
-            Sign out
+            {t("Sign out")}
           </button>
         </form>
       </div>
@@ -115,9 +122,36 @@ export default function Topbar({
   );
 }
 
+// EN / हिं switch. Each button posts the locale to the server action, which
+// sets the cookie and revalidates the layout so the whole app re-renders.
+function LangToggle({ current }: { current: Locale }) {
+  return (
+    <div className="flex overflow-hidden rounded-lg border border-stone-200">
+      {LOCALES.map((loc) => (
+        <form key={loc} action={setLocale}>
+          <input type="hidden" name="locale" value={loc} />
+          <button
+            type="submit"
+            aria-pressed={current === loc}
+            className={
+              "px-2.5 py-1.5 text-sm font-medium transition " +
+              (current === loc
+                ? "bg-stone-900 text-white"
+                : "bg-white text-stone-600 hover:bg-stone-50")
+            }
+          >
+            {LOCALE_LABELS[loc]}
+          </button>
+        </form>
+      ))}
+    </div>
+  );
+}
+
 // Captures the device location (best-effort) and stamps the time via the
 // server action. Already-marked staff see when, and can re-mark.
 function MarkAttendanceButton({ initialMarkedAt }: { initialMarkedAt: string | null }) {
+  const t = useT();
   const [markedAt, setMarkedAt] = useState<string | null>(initialMarkedAt);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -172,10 +206,10 @@ function MarkAttendanceButton({ initialMarkedAt }: { initialMarkedAt: string | n
         }
       >
         {busy
-          ? "Marking…"
+          ? t("Marking…")
           : markedAt
-            ? `✓ Marked · ${formatTime(markedAt)}`
-            : "Mark Attendance"}
+            ? `✓ ${t("Marked")} · ${formatTime(markedAt)}`
+            : t("Mark Attendance")}
       </button>
       {error && <span className="mt-0.5 text-xs text-red-600">{error}</span>}
     </div>

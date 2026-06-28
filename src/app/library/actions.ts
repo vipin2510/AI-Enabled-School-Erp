@@ -22,6 +22,37 @@ async function nextBookCode(schoolId: string): Promise<string> {
 
 const onlyDigits = (s: string) => s.replace(/\D+/g, "");
 
+// Resolve a book by code for the desk: match the code verbatim first (handles
+// alphanumeric codes like "SAN-4525"), then fall back to a digits-only match
+// so a bare scanned/typed number still finds a legacy numeric code.
+type DbClient = Awaited<ReturnType<typeof createClient>>;
+async function findBook(
+  supabase: DbClient,
+  schoolId: string,
+  code: string,
+  columns: string,
+): Promise<{ id: string; title: string; status?: string } | null> {
+  const exact = await supabase
+    .from("books")
+    .select(columns)
+    .eq("school_id", schoolId)
+    .eq("code", code)
+    .maybeSingle();
+  if (exact.data) return exact.data as unknown as { id: string; title: string; status?: string };
+
+  const digits = onlyDigits(code);
+  if (digits && digits !== code) {
+    const byNum = await supabase
+      .from("books")
+      .select(columns)
+      .eq("school_id", schoolId)
+      .eq("code", digits)
+      .maybeSingle();
+    if (byNum.data) return byNum.data as unknown as { id: string; title: string; status?: string };
+  }
+  return null;
+}
+
 export async function saveLibrarySettings(formData: FormData) {
   const profile = await requireDepartment("library");
   const schoolId = await getCurrentSchoolId(profile);
@@ -193,16 +224,14 @@ export type DeskResult = { ok?: boolean; message?: string; error?: string };
 export async function issueBook(code: string, studentId: string): Promise<DeskResult> {
   const profile = await requireDepartment("library");
   const schoolId = await getCurrentSchoolId(profile);
-  const normalised = onlyDigits(code);
-  if (!normalised || !studentId) return { error: "Pick a book and a student." };
+  const wanted = code.trim();
+  if (!wanted || !studentId) return { error: "Pick a book and a student." };
   const supabase = await createClient();
 
-  const { data: book } = await supabase
-    .from("books")
-    .select("id, title, status")
-    .eq("school_id", schoolId)
-    .eq("code", normalised)
-    .maybeSingle();
+  // The desk resolves the exact book first and passes its real code (e.g.
+  // "SAN-4525"), so match verbatim. Fall back to a digits-only match for any
+  // legacy caller that still hands over a bare scanned number.
+  const book = await findBook(supabase, schoolId, wanted, "id, title, status");
   if (!book) return { error: "No book found for that number." };
   if (book.status !== "active") return { error: `This book is marked ${book.status}.` };
 
@@ -267,16 +296,11 @@ export async function issueBook(code: string, studentId: string): Promise<DeskRe
 export async function returnBook(code: string): Promise<DeskResult> {
   const profile = await requireDepartment("library");
   const schoolId = await getCurrentSchoolId(profile);
-  const normalised = onlyDigits(code);
-  if (!normalised) return { error: "Scan or enter a book number." };
+  const wanted = code.trim();
+  if (!wanted) return { error: "Scan or enter a book number." };
   const supabase = await createClient();
 
-  const { data: book } = await supabase
-    .from("books")
-    .select("id, title")
-    .eq("school_id", schoolId)
-    .eq("code", normalised)
-    .maybeSingle();
+  const book = await findBook(supabase, schoolId, wanted, "id, title");
   if (!book) return { error: "No book found for that number." };
 
   const { data: loan } = await supabase
