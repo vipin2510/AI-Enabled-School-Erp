@@ -43,7 +43,7 @@ values
    'Tagore',
    '/branding/tagore/logo.png',
    'Sakri, Bilaspur, Chhattisgarh',
-   null,
+   'tagore-erp.vercel.app',
    2)
 on conflict (id) do nothing;
 

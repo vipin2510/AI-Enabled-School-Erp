@@ -43,7 +43,8 @@ export const GROUPS: Group[] = [
     shortName: "Tagore",
     logoPath: "/branding/tagore/logo.png",
     location: "Sakri, Bilaspur, Chhattisgarh",
-    domain: null,
+    // Tagore's Vercel URL — login on this host shows Tagore branding.
+    domain: "tagore-erp.vercel.app",
   },
 ];
 

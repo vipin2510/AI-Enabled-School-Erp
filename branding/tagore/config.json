@@ -7,11 +7,11 @@
   "publicLogoPath": "/branding/tagore/logo.png",
   "location": "Sakri, Bilaspur, Chhattisgarh",
   "pinCode": "495003",
-  "domain": null,
+  "domain": "tagore-erp.vercel.app",
   "feeModel": "quarterly",
   "vercel": {
-    "note": "Deploy the SAME app; add the Tagore domain to the one Vercel project. URL is set after the domain is attached.",
-    "url": null,
+    "note": "Same Vercel project as Adeshwar; this alias points at the shared deployment and resolves Tagore branding by host.",
+    "url": "https://tagore-erp.vercel.app",
     "suggestedDomain": "erp.tagore.in"
   },
   "institutes": [
