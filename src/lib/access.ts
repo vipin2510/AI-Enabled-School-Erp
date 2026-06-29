@@ -48,8 +48,10 @@ export const GROUPS: Group[] = [
     logoPath: "/branding/tagore/logo.png",
     unitLabel: "Institute",
     location: "Sakri, Bilaspur, Chhattisgarh",
-    // Tagore's Vercel URL — login on this host shows Tagore branding.
-    domain: "tagore-erp.vercel.app",
+    // Tagore's own custom domain — login on this host shows Tagore branding.
+    // (A custom domain is served publicly; the *.vercel.app URLs are gated by
+    // the team's deployment protection.)
+    domain: "erp.tipr.in",
   },
 ];
 

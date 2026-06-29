@@ -7,12 +7,12 @@
   "publicLogoPath": "/branding/tagore/logo.png",
   "location": "Sakri, Bilaspur, Chhattisgarh",
   "pinCode": "495003",
-  "domain": "tagore-erp.vercel.app",
+  "domain": "erp.tipr.in",
   "feeModel": "quarterly",
   "vercel": {
-    "note": "Same Vercel project as Adeshwar; this alias points at the shared deployment and resolves Tagore branding by host.",
-    "url": "https://tagore-erp.vercel.app",
-    "suggestedDomain": "erp.tagore.in"
+    "note": "Same Vercel project as Adeshwar; the custom domain erp.tipr.in resolves Tagore branding by host and is served publicly (the *.vercel.app URLs are gated by deployment protection).",
+    "url": "https://erp.tipr.in",
+    "dns": "A erp.tipr.in -> 76.76.21.21  (or CNAME -> cname.vercel-dns.com)"
   },
   "institutes": [
     {
