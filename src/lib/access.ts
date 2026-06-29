@@ -17,6 +17,9 @@ export type Group = {
   shortName: string;      // compact label for chrome
   // Public path to the logo (served from `public/`), e.g. /branding/tagore/logo.png.
   logoPath: string;
+  // What to call a tenant unit in this group's UI: Adeshwar switches between
+  // "School"s, Tagore between "Institute"s (school / pharmacy / management).
+  unitLabel: string;
   location: string;
   // Host that resolves to this group pre-login (e.g. "erp.tagore.in"). null =
   // the default group served on the primary domain.
@@ -33,6 +36,7 @@ export const GROUPS: Group[] = [
     name: "Adeshwar Public School",
     shortName: "Adeshwar",
     logoPath: "/branding/aadeshwar/logo.jpeg",
+    unitLabel: "School",
     location: "Kondagaon, Chhattisgarh",
     domain: null,
   },
@@ -42,6 +46,7 @@ export const GROUPS: Group[] = [
     name: "Tagore Group of Institutions",
     shortName: "Tagore",
     logoPath: "/branding/tagore/logo.png",
+    unitLabel: "Institute",
     location: "Sakri, Bilaspur, Chhattisgarh",
     // Tagore's Vercel URL — login on this host shows Tagore branding.
     domain: "tagore-erp.vercel.app",

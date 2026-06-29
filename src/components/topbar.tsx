@@ -23,6 +23,9 @@ type Props = {
   allowed: Department[];
   school: School;
   allowedSchools: School[];
+  // What this group calls a tenant unit ("School" for Adeshwar, "Institute" for
+  // Tagore). Also the heading above the switcher.
+  unitLabel: string;
   canMarkAttendance: boolean;
   markedAt: string | null;
   locale: Locale;
@@ -36,6 +39,7 @@ export default function Topbar({
   allowed,
   school,
   allowedSchools,
+  unitLabel,
   canMarkAttendance,
   markedAt,
   locale,
@@ -46,11 +50,20 @@ export default function Topbar({
   const canSwitchDept = role !== "staff" && allowed.length > 1;
   const canSwitchSchool = role !== "staff" && allowedSchools.length > 1;
 
+  // Label each unit by whatever distinguishes it: the town when towns differ
+  // (Adeshwar's branches), otherwise the unit's name (Tagore's institutes all
+  // sit in one town, so the name — Pharmacy / School / Management — is what
+  // tells them apart).
+  const city = (s: School) => s.location.split(",")[0];
+  const citiesUnique =
+    new Set(allowedSchools.map(city)).size === allowedSchools.length;
+  const unitName = (s: School) => (citiesUnique ? city(s) : s.name);
+
   return (
     <header className="flex items-center justify-between gap-4 border-b border-[color:var(--border)] bg-[color:var(--card)] px-6 py-3">
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-3">
-          <span className="text-xs uppercase tracking-wide text-stone-400">{t("School")}</span>
+          <span className="text-xs uppercase tracking-wide text-stone-400">{t(unitLabel)}</span>
           {canSwitchSchool ? (
             <form ref={schoolFormRef} action={setSchool}>
               <input type="hidden" name="next" value="/" />
@@ -63,7 +76,7 @@ export default function Topbar({
               >
                 {allowedSchools.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.location.split(",")[0]}
+                    {unitName(s)}
                   </option>
                 ))}
               </select>
@@ -73,7 +86,7 @@ export default function Topbar({
               className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-medium"
               title={school.location}
             >
-              {school.location.split(",")[0]}
+              {unitName(school)}
             </span>
           )}
         </div>

@@ -126,6 +126,7 @@ async function AppShell({
           allowed={allowed}
           school={school}
           allowedSchools={schools}
+          unitLabel={group.unitLabel}
           canMarkAttendance={marksOwnAttendance(profile.role)}
           markedAt={markedAt}
           locale={locale}

@@ -40,9 +40,9 @@ export default async function SelectSchoolPage({
             height={56}
             className="rounded-full object-contain"
           />
-          <h1 className="mt-3 text-lg font-semibold">Choose a school</h1>
+          <h1 className="mt-3 text-lg font-semibold">Select your {group.unitLabel.toLowerCase()}</h1>
           <p className="text-sm text-stone-500">
-            Welcome, {profile.full_name || profile.email || profile.phone}. Pick a unit to
+            Welcome, {profile.full_name || profile.email || profile.phone}. Pick a {group.unitLabel.toLowerCase()} to
             enter. You can switch later from the top bar.
           </p>
         </div>
