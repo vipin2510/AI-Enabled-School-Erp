@@ -24,7 +24,9 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Pathshala ERP — Adeshwar Public School",
+  // Group-neutral: the app is multi-tenant (Adeshwar + Tagore). Per-group
+  // branding is rendered in-page (login, sidebar) by host/profile.
+  title: "Pathshala ERP",
   description: "School ERP — Fees, Admissions, Receipts",
 };
 
