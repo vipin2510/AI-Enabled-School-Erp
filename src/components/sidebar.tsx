@@ -7,15 +7,25 @@ import type { NavItem } from "@/lib/access";
 
 export type NavGroup = { label?: string; items: NavItem[] };
 
-export default function Sidebar({ groups }: { groups: NavGroup[] }) {
+export default function Sidebar({
+  groups,
+  brandName = "Pathshala",
+  brandSub = "Adeshwar Public School",
+  logoSrc = "/letterhead/aps-logo.jpeg",
+}: {
+  groups: NavGroup[];
+  brandName?: string;
+  brandSub?: string;
+  logoSrc?: string;
+}) {
   const path = usePathname();
   return (
     <aside className="w-60 shrink-0 border-r border-[color:var(--border)] bg-[color:var(--card)] px-4 py-6">
       <Link href="/" className="flex items-center gap-3 mb-8 px-2">
-        <Image src="/letterhead/aps-logo.jpeg" alt="APS" width={40} height={40} className="rounded-full" />
+        <Image src={logoSrc} alt={brandName} width={40} height={40} className="rounded-full object-contain" />
         <div>
-          <div className="text-sm font-semibold leading-tight">Pathshala</div>
-          <div className="text-xs text-stone-500 leading-tight">Adeshwar Public School</div>
+          <div className="text-sm font-semibold leading-tight">{brandName}</div>
+          <div className="text-xs text-stone-500 leading-tight">{brandSub}</div>
         </div>
       </Link>
       <nav className="flex flex-col gap-4">

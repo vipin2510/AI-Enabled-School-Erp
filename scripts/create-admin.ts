@@ -3,12 +3,14 @@
  * only an admin can create other logins from inside the app.
  *
  *   npx tsx scripts/create-admin.ts <identifier> <password> ["Full Name"]
+ *   GROUP=tagore npx tsx scripts/create-admin.ts <identifier> <password> ["Full Name"]
  *
  * Where <identifier> is either:
  *   - an email   (e.g. principal@example.com), or
  *   - a 10-digit phone number (e.g. 9876543210).
  *
- * Admin profiles get school_ids = all three franchise schools.
+ * GROUP selects the franchise (default "adeshwar"; use "tagore" to bootstrap the
+ * first Tagore admin). The admin profile gets that group's schools + group_id.
  *
  * Requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local.
  */
@@ -41,12 +43,35 @@ const supabase = createClient(url, serviceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-// Match the SCHOOLS constant in src/lib/access.ts.
-const ALL_SCHOOLS = [
-  "00000000-0000-0000-0000-000000000001",
-  "00000000-0000-0000-0000-000000000002",
-  "00000000-0000-0000-0000-000000000003",
-];
+// Match the GROUPS + SCHOOLS constants in src/lib/access.ts. Each group's admin
+// spans only that group's schools.
+const GROUPS: Record<string, { id: string; schools: string[] }> = {
+  adeshwar: {
+    id: "10000000-0000-0000-0000-000000000001",
+    schools: [
+      "00000000-0000-0000-0000-000000000001",
+      "00000000-0000-0000-0000-000000000002",
+      "00000000-0000-0000-0000-000000000003",
+    ],
+  },
+  tagore: {
+    id: "10000000-0000-0000-0000-000000000002",
+    schools: [
+      "00000000-0000-0000-0000-0000000000a1",
+      "00000000-0000-0000-0000-0000000000a2",
+      "00000000-0000-0000-0000-0000000000a3",
+    ],
+  },
+};
+
+const groupCode = (process.env.GROUP ?? "adeshwar").toLowerCase();
+const group = GROUPS[groupCode];
+if (!group) {
+  console.error(`Unknown GROUP "${groupCode}". Use one of: ${Object.keys(GROUPS).join(", ")}.`);
+  process.exit(1);
+}
+const ALL_SCHOOLS = group.schools;
+const GROUP_ID = group.id;
 
 function classify(raw: string): { email?: string; phone?: string } {
   if (raw.includes("@")) return { email: raw };
@@ -68,6 +93,7 @@ async function main() {
           full_name: fullName ?? "Administrator",
           role: "admin",
           school_ids: ALL_SCHOOLS,
+          group_id: GROUP_ID,
         },
       }
     : {
@@ -84,6 +110,7 @@ async function main() {
           role: "admin",
           phone: id.phone!,
           school_ids: ALL_SCHOOLS,
+          group_id: GROUP_ID,
         },
       };
 
@@ -104,6 +131,7 @@ async function main() {
             is_active: true,
             department: null,
             school_ids: ALL_SCHOOLS,
+            group_id: GROUP_ID,
             ...(id.phone ? { phone: id.phone } : {}),
           })
           .eq("id", existing.id);
@@ -127,6 +155,7 @@ async function main() {
           role: "admin",
           department: null,
           school_ids: ALL_SCHOOLS,
+          group_id: GROUP_ID,
           is_active: true,
         },
         { onConflict: "id" }

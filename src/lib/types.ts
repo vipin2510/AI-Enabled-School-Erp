@@ -4,6 +4,7 @@ export type FeeKind =
   | "admission_one_time"
   | "yearly"
   | "monthly"
+  | "quarterly"
   | "instalment";
 
 export type Scope = "school" | "hostel";

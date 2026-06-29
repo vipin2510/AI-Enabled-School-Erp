@@ -47,27 +47,29 @@ export default async function UsersPage() {
 
       <section className="card p-5 mb-8">
         <h2 className="font-medium mb-4">Create a new login</h2>
-        <CreateUserForm />
+        <CreateUserForm schools={SCHOOLS.filter((s) => s.groupId === me.group_id)} />
       </section>
 
       <Suspense fallback={<TableSkeleton />}>
-        <UsersTable currentUserId={me.id} />
+        <UsersTable currentUserId={me.id} groupId={me.group_id} />
       </Suspense>
     </div>
   );
 }
 
-async function UsersTable({ currentUserId }: { currentUserId: string }) {
+async function UsersTable({ currentUserId, groupId }: { currentUserId: string; groupId: string }) {
   let users: ProfileRow[] = [];
   let loadError: string | null = null;
 
   try {
     const supabase = await createClient();
+    // Scope to the admin's own group so groups never see each other's logins.
     const { data, error } = await supabase
       .from("profiles")
       .select(
         "id, email, phone, full_name, role, department, school_ids, is_active, created_at",
       )
+      .eq("group_id", groupId)
       .order("created_at", { ascending: true });
     if (error) {
       loadError = error.message;

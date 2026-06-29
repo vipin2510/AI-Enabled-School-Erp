@@ -1,0 +1,56 @@
+{
+  "groupId": "10000000-0000-0000-0000-000000000002",
+  "code": "tagore",
+  "name": "Tagore Group of Institutions",
+  "shortName": "Tagore",
+  "logo": "logo.png",
+  "publicLogoPath": "/branding/tagore/logo.png",
+  "location": "Sakri, Bilaspur, Chhattisgarh",
+  "pinCode": "495003",
+  "domain": null,
+  "feeModel": "quarterly",
+  "vercel": {
+    "note": "Deploy the SAME app; add the Tagore domain to the one Vercel project. URL is set after the domain is attached.",
+    "url": null,
+    "suggestedDomain": "erp.tagore.in"
+  },
+  "institutes": [
+    {
+      "schoolId": "00000000-0000-0000-0000-0000000000a1",
+      "code": "tipr",
+      "name": "Tagore Institute of Pharmacy & Research",
+      "type": "pharmacy",
+      "website": "https://tipr.in/",
+      "board": "CSVTU",
+      "approvals": ["PCI", "DTE"],
+      "programs": ["B.Pharm (4 yr)", "D.Pharm (2 yr)"],
+      "phone": ["+919243493618", "+916232060011"],
+      "email": "info@tipr.in"
+    },
+    {
+      "schoolId": "00000000-0000-0000-0000-0000000000a2",
+      "code": "tisbsp",
+      "name": "Tagore International School",
+      "type": "school",
+      "website": "https://tisbsp.in/",
+      "board": "CBSE",
+      "affiliationNo": "3330506",
+      "grades": "Play School to Class 10",
+      "phone": ["+916232061100"],
+      "email": "info.tisbsp@gmail.com"
+    },
+    {
+      "schoolId": "00000000-0000-0000-0000-0000000000a3",
+      "code": "tcmbsp",
+      "name": "Tagore College of Management",
+      "type": "management",
+      "website": "https://tcmbsp.in/",
+      "board": "CSVTU",
+      "approvals": ["AICTE"],
+      "programs": ["MBA"],
+      "phone": ["+916232060077", "+919691928177"],
+      "email": "tcmbsp56@gmail.com"
+    }
+  ],
+  "feeStructureTodo": "Actual amounts live in PDFs on each institute's /fee-structure page. Seed exact numbers via the Fees > Structures editor (kind = 'quarterly', period_index 1..4) once provided."
+}

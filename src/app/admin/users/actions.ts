@@ -6,8 +6,6 @@ import { requireRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SCHOOLS } from "@/lib/access";
 
-const VALID_SCHOOL_IDS = SCHOOLS.map((s) => s.id);
-
 const CreateUserSchema = z
   .object({
     phone: z
@@ -31,16 +29,16 @@ const CreateUserSchema = z
   .refine((d) => d.role !== "staff" || d.school_ids.length === 1, {
     message: "Staff must be assigned to exactly one school.",
     path: ["school_ids"],
-  })
-  .refine((d) => d.school_ids.every((id) => VALID_SCHOOL_IDS.includes(id)), {
-    message: "Unknown school id.",
-    path: ["school_ids"],
   });
 
 export type ActionState = { error?: string; success?: string } | undefined;
 
 export async function createUser(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireRole("admin");
+  // New users are created INSIDE the creating admin's group — a Tagore admin
+  // can only mint Tagore logins, scoped to Tagore schools. This is the gate
+  // that keeps groups from leaking into each other via user creation.
+  const me = await requireRole("admin");
+  const groupSchoolIds = SCHOOLS.filter((s) => s.groupId === me.group_id).map((s) => s.id);
 
   const rawDept = String(formData.get("department") ?? "");
   const rawSchools = formData.getAll("school_ids").map((v) => String(v)).filter(Boolean);
@@ -58,10 +56,14 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
   }
 
   const { phone, password, full_name, role, school_ids } = parsed.data;
+  // Reject any school outside the admin's own group.
+  if (!school_ids.every((id) => groupSchoolIds.includes(id))) {
+    return { error: "Unknown school id." };
+  }
   // Admin/manager are cross-department, so clear any department for them.
   const department = role === "staff" ? parsed.data.department : null;
-  // Admin always sees every school regardless of what the form said.
-  const finalSchoolIds = role === "admin" ? VALID_SCHOOL_IDS : school_ids;
+  // Admin sees every school in their group regardless of what the form said.
+  const finalSchoolIds = role === "admin" ? groupSchoolIds : school_ids;
 
   // Set a synthetic email alongside the phone so sign-in can go through
   // Supabase's email provider (the Phone provider is disabled at the project
@@ -79,6 +81,7 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
       department: department ?? "",
       phone,
       school_ids: finalSchoolIds,
+      group_id: me.group_id,
     },
   });
 

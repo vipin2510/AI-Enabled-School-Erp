@@ -2,15 +2,15 @@
 
 import { useActionState, useState } from "react";
 import { createUser, type ActionState } from "./actions";
-import { DEPARTMENTS, SCHOOLS } from "@/lib/access";
+import { DEPARTMENTS, type School } from "@/lib/access";
 
-export default function CreateUserForm() {
+export default function CreateUserForm({ schools }: { schools: School[] }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(createUser, undefined);
   const [role, setRole] = useState<"admin" | "manager" | "staff">("staff");
   // Staff gets a radio (one school); manager gets checkboxes (subset);
   // admin auto-spans all schools (the server enforces this regardless).
-  const [singleSchool, setSingleSchool] = useState<string>(SCHOOLS[0]?.id ?? "");
-  const [multiSchools, setMultiSchools] = useState<string[]>(SCHOOLS.map((s) => s.id));
+  const [singleSchool, setSingleSchool] = useState<string>(schools[0]?.id ?? "");
+  const [multiSchools, setMultiSchools] = useState<string[]>(schools.map((s) => s.id));
 
   const toggleSchool = (id: string) => {
     setMultiSchools((prev) =>
@@ -66,15 +66,15 @@ export default function CreateUserForm() {
         <legend className="px-2 text-xs font-medium text-stone-600">School access</legend>
         {role === "admin" && (
           <div className="text-sm text-stone-600">
-            Admins see every school. {SCHOOLS.length} schools assigned automatically.
-            {SCHOOLS.map((s) => (
+            Admins see every school. {schools.length} schools assigned automatically.
+            {schools.map((s) => (
               <input key={s.id} type="hidden" name="school_ids" value={s.id} />
             ))}
           </div>
         )}
         {role === "manager" && (
           <div className="space-y-2">
-            {SCHOOLS.map((s) => (
+            {schools.map((s) => (
               <label key={s.id} className="flex items-start gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -97,7 +97,7 @@ export default function CreateUserForm() {
         )}
         {role === "staff" && (
           <div className="space-y-2">
-            {SCHOOLS.map((s) => (
+            {schools.map((s) => (
               <label key={s.id} className="flex items-start gap-2 text-sm">
                 <input
                   type="radio"

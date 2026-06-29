@@ -4,7 +4,7 @@ import "./globals.css";
 import Sidebar, { type NavGroup } from "@/components/sidebar";
 import Topbar from "@/components/topbar";
 import IdleWatcher from "@/components/idle-watcher";
-import { getProfile, getCurrentDepartment, getCurrentSchool } from "@/lib/auth";
+import { getProfile, getCurrentDepartment, getCurrentSchool, getCurrentGroup } from "@/lib/auth";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { I18nProvider } from "@/lib/i18n/client";
 import type { Locale } from "@/lib/i18n/config";
@@ -67,7 +67,8 @@ async function AppShell({
   // Resolve the active school. Leaders without one picked yet get bounced to
   // /select-school. Staff always have one (pinned by their profile).
   const school = await getCurrentSchool(profile);
-  const schools = allowedSchools(profile.role, profile.school_ids);
+  const schools = allowedSchools(profile.role, profile.school_ids, profile.group_id);
+  const group = getCurrentGroup(profile);
   if (!school) {
     const headerStore = await headers();
     const pathname = headerStore.get("x-pathname") ?? "";
@@ -115,7 +116,7 @@ async function AppShell({
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar groups={groups} />
+      <Sidebar groups={groups} brandName={group.shortName} brandSub={group.name} logoSrc={group.logoPath} />
       <div className="flex flex-1 flex-col">
         <Topbar
           fullName={profile.full_name ?? ""}

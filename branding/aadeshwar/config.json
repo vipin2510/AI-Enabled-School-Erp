@@ -1,0 +1,41 @@
+{
+  "groupId": "10000000-0000-0000-0000-000000000001",
+  "code": "adeshwar",
+  "name": "Adeshwar Public School",
+  "shortName": "Adeshwar",
+  "logo": "logo.jpeg",
+  "publicLogoPath": "/branding/aadeshwar/logo.jpeg",
+  "location": "Kondagaon, Chhattisgarh",
+  "domain": null,
+  "feeModel": "monthly",
+  "vercel": {
+    "note": "Primary domain of the single Vercel project (default group).",
+    "url": "https://ai-enabled-school-erp.vercel.app",
+    "suggestedDomain": "erp.adeshwar.in"
+  },
+  "institutes": [
+    {
+      "schoolId": "00000000-0000-0000-0000-000000000001",
+      "code": "kondagaon",
+      "name": "Adeshwar Public School",
+      "type": "school",
+      "board": "CISCE",
+      "boardCode": "CG 024",
+      "location": "Kondagaon, Chhattisgarh"
+    },
+    {
+      "schoolId": "00000000-0000-0000-0000-000000000002",
+      "code": "pharasgaon",
+      "name": "Adeshwar Public School",
+      "type": "school",
+      "location": "Pharasgaon, Chhattisgarh"
+    },
+    {
+      "schoolId": "00000000-0000-0000-0000-000000000003",
+      "code": "chipawand",
+      "name": "Adeshwar Public School",
+      "type": "school",
+      "location": "Chipawand, Chhattisgarh"
+    }
+  ]
+}

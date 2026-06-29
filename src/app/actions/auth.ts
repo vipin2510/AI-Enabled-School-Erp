@@ -116,7 +116,7 @@ export async function setSchool(formData: FormData) {
   if (!profile) redirect("/login");
   if (profile.role === "staff") redirect("/");
 
-  const allowed = allowedSchools(profile.role, profile.school_ids);
+  const allowed = allowedSchools(profile.role, profile.school_ids, profile.group_id);
   if (!allowed.some((s) => s.id === schoolId)) {
     // Silently ignore an out-of-bounds school — should only happen if the
     // form was tampered with.

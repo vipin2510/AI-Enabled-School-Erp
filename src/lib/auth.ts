@@ -8,11 +8,15 @@ import {
   COOKIE_DEPARTMENT,
   COOKIE_SCHOOL,
   SCHOOLS,
+  DEFAULT_GROUP_ID,
   allowedDepartments,
   allowedSchools,
+  findGroup,
   findSchool,
   isDepartment,
   type Department,
+  type Group,
+  type GroupId,
   type Role,
   type School,
   type SchoolId,
@@ -26,6 +30,7 @@ export type Profile = {
   role: Role;
   department: Department | null;
   school_ids: SchoolId[];
+  group_id: GroupId;
   is_active: boolean;
 };
 
@@ -42,13 +47,20 @@ async function loadProfileById(userId: string): Promise<Profile | null> {
     const anon = createAnonClient();
     const { data } = await anon
       .from("profiles")
-      .select("id, email, phone, full_name, role, department, school_ids, is_active")
+      .select("id, email, phone, full_name, role, department, school_ids, group_id, is_active")
       .eq("id", userId)
       .single();
     if (!data) return null;
-    const row = data as Omit<Profile, "school_ids"> & { school_ids: SchoolId[] | null };
+    const row = data as Omit<Profile, "school_ids" | "group_id"> & {
+      school_ids: SchoolId[] | null;
+      group_id: GroupId | null;
+    };
     if (!row.is_active) return null;
-    return { ...row, school_ids: row.school_ids ?? [] } as Profile;
+    return {
+      ...row,
+      school_ids: row.school_ids ?? [],
+      group_id: row.group_id ?? DEFAULT_GROUP_ID,
+    } as Profile;
   });
 }
 
@@ -121,7 +133,7 @@ export async function getCurrentDepartment(profile: Profile): Promise<Department
 // schools they can see, and fall back to the first allowed school. Returns
 // null if the profile has no school access at all (a configuration bug).
 export async function getCurrentSchool(profile: Profile): Promise<School | null> {
-  const allowed = allowedSchools(profile.role, profile.school_ids);
+  const allowed = allowedSchools(profile.role, profile.school_ids, profile.group_id);
   if (allowed.length === 0) return null;
 
   if (profile.role === "staff") {
@@ -155,6 +167,12 @@ export async function requireSchool(profile: Profile): Promise<School> {
 export async function getCurrentSchoolId(profile: Profile): Promise<SchoolId> {
   const school = await requireSchool(profile);
   return school.id;
+}
+
+// The group (franchise) the profile belongs to — drives branding (logo, name)
+// across the shell and PDFs. Falls back to the default group if unset.
+export function getCurrentGroup(profile: Profile): Group {
+  return findGroup(profile.group_id) ?? findGroup(DEFAULT_GROUP_ID)!;
 }
 
 // Re-export for convenience so callers only import from one module.

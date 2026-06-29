@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { requireProfile } from "@/lib/auth";
+import { requireProfile, getCurrentGroup } from "@/lib/auth";
 import { allowedSchools } from "@/lib/access";
 import { setSchool } from "@/app/actions/auth";
 import { redirect } from "next/navigation";
@@ -21,7 +21,8 @@ export default async function SelectSchoolPage({
 
   // Staff or single-school profile: nothing to choose, send them on.
   if (profile.role === "staff") redirect(target);
-  const schools = allowedSchools(profile.role, profile.school_ids);
+  const group = getCurrentGroup(profile);
+  const schools = allowedSchools(profile.role, profile.school_ids, profile.group_id);
   if (schools.length <= 1) {
     // No choice to make — but we still want to set the cookie so subsequent
     // requests don't bounce back here. Fall through to render a one-card
@@ -33,11 +34,11 @@ export default async function SelectSchoolPage({
       <div className="w-full max-w-2xl">
         <div className="flex flex-col items-center mb-8">
           <Image
-            src="/letterhead/aps-logo.jpeg"
-            alt="APS"
+            src={group.logoPath}
+            alt={group.shortName}
             width={56}
             height={56}
-            className="rounded-full"
+            className="rounded-full object-contain"
           />
           <h1 className="mt-3 text-lg font-semibold">Choose a school</h1>
           <p className="text-sm text-stone-500">

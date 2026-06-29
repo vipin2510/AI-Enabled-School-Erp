@@ -15,6 +15,7 @@ const ItemSchema = z.object({
     "admission_one_time",
     "yearly",
     "monthly",
+    "quarterly",
     "instalment",
   ]),
   period_index: z.number().int().nullable().optional(),

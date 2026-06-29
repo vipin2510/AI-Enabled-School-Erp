@@ -55,6 +55,21 @@ const MONTH_ABBR = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP
 // `computeTiling` so the live preview and this renderer never drift.
 export type { ReceiptLayout };
 
+// School/group header shown on each receipt. Defaults to Adeshwar so existing
+// callers that don't pass it are unchanged; the receipt route fills it from the
+// invoice's school + group for multi-group support.
+export type ReceiptBranding = {
+  name: string;
+  line1?: string;
+  line2?: string;
+};
+
+export const DEFAULT_RECEIPT_BRANDING: ReceiptBranding = {
+  name: "ADESHWAR PUBLIC SCHOOL",
+  line1: "Affiliated to CISCE Board · Kondagaon (C.G.)",
+  line2: "School Code: CG024 · 9111005301, 9111005303",
+};
+
 export const DEFAULT_RECEIPT_LAYOUT: ReceiptLayout = {
   orientation: "portrait",
   box_width_mm: 99,
@@ -179,11 +194,19 @@ function fmtDate(s: string) {
   });
 }
 
-// Collapse all (non-waived) monthly items into one line listing the months,
-// e.g. "Monthly Fee (APR, MAY, JUN)". Everything else stays as its own line.
+// Quarter labels (period_index 1..4). The school's academic year starts in
+// April, so Q1 = Apr–Jun, etc.
+const QUARTER_LABEL = ["Q1 (Apr–Jun)", "Q2 (Jul–Sep)", "Q3 (Oct–Dec)", "Q4 (Jan–Mar)"];
+
+// Collapse periodic items into one line each:
+//   monthly   → "Monthly Fee (APR, MAY, JUN)"
+//   quarterly → "Quarterly Fee (Q1 (Apr–Jun), Q2 (Jul–Sep))"
+// Everything else stays as its own line.
 function displayLines(items: Item[]): { description: string; amount: number; waived: boolean }[] {
-  const monthly = items.filter((i) => i.kind === "monthly" && !i.waived && i.period_index);
-  const rest = items.filter((i) => !(i.kind === "monthly" && !i.waived && i.period_index));
+  const isPeriodic = (i: Item, kind: string) => i.kind === kind && !i.waived && !!i.period_index;
+  const monthly = items.filter((i) => isPeriodic(i, "monthly"));
+  const quarterly = items.filter((i) => isPeriodic(i, "quarterly"));
+  const rest = items.filter((i) => !isPeriodic(i, "monthly") && !isPeriodic(i, "quarterly"));
 
   const lines = rest.map((i) => ({ description: i.description, amount: Number(i.amount), waived: i.waived }));
 
@@ -192,10 +215,21 @@ function displayLines(items: Item[]): { description: string; amount: number; wai
       .map((i) => i.period_index as number)
       .sort((a, b) => a - b)
       .map((m) => MONTH_ABBR[(m - 1) % 12]);
-    const amount = monthly.reduce((s, i) => s + Number(i.amount), 0);
     lines.push({
       description: `Monthly Fee (${months.join(", ")})`,
-      amount,
+      amount: monthly.reduce((s, i) => s + Number(i.amount), 0),
+      waived: false,
+    });
+  }
+
+  if (quarterly.length) {
+    const quarters = quarterly
+      .map((i) => i.period_index as number)
+      .sort((a, b) => a - b)
+      .map((q) => QUARTER_LABEL[(q - 1) % 4]);
+    lines.push({
+      description: `Quarterly Fee (${quarters.join(", ")})`,
+      amount: quarterly.reduce((s, i) => s + Number(i.amount), 0),
       waived: false,
     });
   }
@@ -207,11 +241,13 @@ function ReceiptCopy({
   logoDataUrl,
   copyTag,
   styles,
+  branding,
 }: {
   invoice: Invoice;
   logoDataUrl: string;
   copyTag: string;
   styles: Styles;
+  branding: ReceiptBranding;
 }) {
   const s = invoice.students;
   const lines = displayLines(invoice.invoice_items);
@@ -221,13 +257,9 @@ function ReceiptCopy({
       <View style={styles.headerRow}>
         <Image src={logoDataUrl} style={styles.logo} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.schoolName}>ADESHWAR PUBLIC SCHOOL</Text>
-          <Text style={styles.schoolSub}>
-            Affiliated to CISCE Board · Kondagaon (C.G.)
-          </Text>
-          <Text style={styles.schoolSub}>
-            School Code: CG024 · 9111005301, 9111005303
-          </Text>
+          <Text style={styles.schoolName}>{branding.name}</Text>
+          {branding.line1 ? <Text style={styles.schoolSub}>{branding.line1}</Text> : null}
+          {branding.line2 ? <Text style={styles.schoolSub}>{branding.line2}</Text> : null}
         </View>
       </View>
 
@@ -308,10 +340,12 @@ export function ReceiptPdf({
   invoice,
   logoDataUrl,
   layout = DEFAULT_RECEIPT_LAYOUT,
+  branding = DEFAULT_RECEIPT_BRANDING,
 }: {
   invoice: Invoice;
   logoDataUrl: string;
   layout?: ReceiptLayout;
+  branding?: ReceiptBranding;
 }) {
   const t = computeTiling(layout);
   const { cols, rows, perPage } = t;
@@ -399,6 +433,7 @@ export function ReceiptPdf({
                       logoDataUrl={logoDataUrl}
                       copyTag={tag}
                       styles={styles}
+                      branding={branding}
                     />
                   </View>
                 </View>
