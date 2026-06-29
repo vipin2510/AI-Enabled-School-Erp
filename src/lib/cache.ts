@@ -118,15 +118,16 @@ export function getLateFeeSettings(schoolId: string): Promise<LateFeeSettings> {
 // All sizes are millimetres on A4 (210 × 297 mm). The `FeePrintLayout` shape
 // lives in `@/lib/fee-print-layout` (shared with the client preview).
 export type { FeePrintLayout };
-// Defaults reproduce the historic half-A4 stacked copy: full A4 width minus
-// margins, half the height → two boxes (School + Student) per portrait page.
+// Defaults: a 2×2 portrait grid (half A4 width × half height). The two copies
+// (School + Student) print in the top row; the bottom row is left blank. Each
+// copy carries a 15 mm left punch gutter so either can be hole-punched.
 export const FEE_PRINT_DEFAULTS: FeePrintLayout = {
   orientation: "portrait",
-  box_width_mm: 198,
-  box_height_mm: 140,
+  box_width_mm: 99,
+  box_height_mm: 142.5,
   page_margin_mm: 6,
   box_gap_mm: 0,
-  school_binding_mm: 0,
+  school_binding_mm: 15,
 };
 export function getFeePrintLayout(schoolId: string): Promise<FeePrintLayout> {
   return cached(

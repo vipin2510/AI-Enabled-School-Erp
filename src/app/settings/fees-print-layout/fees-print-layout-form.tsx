@@ -145,12 +145,12 @@ export default function FeesPrintLayoutForm({
       </div>
 
       <label className="block">
-        <div className="text-sm font-medium mb-1">School-copy binding margin (mm)</div>
+        <div className="text-sm font-medium mb-1">Punch margin (mm)</div>
         <Input type="number" value={binding} min={0} max={40} step={1} onChange={(e) => setBinding(e.target.value)} />
         <p className="text-xs text-stone-500 mt-1">
-          Blank gutter added on the left of the <span className="font-medium">School Copy</span>{" "}
-          only, so it can be hole-punched and filed without the punch going
-          through the printed content. The Student Copy is unaffected.
+          Blank gutter added on the left of <span className="font-medium">both copies</span>,
+          so either can be hole-punched and filed without the punch going
+          through the printed content.
         </p>
       </label>
 
@@ -159,8 +159,8 @@ export default function FeesPrintLayoutForm({
         <LayoutPreview layout={layout} />
         <p className="text-xs text-stone-500 mt-2">
           {tiling.cols * tiling.rows} box{tiling.cols * tiling.rows === 1 ? "" : "es"} per page
-          {" "}({tiling.cols} across × {tiling.rows} down). Each box is one receipt copy; the
-          School and Student copies repeat to fill the page. Dashed lines mark where to cut.
+          {" "}({tiling.cols} across × {tiling.rows} down). Only the School and Student
+          copies print (top cells); any remaining cells stay blank. Dashed lines mark where to cut.
           {(tiling.boxWmm !== num(boxW) || tiling.boxHmm !== num(boxH)) &&
             " Box size was clamped to fit the page."}
         </p>
@@ -183,8 +183,10 @@ function LayoutPreview({ layout }: { layout: FeePrintLayout }) {
   const { w: pageWmm, h: pageHmm } = pageDims(layout.orientation);
   // Render the sheet to scale: pick a px-per-mm that keeps the long edge ~260px.
   const pxPerMm = 260 / Math.max(pageWmm, pageHmm);
+  // Only the two copies print (School then Student); any further cells in the
+  // grid are left blank, so the receipts come from the top of the sheet.
   const boxes = Array.from({ length: t.cols * t.rows }, (_, i) =>
-    i % 2 === 0 ? "School Copy" : "Student Copy",
+    i === 0 ? "School Copy" : i === 1 ? "Student Copy" : "",
   );
 
   return (
@@ -201,8 +203,8 @@ function LayoutPreview({ layout }: { layout: FeePrintLayout }) {
           }}
         >
           {boxes.map((label, i) => {
-            const isSchool = label === "School Copy";
-            const gutterPx = isSchool ? layout.school_binding_mm * pxPerMm : 0;
+            // Punch gutter on both printed copies; blank cells get none.
+            const gutterPx = label ? layout.school_binding_mm * pxPerMm : 0;
             return (
               <div
                 key={i}

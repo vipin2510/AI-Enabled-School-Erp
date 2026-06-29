@@ -198,6 +198,7 @@ export default async function CollectFeePage({
         isNewAdmission={!!student.is_new_admission}
         studentCategory={(student.category ?? "regular") as "regular" | "rte" | "staff_child"}
         busFeeAmount={student.bus_fee_amount ?? null}
+        defaultCollectedBy={profile.full_name ?? ""}
       />
     </div>
   );

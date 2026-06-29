@@ -253,7 +253,10 @@ export async function POST(req: Request) {
     late_fee_waived: body.late_fee_waived,
     waiver_reason: body.waiver_reason ?? null,
     notes: body.notes ?? null,
-    created_by: body.created_by ?? null,
+    // Stamp who generated the receipt. Always the signed-in user — the client
+    // cannot set this (the form field is read-only), so body.created_by is
+    // ignored here on purpose.
+    created_by: profile.full_name || null,
   };
   if (issuedAt) insertPayload.issued_at = issuedAt;
   if (body.idempotency_key) insertPayload.idempotency_key = body.idempotency_key;
