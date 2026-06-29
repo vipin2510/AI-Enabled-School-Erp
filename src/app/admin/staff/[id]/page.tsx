@@ -47,7 +47,7 @@ export default async function StaffProfilePage({
   const [{ data: profileRow }, { data: marksData }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, email, phone, role, department, school_ids, is_active, created_at")
+      .select("id, full_name, email, phone, role, department, school_ids, group_id, is_active, created_at")
       .eq("id", id)
       .maybeSingle(),
     supabase
@@ -60,7 +60,10 @@ export default async function StaffProfilePage({
       .limit(180),
   ]);
 
-  if (!profileRow) notFound();
+  // Don't let an admin view a staffer outside their own group via a direct URL.
+  if (!profileRow || (profileRow as { group_id: string | null }).group_id !== me.group_id) {
+    notFound();
+  }
   const profile = profileRow as Profile;
   const marks = (marksData ?? []) as Mark[];
 

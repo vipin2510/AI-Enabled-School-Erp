@@ -53,6 +53,7 @@ export default async function StaffAttendancePage({
     supabase
       .from("profiles")
       .select("id, full_name, email, role")
+      .eq("group_id", profile.group_id)
       .in("role", ["manager", "staff"])
       .eq("is_active", true)
       .order("full_name"),

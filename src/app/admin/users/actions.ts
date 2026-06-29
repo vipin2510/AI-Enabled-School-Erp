@@ -94,13 +94,19 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
 }
 
 export async function setUserActive(formData: FormData) {
-  await requireRole("admin");
+  const me = await requireRole("admin");
   const id = String(formData.get("id") ?? "");
   const active = String(formData.get("active") ?? "") === "true";
   if (!id) return;
 
   const admin = createAdminClient();
-  await admin.from("profiles").update({ is_active: active }).eq("id", id);
+  // Scope the mutation to the caller's group so an admin can't toggle a user
+  // in another group by passing their id.
+  await admin
+    .from("profiles")
+    .update({ is_active: active })
+    .eq("id", id)
+    .eq("group_id", me.group_id);
   revalidatePath("/admin/users");
 }
 
@@ -115,7 +121,16 @@ export async function deleteUser(formData: FormData) {
   if (!id || id === me.id) return; // never let admin delete themselves
 
   const admin = createAdminClient();
-  await admin.from("profiles").delete().eq("id", id);
+  // Verify the target is in the caller's group before the (group-blind) Auth
+  // admin delete — otherwise an admin could delete another group's login by id.
+  const { data: target } = await admin
+    .from("profiles")
+    .select("group_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!target || (target as { group_id: string | null }).group_id !== me.group_id) return;
+
+  await admin.from("profiles").delete().eq("id", id).eq("group_id", me.group_id);
   await admin.auth.admin.deleteUser(id);
   revalidatePath("/admin/users");
 }
@@ -123,7 +138,7 @@ export async function deleteUser(formData: FormData) {
 // Reassign a user's department (staff only — admin/manager are cross-dept
 // so we coerce their department to null). Pass department="" to clear.
 export async function setUserDepartment(formData: FormData) {
-  await requireRole("admin");
+  const me = await requireRole("admin");
   const id = String(formData.get("id") ?? "");
   const raw = String(formData.get("department") ?? "").trim();
   if (!id) return;
@@ -135,14 +150,20 @@ export async function setUserDepartment(formData: FormData) {
 
   const admin = createAdminClient();
   // Read role to enforce: only staff can have a department; admin/manager
-  // are cross-dept and their department must stay null.
+  // are cross-dept and their department must stay null. Scope to the caller's
+  // group so another group's user can't be touched by id.
   const { data: profile } = await admin
     .from("profiles")
-    .select("role")
+    .select("role, group_id")
     .eq("id", id)
     .maybeSingle();
+  if (!profile || (profile as { group_id: string | null }).group_id !== me.group_id) return;
   const finalDept = profile?.role === "staff" ? dept : null;
 
-  await admin.from("profiles").update({ department: finalDept }).eq("id", id);
+  await admin
+    .from("profiles")
+    .update({ department: finalDept })
+    .eq("id", id)
+    .eq("group_id", me.group_id);
   revalidatePath("/admin/users");
 }

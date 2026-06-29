@@ -34,6 +34,7 @@ export async function GET(req: Request) {
     supabase
       .from("profiles")
       .select("id, full_name, email, phone, role")
+      .eq("group_id", profile.group_id)
       .in("role", ["manager", "staff"])
       .order("full_name"),
     (() => {

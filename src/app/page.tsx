@@ -61,7 +61,7 @@ export default async function Overview() {
     supabase.from("books").select("id", { count: "exact", head: true }).eq("school_id", schoolId),
     supabase.from("book_loans").select("id", { count: "exact", head: true }).eq("school_id", schoolId).is("returned_at", null),
     supabase.from("book_requests").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("status", "open"),
-    supabase.from("profiles").select("id").in("role", ["manager", "staff"]).eq("is_active", true),
+    supabase.from("profiles").select("id").eq("group_id", profile.group_id).in("role", ["manager", "staff"]).eq("is_active", true),
     supabase.from("staff_attendance").select("profile_id").eq("school_id", schoolId).eq("date", today),
     supabase.from("change_requests").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("status", "open"),
   ]);
