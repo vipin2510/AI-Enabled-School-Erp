@@ -383,6 +383,7 @@ export default function CollectForm({
     if (!struct) return null;
     const applicable = struct.fee_structure_components.filter(isApplicable);
     const monthly = applicable.filter((c) => c.kind === "monthly");
+    const quarterly = applicable.filter((c) => c.kind === "quarterly");
     const instalments = applicable.filter((c) => c.kind === "instalment");
     const oneTimes = applicable.filter(
       (c) => c.is_one_time || ["registration", "caution", "yearly", "admission_one_time"].includes(c.kind)
@@ -399,6 +400,11 @@ export default function CollectForm({
             {monthly.length > 0 && (
               <Button variant="secondary" type="button" onClick={() => selectAllOfKind(struct, "monthly")}>
                 All months
+              </Button>
+            )}
+            {quarterly.length > 0 && (
+              <Button variant="secondary" type="button" onClick={() => selectAllOfKind(struct, "quarterly")}>
+                All quarters
               </Button>
             )}
             {instalments.length > 0 && (
@@ -424,6 +430,17 @@ export default function CollectForm({
           <ComponentGroup
             label="Instalments"
             components={instalments}
+            scope={struct.scope}
+            selected={selected}
+            paidSet={paidSet}
+            onToggle={toggleItem}
+            onToggleWaiver={toggleWaiver}
+          />
+        )}
+        {quarterly.length > 0 && (
+          <ComponentGroup
+            label="Quarterly"
+            components={quarterly}
             scope={struct.scope}
             selected={selected}
             paidSet={paidSet}
