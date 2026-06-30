@@ -4,11 +4,8 @@ import "./globals.css";
 import Sidebar, { type NavGroup } from "@/components/sidebar";
 import Topbar from "@/components/topbar";
 import IdleWatcher from "@/components/idle-watcher";
-<<<<<<< HEAD
 import { ShellNavProvider } from "@/components/shell-nav";
-=======
 import DemoTour from "@/components/demo-tour";
->>>>>>> feat/demo-feature
 import { getProfile, getCurrentDepartment, getCurrentSchool, getCurrentGroup } from "@/lib/auth";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { I18nProvider } from "@/lib/i18n/client";

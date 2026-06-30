@@ -65,7 +65,6 @@ export default function Topbar({
   const unitName = (s: School) => (citiesUnique ? city(s) : s.name);
 
   return (
-<<<<<<< HEAD
     <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[color:var(--border)] bg-[color:var(--card)] px-3 py-2 md:gap-x-4 md:px-6 md:py-3">
       <div className="flex items-center gap-2 md:gap-6">
         {/* Mobile: open the sidebar drawer. */}
@@ -81,19 +80,13 @@ export default function Topbar({
             <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
-        <div className="flex items-center gap-2 md:gap-3">
-          <span className="hidden text-xs uppercase tracking-wide text-stone-400 lg:inline">{t(unitLabel)}</span>
-=======
-    <header className="flex items-center justify-between gap-4 border-b border-[color:var(--border)] bg-[color:var(--card)] px-6 py-3">
-      <div className="flex items-center gap-6">
         {isDemo && (
-          <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+          <span className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
             {t("Demo — data is temporary")}
           </span>
         )}
-        <div className="flex items-center gap-3">
-          <span className="text-xs uppercase tracking-wide text-stone-400">{t(unitLabel)}</span>
->>>>>>> feat/demo-feature
+        <div className="flex items-center gap-2 md:gap-3">
+          <span className="hidden text-xs uppercase tracking-wide text-stone-400 lg:inline">{t(unitLabel)}</span>
           {canSwitchSchool ? (
             <form ref={schoolFormRef} action={setSchool}>
               <input type="hidden" name="next" value="/" />
