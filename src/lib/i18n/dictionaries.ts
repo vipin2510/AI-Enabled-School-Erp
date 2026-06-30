@@ -107,6 +107,31 @@ export const hi: Record<string, string> = {
   "Demo — data is temporary": "डेमो — डेटा अस्थायी है",
   "Laptop preview": "लैपटॉप पूर्वावलोकन",
   "Switch to mobile view": "मोबाइल व्यू पर जाएँ",
+  "Close": "बंद करें",
+
+  // ── Landing page ──────────────────────────────────────────────────
+  "Run your whole school from one place": "अपने पूरे विद्यालय को एक ही जगह से चलाएँ",
+  "Fees, academics, library and results — one calm, fast ERP for your institute.":
+    "शुल्क, शिक्षण, पुस्तकालय और परिणाम — आपके संस्थान के लिए एक सरल, तेज़ ERP।",
+  "No sign-up needed — the demo runs on sample data.":
+    "किसी साइन-अप की ज़रूरत नहीं — डेमो नमूना डेटा पर चलता है।",
+  "Everything in the demo": "डेमो में सब कुछ",
+  "Structures, collection and instant printable receipts.":
+    "शुल्क संरचना, संग्रह और तुरंत प्रिंट होने वाली रसीदें।",
+  "Students, classes, attendance and ID cards.":
+    "छात्र, कक्षाएँ, उपस्थिति और आईडी कार्ड।",
+  "Catalogue, issue/return and book requests.":
+    "सूची, जारी/वापसी और पुस्तक अनुरोध।",
+  "Enter marks and generate report cards.":
+    "अंक भरें और रिपोर्ट कार्ड बनाएँ।",
+  "No account? Ask your administrator to create one.":
+    "खाता नहीं है? अपने प्रशासक से बनवाएँ।",
+  "Bilingual — English & हिंदी": "द्विभाषी — अंग्रेज़ी और हिंदी",
+  "Print-ready receipts & report cards": "प्रिंट-तैयार रसीदें और रिपोर्ट कार्ड",
+  "Multi-branch ready": "मल्टी-ब्रांच के लिए तैयार",
+  "Total Students": "कुल छात्र",
+  "Collected · June": "संग्रहित · जून",
+  "Present Today": "आज उपस्थित",
 
   // ── Demo guided tour ──────────────────────────────────────────────
   "Tour": "टूर",

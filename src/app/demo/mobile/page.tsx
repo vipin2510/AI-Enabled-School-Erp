@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import PhoneFrame from "@/components/phone-frame";
+import FrameBuster from "@/components/frame-buster";
 
 export const dynamic = "force-dynamic";
 
@@ -9,5 +10,10 @@ export const dynamic = "force-dynamic";
 export default async function DemoMobilePage() {
   const profile = await requireProfile();
   if (!profile.is_demo) redirect("/");
-  return <PhoneFrame />;
+  return (
+    <>
+      <FrameBuster />
+      <PhoneFrame />
+    </>
+  );
 }
