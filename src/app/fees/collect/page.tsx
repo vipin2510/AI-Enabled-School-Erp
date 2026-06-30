@@ -56,7 +56,7 @@ export default async function CollectFeePicker({
         </p>
       </header>
 
-      <form action="/fees/collect" className="flex flex-col sm:flex-row gap-3 mb-4">
+      <form action="/fees/collect" data-tour="fees-collect-search" className="flex flex-col sm:flex-row gap-3 mb-4">
         <input
           name="q"
           defaultValue={q ?? ""}

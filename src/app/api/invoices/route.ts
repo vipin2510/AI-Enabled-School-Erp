@@ -261,6 +261,12 @@ export async function POST(req: Request) {
   };
   if (issuedAt) insertPayload.issued_at = issuedAt;
   if (body.idempotency_key) insertPayload.idempotency_key = body.idempotency_key;
+  // Demo receipts get an explicit DEMO/<ay>/<rand> number. The receipt_no
+  // trigger only fires when the column is null, so this also keeps demo writes
+  // from consuming the production invoice sequence.
+  if (profile.is_demo) {
+    insertPayload.receipt_no = `DEMO/${body.academic_year}/${crypto.randomUUID().slice(0, 8)}`;
+  }
 
   const { data: invoice, error: invErr } = await supabase
     .from("invoices")

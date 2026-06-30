@@ -2,7 +2,9 @@ import Image from "next/image";
 import { Suspense } from "react";
 import { headers } from "next/headers";
 import { groupForHost } from "@/lib/access";
+import { isPhone } from "@/lib/device";
 import LoginForm from "./login-form";
+import DemoChooser from "./demo-chooser";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,7 @@ export default async function LoginPage() {
   const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
   const group = groupForHost(host);
+  const mobile = isPhone(headerStore.get("user-agent"));
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-stone-100 px-4">
@@ -31,6 +34,7 @@ export default async function LoginPage() {
           <Suspense>
             <LoginForm />
           </Suspense>
+          <DemoChooser isMobile={mobile} />
         </div>
         <p className="mt-4 text-center text-xs text-stone-400">
           No account? Ask your administrator to create one.

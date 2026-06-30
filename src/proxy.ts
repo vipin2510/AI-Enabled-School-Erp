@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { DEMO_COOKIE, verifyDemo } from "@/lib/demo";
 
 // Idle timeout: forced logout after 30 minutes without a request. Each
 // authenticated request resets the timer via the erp_last_active cookie.
@@ -29,6 +30,22 @@ export async function proxy(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isLogin = path === "/login";
+
+  // Demo sandbox: a valid signed `erp_demo` cookie is its own session. Let it
+  // through with no Supabase auth/refresh (a demo visitor has no sb-* cookie,
+  // which would otherwise bounce them to /login). An invalid/expired demo
+  // cookie is cleared and the visitor falls back to the anonymous path.
+  const demoRaw = request.cookies.get(DEMO_COOKIE)?.value;
+  if (demoRaw) {
+    const demo = await verifyDemo(demoRaw);
+    if (demo) {
+      if (isLogin) return redirectHome(request);
+      return passThrough(requestHeaders);
+    }
+    const resp = isLogin ? passThrough(requestHeaders) : redirectToLogin(request, path);
+    resp.cookies.delete(DEMO_COOKIE);
+    return resp;
+  }
 
   const authCookies = request.cookies
     .getAll()

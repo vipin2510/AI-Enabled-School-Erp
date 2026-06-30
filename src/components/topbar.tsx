@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { setDepartment, setSchool, logout } from "@/app/actions/auth";
+import { exitDemo } from "@/app/actions/demo";
 import { setLocale } from "@/app/actions/i18n";
 import { markStaffAttendance } from "@/app/actions/staff-attendance";
 import { formatTime } from "@/lib/utils";
@@ -30,6 +31,7 @@ type Props = {
   canMarkAttendance: boolean;
   markedAt: string | null;
   locale: Locale;
+  isDemo?: boolean;
 };
 
 export default function Topbar({
@@ -44,6 +46,7 @@ export default function Topbar({
   canMarkAttendance,
   markedAt,
   locale,
+  isDemo,
 }: Props) {
   const t = useT();
   const { setOpen } = useShellNav();
@@ -62,6 +65,7 @@ export default function Topbar({
   const unitName = (s: School) => (citiesUnique ? city(s) : s.name);
 
   return (
+<<<<<<< HEAD
     <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[color:var(--border)] bg-[color:var(--card)] px-3 py-2 md:gap-x-4 md:px-6 md:py-3">
       <div className="flex items-center gap-2 md:gap-6">
         {/* Mobile: open the sidebar drawer. */}
@@ -79,6 +83,17 @@ export default function Topbar({
         </button>
         <div className="flex items-center gap-2 md:gap-3">
           <span className="hidden text-xs uppercase tracking-wide text-stone-400 lg:inline">{t(unitLabel)}</span>
+=======
+    <header className="flex items-center justify-between gap-4 border-b border-[color:var(--border)] bg-[color:var(--card)] px-6 py-3">
+      <div className="flex items-center gap-6">
+        {isDemo && (
+          <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+            {t("Demo — data is temporary")}
+          </span>
+        )}
+        <div className="flex items-center gap-3">
+          <span className="text-xs uppercase tracking-wide text-stone-400">{t(unitLabel)}</span>
+>>>>>>> feat/demo-feature
           {canSwitchSchool ? (
             <form ref={schoolFormRef} action={setSchool}>
               <input type="hidden" name="next" value="/" />
@@ -111,7 +126,7 @@ export default function Topbar({
           {canSwitchDept ? (
             // Switching submits the server action, which sets the cookie; the
             // action's revalidation re-renders the shell + page for the new dept.
-            <form ref={deptFormRef} action={setDepartment}>
+            <form ref={deptFormRef} action={setDepartment} data-tour="dept-switcher">
               <select
                 name="department"
                 defaultValue={department}
@@ -140,11 +155,19 @@ export default function Topbar({
           <div className="text-sm font-medium">{fullName || email}</div>
           <div className="text-xs text-stone-500">{t(ROLE_LABELS[role])}</div>
         </div>
-        <form action={logout}>
-          <button className="rounded-lg border border-stone-200 bg-stone-100 px-3 py-1.5 text-sm text-stone-900 hover:bg-stone-200">
-            {t("Sign out")}
-          </button>
-        </form>
+        {isDemo ? (
+          <form action={exitDemo}>
+            <button data-tour="exit-demo" className="rounded-lg border border-amber-300 bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-200">
+              {t("Exit demo")}
+            </button>
+          </form>
+        ) : (
+          <form action={logout}>
+            <button className="rounded-lg border border-stone-200 bg-stone-100 px-3 py-1.5 text-sm text-stone-900 hover:bg-stone-200">
+              {t("Sign out")}
+            </button>
+          </form>
+        )}
       </div>
     </header>
   );
@@ -154,7 +177,7 @@ export default function Topbar({
 // sets the cookie and revalidates the layout so the whole app re-renders.
 function LangToggle({ current }: { current: Locale }) {
   return (
-    <div className="flex overflow-hidden rounded-lg border border-stone-200">
+    <div data-tour="lang-toggle" className="flex overflow-hidden rounded-lg border border-stone-200">
       {LOCALES.map((loc) => (
         <form key={loc} action={setLocale}>
           <input type="hidden" name="locale" value={loc} />

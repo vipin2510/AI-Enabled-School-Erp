@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole, getCurrentSchoolId } from "@/lib/auth";
 import { findSchool } from "@/lib/access";
+import { makeDemoSchool } from "@/lib/demo";
 import { currentAcademicYear } from "@/lib/results";
 import {
   IdCardSheet,
@@ -99,7 +100,7 @@ export async function GET(req: Request) {
 
   // Header info for the card — driven by the active school so each branch
   // prints its own identity (Kondagaon / Pharasgaon / Chipawand).
-  const meta = findSchool(schoolId);
+  const meta = profile.is_demo ? makeDemoSchool(schoolId) : findSchool(schoolId);
   const school: IdCardSchool = {
     name: meta?.name ?? "Adeshwar Public School",
     cityLine: meta?.location?.split(",")[0] ?? "Kondagaon",

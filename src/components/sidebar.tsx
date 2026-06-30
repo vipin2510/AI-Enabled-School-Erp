@@ -62,7 +62,11 @@ export default function Sidebar({
                 <Link
                   key={n.href}
                   href={n.href}
+<<<<<<< HEAD
                   onClick={close}
+=======
+                  data-tour={`nav:${n.href}`}
+>>>>>>> feat/demo-feature
                   className={cn(
                     "px-3 py-2 rounded-lg text-sm transition",
                     active

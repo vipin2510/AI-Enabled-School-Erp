@@ -90,14 +90,14 @@ export default async function FeesDashboard() {
         </p>
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div data-tour="fees-stats" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card title={`Students Paid · ${monthLabel}`} value={`${paidCount} / ${totalStudents}`} tone="emerald" />
         <Card title={`Students Unpaid · ${monthLabel}`} value={unpaidCount} tone="amber" />
         <Card title={`Outstanding · ${monthLabel}`} value={inr(outstanding)} tone="rose" />
       </div>
 
       <section className="mt-8">
-        <div className="card p-5">
+        <div data-tour="fees-export" className="card p-5">
           <h2 className="text-lg font-medium">Export Pending Fees</h2>
           <p className="text-stone-500 text-sm mb-3">
             Download a class-wise list of students who haven&apos;t paid a given month&apos;s

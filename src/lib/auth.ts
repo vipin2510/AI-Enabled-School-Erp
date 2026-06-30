@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAnonClient } from "@/lib/supabase/anon";
 import { cached } from "@/lib/cache/index";
+import { DEMO_COOKIE, verifyDemo, makeDemoProfile, makeDemoSchool } from "@/lib/demo";
 import {
   COOKIE_DEPARTMENT,
   COOKIE_SCHOOL,
@@ -32,6 +33,9 @@ export type Profile = {
   school_ids: SchoolId[];
   group_id: GroupId;
   is_active: boolean;
+  // True only for the synthetic profile minted from a valid `erp_demo` cookie
+  // (public "See Demo" sandbox). Never set on a real DB-backed profile.
+  is_demo?: boolean;
 };
 
 // Pull the profile row for a known user id. Cached for 60s in the local store
@@ -79,6 +83,14 @@ async function loadProfileById(userId: string): Promise<Profile | null> {
 // on the next request so the user doesn't loop.
 export const getProfile = cache(async (): Promise<Profile | null> => {
   try {
+    // Demo sandbox: a valid `erp_demo` cookie short-circuits Supabase auth and
+    // the 60s profile cache, returning a synthetic admin scoped to the
+    // visitor's ephemeral demo school. Checked first so a demo visitor needs no
+    // sb-* session at all.
+    const cookieStore = await cookies();
+    const demo = await verifyDemo(cookieStore.get(DEMO_COOKIE)?.value);
+    if (demo) return makeDemoProfile(demo.demoSchoolId);
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -133,6 +145,11 @@ export async function getCurrentDepartment(profile: Profile): Promise<Department
 // schools they can see, and fall back to the first allowed school. Returns
 // null if the profile has no school access at all (a configuration bug).
 export async function getCurrentSchool(profile: Profile): Promise<School | null> {
+  // Demo: the ephemeral school isn't in the static SCHOOLS array, so synthesize
+  // it from the profile (set from the signed cookie). Must come first — it has
+  // no cookie to pick and must not bounce to /select-school.
+  if (profile.is_demo) return makeDemoSchool(profile.school_ids[0]);
+
   const allowed = allowedSchools(profile.role, profile.school_ids, profile.group_id);
   if (allowed.length === 0) return null;
 
