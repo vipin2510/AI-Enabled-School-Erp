@@ -32,12 +32,12 @@ export default async function ResultsPage() {
             Choose a class and section to enter marks and generate report cards.
           </p>
         </div>
-        <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-medium text-stone-600">
+        <span data-tour="results-year" className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-medium text-stone-600">
           Academic Year {currentAcademicYear()}
         </span>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div data-tour="results-grid" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {(classes ?? []).map((c) => {
           const list = byClass.get(c.id) ?? [];
           return (

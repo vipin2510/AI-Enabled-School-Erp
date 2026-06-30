@@ -90,7 +90,7 @@ export default async function AcademicsDashboard({
         <p className="text-stone-500 text-sm">Attendance overview across the school — {prettyDate(today)}</p>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div data-tour="academics-stats" className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard title="Total Students" value={totalStudents} icon="🎓" tone="sky" href="/academics/students" />
         <StatCard
           title="Present Today"
@@ -111,10 +111,10 @@ export default async function AcademicsDashboard({
       <section className="mt-10">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-medium">Attendance by Class</h2>
+            <h2 data-tour="academics-chart" className="text-lg font-medium">Attendance by Class</h2>
             <p className="text-sm text-stone-500">{win.label}</p>
           </div>
-          <div className="inline-flex rounded-lg border border-stone-200 bg-white p-0.5 text-sm">
+          <div data-tour="academics-range" className="inline-flex rounded-lg border border-stone-200 bg-white p-0.5 text-sm">
             {(["day", "week", "month"] as Range[]).map((r) => (
               <Link
                 key={r}

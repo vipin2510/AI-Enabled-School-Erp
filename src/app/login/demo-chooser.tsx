@@ -8,7 +8,7 @@ import { startDemo } from "@/app/actions/demo";
 // (institute now; parent later) then a device. Each device option is a plain
 // <form action={startDemo}> with a hidden `device` field — the server action
 // provisions the demo and redirects, so no client fetch is needed.
-export default function DemoChooser() {
+export default function DemoChooser({ isMobile = false }: { isMobile?: boolean }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [audience, setAudience] = useState<"institute" | "parent" | null>(null);
@@ -50,11 +50,13 @@ export default function DemoChooser() {
       {audience === "institute" && (
         <div className="space-y-2">
           <p className="text-xs font-medium text-stone-500">{t("How do you want to view it?")}</p>
-          <div className="grid grid-cols-2 gap-2">
-            <form action={startDemo}>
-              <input type="hidden" name="device" value="laptop" />
-              <DeviceButton label={t("View on laptop")} />
-            </form>
+          <div className={isMobile ? "" : "grid grid-cols-2 gap-2"}>
+            {!isMobile && (
+              <form action={startDemo}>
+                <input type="hidden" name="device" value="laptop" />
+                <DeviceButton label={t("View on laptop")} />
+              </form>
+            )}
             <form action={startDemo}>
               <input type="hidden" name="device" value="mobile" />
               <DeviceButton label={t("View on mobile")} />

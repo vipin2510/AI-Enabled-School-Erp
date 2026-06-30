@@ -2,10 +2,12 @@
 
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createAnonClient } from "@/lib/supabase/anon";
-import { DEMO_GROUP_ID } from "@/lib/access";
+import { DEMO_GROUP_ID, COOKIE_DEPARTMENT, type Department } from "@/lib/access";
 import { DEMO_COOKIE, DEMO_TTL_SECONDS, signDemo, verifyDemo } from "@/lib/demo";
 import { cloneTemplateSchool, teardownDemoSchool } from "@/lib/demo-seed";
+import { isPhone } from "@/lib/device";
 
 // Basic per-instance, per-IP rate limit so a script can't mass-create demo
 // schools. Best-effort (serverless memory isn't shared across instances); the
@@ -69,7 +71,31 @@ export async function startDemo(formData: FormData): Promise<void> {
     maxAge: DEMO_TTL_SECONDS,
   });
 
-  redirect(device === "mobile" ? "/demo/mobile" : "/");
+  // Frame the demo by device: laptop → MacBook frame; "mobile" from a
+  // desktop/tablet → phone frame; "mobile" from a real phone → full-screen app
+  // (no phone-in-a-phone).
+  const realPhone = isPhone(hdrs.get("user-agent"));
+  if (device === "mobile") {
+    redirect(realPhone ? "/" : "/demo/mobile");
+  }
+  redirect("/demo/laptop");
+}
+
+// Tour navigation: switch the active department (erp_dept cookie) and land on a
+// module page. Mirrors setDepartment but takes an explicit href so the tour can
+// target a module's dashboard. No-ops outside a demo session.
+export async function goToDemoStop(dept: Department, href: string): Promise<void> {
+  const cookieStore = await cookies();
+  const demo = await verifyDemo(cookieStore.get(DEMO_COOKIE)?.value);
+  if (!demo) return;
+  cookieStore.set(COOKIE_DEPARTMENT, dept, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+  revalidatePath("/", "layout");
+  redirect(href);
 }
 
 export async function exitDemo(): Promise<void> {

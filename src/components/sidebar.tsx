@@ -43,6 +43,7 @@ export default function Sidebar({
                 <Link
                   key={n.href}
                   href={n.href}
+                  data-tour={`nav:${n.href}`}
                   className={cn(
                     "px-3 py-2 rounded-lg text-sm transition",
                     active

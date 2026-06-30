@@ -4,6 +4,7 @@ import "./globals.css";
 import Sidebar, { type NavGroup } from "@/components/sidebar";
 import Topbar from "@/components/topbar";
 import IdleWatcher from "@/components/idle-watcher";
+import DemoTour from "@/components/demo-tour";
 import { getProfile, getCurrentDepartment, getCurrentSchool, getCurrentGroup } from "@/lib/auth";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { I18nProvider } from "@/lib/i18n/client";
@@ -39,7 +40,7 @@ export default async function RootLayout({
   // inside an iframe (which gets its own shell), so the outer page must NOT get
   // the sidebar/topbar even though there's a (demo) profile.
   const headerStore = await headers();
-  const isFrameHost = (headerStore.get("x-pathname") ?? "").startsWith("/demo/mobile");
+  const isFrameHost = (headerStore.get("x-pathname") ?? "").startsWith("/demo/");
 
   return (
     <html lang={locale} className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
@@ -148,6 +149,7 @@ async function AppShell({
         <main className="flex-1 px-6 py-6 md:px-10">{children}</main>
       </div>
       <IdleWatcher />
+      {profile.is_demo && <DemoTour department={department} />}
     </div>
   );
 }

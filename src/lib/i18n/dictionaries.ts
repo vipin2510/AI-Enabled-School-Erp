@@ -105,6 +105,55 @@ export const hi: Record<string, string> = {
   "Switch to laptop view": "लैपटॉप व्यू पर जाएँ",
   "Exit demo": "डेमो से बाहर निकलें",
   "Demo — data is temporary": "डेमो — डेटा अस्थायी है",
+  "Laptop preview": "लैपटॉप पूर्वावलोकन",
+  "Switch to mobile view": "मोबाइल व्यू पर जाएँ",
+
+  // ── Demo guided tour ──────────────────────────────────────────────
+  "Tour": "टूर",
+  "Next": "आगे",
+  "Done": "हो गया",
+  "Your 4 modules": "आपके 4 मॉड्यूल",
+  "Switch between Fees, Academics, Library and Results from here anytime.":
+    "यहाँ से कभी भी शुल्क, शैक्षणिक, पुस्तकालय और परिणाम के बीच स्विच करें।",
+  "Fees at a glance": "एक नज़र में शुल्क",
+  "Paid, unpaid and outstanding amounts for the current month.":
+    "चालू माह के भुगतान, बकाया और शेष राशि।",
+  "Export pending fees": "बकाया शुल्क निर्यात करें",
+  "Download class-wise pending fees as a CSV in one click.":
+    "एक क्लिक में कक्षावार बकाया शुल्क CSV के रूप में डाउनलोड करें।",
+  "Collect a fee": "शुल्क जमा करें",
+  "Let's open the fee-collection screen.": "आइए शुल्क-संग्रह स्क्रीन खोलें।",
+  "Find a student": "छात्र खोजें",
+  "Search by name, mobile or class, then take the payment and print a receipt.":
+    "नाम, मोबाइल या कक्षा से खोजें, फिर भुगतान लें और रसीद प्रिंट करें।",
+  "Now we're in the Academics module — attendance, students, classes and ID cards.":
+    "अब हम शैक्षणिक मॉड्यूल में हैं — उपस्थिति, छात्र, कक्षाएँ और आईडी कार्ड।",
+  "Today at a glance": "आज एक नज़र में",
+  "Live headcount with today's present and absent counts.":
+    "आज की उपस्थित और अनुपस्थित संख्या के साथ लाइव गिनती।",
+  "Pick a range": "अवधि चुनें",
+  "Toggle the view between day, week and month.":
+    "दिन, सप्ताह और माह के बीच दृश्य बदलें।",
+  "Attendance by class": "कक्षावार उपस्थिति",
+  "Per-class attendance rates, at a glance.": "एक नज़र में कक्षावार उपस्थिति दर।",
+  "Catalog totals — books issued, available and requested.":
+    "सूची योग — जारी, उपलब्ध और अनुरोधित पुस्तकें।",
+  "Recent activity": "हाल की गतिविधि",
+  "A live feed of issues and returns.": "जारी और वापसी की लाइव फ़ीड।",
+  "Book requests": "पुस्तक अनुरोध",
+  "Log a title a student has asked the library to add.":
+    "वह पुस्तक दर्ज करें जिसे जोड़ने के लिए छात्र ने कहा है।",
+  "Pick a class and section to enter marks and print report cards.":
+    "अंक भरने और रिपोर्ट कार्ड प्रिंट करने के लिए कक्षा और सेक्शन चुनें।",
+  "Academic year": "शैक्षणिक वर्ष",
+  "Everything stays scoped to the current academic year.":
+    "सब कुछ चालू शैक्षणिक वर्ष तक सीमित रहता है।",
+  "हिंदी / English": "हिंदी / English",
+  "Switch the whole app between English and Hindi anytime.":
+    "पूरे ऐप को कभी भी अंग्रेज़ी और हिंदी के बीच बदलें।",
+  "That's the tour!": "यह रहा टूर!",
+  "Explore freely — and exit the demo whenever you like.":
+    "स्वतंत्र रूप से देखें — और जब चाहें डेमो से बाहर निकलें।",
 };
 
 export const dictionaries: Record<Locale, Record<string, string>> = {

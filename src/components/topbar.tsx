@@ -104,7 +104,7 @@ export default function Topbar({
           {canSwitchDept ? (
             // Switching submits the server action, which sets the cookie; the
             // action's revalidation re-renders the shell + page for the new dept.
-            <form ref={deptFormRef} action={setDepartment}>
+            <form ref={deptFormRef} action={setDepartment} data-tour="dept-switcher">
               <select
                 name="department"
                 defaultValue={department}
@@ -135,7 +135,7 @@ export default function Topbar({
         </div>
         {isDemo ? (
           <form action={exitDemo}>
-            <button className="rounded-lg border border-amber-300 bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-200">
+            <button data-tour="exit-demo" className="rounded-lg border border-amber-300 bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-200">
               {t("Exit demo")}
             </button>
           </form>
@@ -155,7 +155,7 @@ export default function Topbar({
 // sets the cookie and revalidates the layout so the whole app re-renders.
 function LangToggle({ current }: { current: Locale }) {
   return (
-    <div className="flex overflow-hidden rounded-lg border border-stone-200">
+    <div data-tour="lang-toggle" className="flex overflow-hidden rounded-lg border border-stone-200">
       {LOCALES.map((loc) => (
         <form key={loc} action={setLocale}>
           <input type="hidden" name="locale" value={loc} />

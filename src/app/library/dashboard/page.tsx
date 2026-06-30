@@ -88,14 +88,14 @@ export default async function LibraryDashboard() {
         <p className="text-stone-500 text-sm">Catalog at a glance and titles students have asked for.</p>
       </header>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div data-tour="library-stats" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard title="Total Books" value={totalBooks} icon="📚" tone="violet" />
         <StatCard title="Issued Now" value={issued} hint={overdue ? `${overdue} overdue` : "none overdue"} icon="📖" tone="amber" />
         <StatCard title="Available" value={available} icon="✅" tone="emerald" />
         <StatCard title="Open Requests" value={openRequests.length} icon="📝" tone="sky" />
       </div>
 
-      <section className="mt-10">
+      <section data-tour="library-activity" className="mt-10">
         <h2 className="mb-3 text-lg font-medium">
           Recent Activity{" "}
           <span className="text-sm font-normal text-stone-500">
@@ -164,7 +164,7 @@ export default async function LibraryDashboard() {
         </div>
       </section>
 
-      <section className="mt-10 card p-5">
+      <section data-tour="library-request" className="mt-10 card p-5">
         <h2 className="text-lg font-medium">Request a Book</h2>
         <p className="mb-4 text-sm text-stone-500">
           Log a title that isn&apos;t in the library yet but a student has asked for, so it can be
