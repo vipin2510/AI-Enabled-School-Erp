@@ -2,7 +2,6 @@ import Image from "next/image";
 import { Suspense } from "react";
 import { headers } from "next/headers";
 import { groupForHost } from "@/lib/access";
-import { isPhone } from "@/lib/device";
 import { getT } from "@/lib/i18n/server";
 import LoginForm from "./login-form";
 import DemoChooser from "./demo-chooser";
@@ -14,7 +13,6 @@ export default async function LandingPage() {
   const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
   const group = groupForHost(host);
-  const mobile = isPhone(headerStore.get("user-agent"));
   const t = await getT();
 
   const features = [
@@ -22,12 +20,6 @@ export default async function LandingPage() {
     { icon: "🎓", title: t("Academics"), body: t("Students, classes, attendance and ID cards."), tone: "bg-sky-50 text-sky-700" },
     { icon: "📚", title: t("Library"), body: t("Catalogue, issue/return and book requests."), tone: "bg-violet-50 text-violet-700" },
     { icon: "📊", title: t("Results"), body: t("Enter marks and generate report cards."), tone: "bg-amber-50 text-amber-700" },
-  ];
-
-  const benefits = [
-    t("Bilingual — English & हिंदी"),
-    t("Print-ready receipts & report cards"),
-    t("Multi-branch ready"),
   ];
 
   return (
@@ -57,7 +49,7 @@ export default async function LandingPage() {
           {t("Fees, academics, library and results — one calm, fast ERP for your institute.")}
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <DemoChooser isMobile={mobile} />
+          <DemoChooser />
           <a
             href="#signin"
             className="inline-flex items-center justify-center rounded-xl border border-stone-300 bg-white px-6 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
@@ -85,17 +77,6 @@ export default async function LandingPage() {
               <h3 className="mt-3 font-medium">{f.title}</h3>
               <p className="mt-1 text-sm text-stone-500">{f.body}</p>
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Benefits */}
-      <section className="mx-auto max-w-4xl px-5 pb-16">
-        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-stone-500">
-          {benefits.map((b) => (
-            <span key={b} className="inline-flex items-center gap-1.5">
-              <span className="text-accent">✓</span> {b}
-            </span>
           ))}
         </div>
       </section>

@@ -80,11 +80,6 @@ export default function Topbar({
             <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
-        {isDemo && (
-          <span className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
-            {t("Demo — data is temporary")}
-          </span>
-        )}
         <div className="flex items-center gap-2 md:gap-3">
           <span className="hidden text-xs uppercase tracking-wide text-stone-400 lg:inline">{t(unitLabel)}</span>
           {canSwitchSchool ? (

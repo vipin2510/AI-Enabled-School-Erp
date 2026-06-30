@@ -24,9 +24,7 @@ function rateLimited(ip: string): boolean {
   return hits.length > RATE_LIMIT;
 }
 
-export async function startDemo(formData: FormData): Promise<void> {
-  const device = formData.get("device") === "mobile" ? "mobile" : "laptop";
-
+export async function startDemo(): Promise<void> {
   const hdrs = await headers();
   const ip = (hdrs.get("x-forwarded-for") ?? "unknown").split(",")[0].trim();
   if (rateLimited(ip)) {
@@ -71,14 +69,10 @@ export async function startDemo(formData: FormData): Promise<void> {
     maxAge: DEMO_TTL_SECONDS,
   });
 
-  // Frame the demo by device: laptop → MacBook frame; "mobile" from a
-  // desktop/tablet → phone frame; "mobile" from a real phone → full-screen app
-  // (no phone-in-a-phone).
+  // A real phone has no laptop option → go straight to the full-screen app.
+  // Desktop/tablet → the /demo selection page (laptop + mobile live previews).
   const realPhone = isPhone(hdrs.get("user-agent"));
-  if (device === "mobile") {
-    redirect(realPhone ? "/" : "/demo/mobile");
-  }
-  redirect("/demo/laptop");
+  redirect(realPhone ? "/" : "/demo");
 }
 
 // Tour navigation: switch the active department (erp_dept cookie) and land on a

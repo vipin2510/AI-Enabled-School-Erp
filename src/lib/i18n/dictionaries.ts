@@ -108,6 +108,8 @@ export const hi: Record<string, string> = {
   "Laptop preview": "लैपटॉप पूर्वावलोकन",
   "Switch to mobile view": "मोबाइल व्यू पर जाएँ",
   "Close": "बंद करें",
+  "Choose how to explore the demo": "डेमो कैसे देखना है चुनें",
+  "Click a device to open the full demo.": "पूरा डेमो खोलने के लिए एक डिवाइस पर क्लिक करें।",
 
   // ── Landing page ──────────────────────────────────────────────────
   "Run your whole school from one place": "अपने पूरे विद्यालय को एक ही जगह से चलाएँ",

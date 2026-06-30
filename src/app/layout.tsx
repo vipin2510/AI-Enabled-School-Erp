@@ -41,7 +41,9 @@ export default async function RootLayout({
   // inside an iframe (which gets its own shell), so the outer page must NOT get
   // the sidebar/topbar even though there's a (demo) profile.
   const headerStore = await headers();
-  const isFrameHost = (headerStore.get("x-pathname") ?? "").startsWith("/demo/");
+  // The /demo selection page and the /demo/* frame hosts render bare (no app
+  // shell): they host the demo app in iframes that get their own shell.
+  const isFrameHost = (headerStore.get("x-pathname") ?? "").startsWith("/demo");
 
   return (
     <html lang={locale} className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
