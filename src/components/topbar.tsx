@@ -121,6 +121,10 @@ export default function Topbar({
             // action's revalidation re-renders the shell + page for the new dept.
             <form ref={deptFormRef} action={setDepartment} data-tour="dept-switcher">
               <select
+                // Key by department so a programmatic switch (e.g. the demo tour
+                // moving Fees → Academics) remounts the uncontrolled select and
+                // it reflects the new value, not just the page content.
+                key={department}
                 name="department"
                 defaultValue={department}
                 onChange={() => deptFormRef.current?.requestSubmit()}
