@@ -4,6 +4,7 @@ import "./globals.css";
 import Sidebar, { type NavGroup } from "@/components/sidebar";
 import Topbar from "@/components/topbar";
 import IdleWatcher from "@/components/idle-watcher";
+import { ShellNavProvider } from "@/components/shell-nav";
 import { getProfile, getCurrentDepartment, getCurrentSchool, getCurrentGroup } from "@/lib/auth";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { I18nProvider } from "@/lib/i18n/client";
@@ -117,9 +118,10 @@ async function AppShell({
   }
 
   return (
+    <ShellNavProvider>
     <div className="flex min-h-screen">
       <Sidebar groups={groups} brandName={group.shortName} brandSub={group.name} logoSrc={group.logoPath} />
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
           fullName={profile.full_name ?? ""}
           email={profile.email ?? profile.phone ?? ""}
@@ -133,9 +135,10 @@ async function AppShell({
           markedAt={markedAt}
           locale={locale}
         />
-        <main className="flex-1 px-6 py-6 md:px-10">{children}</main>
+        <main className="flex-1 px-4 py-5 md:px-10 md:py-6">{children}</main>
       </div>
       <IdleWatcher />
     </div>
+    </ShellNavProvider>
   );
 }

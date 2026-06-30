@@ -14,6 +14,7 @@ import {
   type Role,
   type School,
 } from "@/lib/access";
+import { useShellNav } from "@/components/shell-nav";
 
 type Props = {
   fullName: string;
@@ -45,6 +46,7 @@ export default function Topbar({
   locale,
 }: Props) {
   const t = useT();
+  const { setOpen } = useShellNav();
   const deptFormRef = useRef<HTMLFormElement>(null);
   const schoolFormRef = useRef<HTMLFormElement>(null);
   const canSwitchDept = role !== "staff" && allowed.length > 1;
@@ -60,10 +62,23 @@ export default function Topbar({
   const unitName = (s: School) => (citiesUnique ? city(s) : s.name);
 
   return (
-    <header className="flex items-center justify-between gap-4 border-b border-[color:var(--border)] bg-[color:var(--card)] px-6 py-3">
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-3">
-          <span className="text-xs uppercase tracking-wide text-stone-400">{t(unitLabel)}</span>
+    <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[color:var(--border)] bg-[color:var(--card)] px-3 py-2 md:gap-x-4 md:px-6 md:py-3">
+      <div className="flex items-center gap-2 md:gap-6">
+        {/* Mobile: open the sidebar drawer. */}
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Open menu"
+          className="-ml-1 rounded-lg p-2 text-stone-600 hover:bg-stone-100 md:hidden"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+        <div className="flex items-center gap-2 md:gap-3">
+          <span className="hidden text-xs uppercase tracking-wide text-stone-400 lg:inline">{t(unitLabel)}</span>
           {canSwitchSchool ? (
             <form ref={schoolFormRef} action={setSchool}>
               <input type="hidden" name="next" value="/" />
@@ -91,8 +106,8 @@ export default function Topbar({
           )}
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs uppercase tracking-wide text-stone-400">{t("Department")}</span>
+        <div className="flex items-center gap-2 md:gap-3">
+          <span className="hidden text-xs uppercase tracking-wide text-stone-400 lg:inline">{t("Department")}</span>
           {canSwitchDept ? (
             // Switching submits the server action, which sets the cookie; the
             // action's revalidation re-renders the shell + page for the new dept.
@@ -118,10 +133,10 @@ export default function Topbar({
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-4">
         <LangToggle current={locale} />
         {canMarkAttendance && <MarkAttendanceButton initialMarkedAt={markedAt} />}
-        <div className="text-right leading-tight">
+        <div className="hidden text-right leading-tight sm:block">
           <div className="text-sm font-medium">{fullName || email}</div>
           <div className="text-xs text-stone-500">{t(ROLE_LABELS[role])}</div>
         </div>
