@@ -4,7 +4,8 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile, getCurrentSchoolId } from "@/lib/auth";
-import { findSchool, findGroup } from "@/lib/access";
+import { findSchool, findGroup, DEMO_GROUP } from "@/lib/access";
+import { makeDemoSchool } from "@/lib/demo";
 import { getFeePrintLayout } from "@/lib/cache";
 import { ReceiptPdf, type ReceiptBranding } from "@/components/receipt-pdf";
 
@@ -35,8 +36,10 @@ export async function GET(
 
   // Resolve the school's group for branding (logo + header). Falls back to
   // the Adeshwar letterhead logo if the group has no logo configured.
-  const school = findSchool(schoolId);
-  const group = school ? findGroup(school.groupId) : null;
+  // The ephemeral demo school isn't in the static SCHOOLS array, so synthesize
+  // its branding; everything else resolves from the static tables.
+  const school = profile.is_demo ? makeDemoSchool(schoolId) : findSchool(schoolId);
+  const group = profile.is_demo ? DEMO_GROUP : school ? findGroup(school.groupId) : null;
   const logoRel = group?.logoPath ?? "/letterhead/aps-logo.jpeg";
   const logoPath = path.join(process.cwd(), "public", logoRel);
   const logoBytes = await fs.readFile(logoPath);

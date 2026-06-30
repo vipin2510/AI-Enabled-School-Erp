@@ -38,6 +38,11 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
   // can only mint Tagore logins, scoped to Tagore schools. This is the gate
   // that keeps groups from leaking into each other via user creation.
   const me = await requireRole("admin");
+  // Demo sandbox is read-mostly: never let a demo visitor mint a real Supabase
+  // auth user via the Admin API.
+  if (me.is_demo) {
+    return { error: "User creation is disabled in the demo." };
+  }
   const groupSchoolIds = SCHOOLS.filter((s) => s.groupId === me.group_id).map((s) => s.id);
 
   const rawDept = String(formData.get("department") ?? "");
@@ -95,6 +100,7 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
 
 export async function setUserActive(formData: FormData) {
   const me = await requireRole("admin");
+  if (me.is_demo) return;
   const id = String(formData.get("id") ?? "");
   const active = String(formData.get("active") ?? "") === "true";
   if (!id) return;
@@ -117,6 +123,7 @@ export async function setUserActive(formData: FormData) {
 // given environment.
 export async function deleteUser(formData: FormData) {
   const me = await requireRole("admin");
+  if (me.is_demo) return;
   const id = String(formData.get("id") ?? "");
   if (!id || id === me.id) return; // never let admin delete themselves
 
@@ -139,6 +146,7 @@ export async function deleteUser(formData: FormData) {
 // so we coerce their department to null). Pass department="" to clear.
 export async function setUserDepartment(formData: FormData) {
   const me = await requireRole("admin");
+  if (me.is_demo) return;
   const id = String(formData.get("id") ?? "");
   const raw = String(formData.get("department") ?? "").trim();
   if (!id) return;

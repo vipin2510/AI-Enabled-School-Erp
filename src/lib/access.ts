@@ -28,6 +28,22 @@ export type Group = {
 
 export const ADESHWAR_GROUP_ID = "10000000-0000-0000-0000-000000000001";
 export const TAGORE_GROUP_ID = "10000000-0000-0000-0000-000000000002";
+// The demo franchise. Every public "See Demo" visitor runs as an admin of an
+// ephemeral school inside this group, so its branding drives the demo shell and
+// receipt PDFs. Kept in GROUPS so findGroup()/getCurrentGroup() resolve it like
+// any other tenant; domain:null keeps it out of pre-login host routing.
+export const DEMO_GROUP_ID = "10000000-0000-0000-0000-0000000000de";
+
+export const DEMO_GROUP: Group = {
+  id: DEMO_GROUP_ID,
+  code: "demo",
+  name: "Demo Public School",
+  shortName: "Demo",
+  logoPath: "/branding/aadeshwar/logo.jpeg",
+  unitLabel: "School",
+  location: "Demo City",
+  domain: null,
+};
 
 export const GROUPS: Group[] = [
   {
@@ -53,6 +69,7 @@ export const GROUPS: Group[] = [
     // the team's deployment protection.)
     domain: "erp.tipr.in",
   },
+  DEMO_GROUP,
 ];
 
 export const DEFAULT_GROUP_ID = ADESHWAR_GROUP_ID;

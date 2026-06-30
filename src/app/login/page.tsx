@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { headers } from "next/headers";
 import { groupForHost } from "@/lib/access";
 import LoginForm from "./login-form";
+import DemoChooser from "./demo-chooser";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export default async function LoginPage() {
           <Suspense>
             <LoginForm />
           </Suspense>
+          <DemoChooser />
         </div>
         <p className="mt-4 text-center text-xs text-stone-400">
           No account? Ask your administrator to create one.

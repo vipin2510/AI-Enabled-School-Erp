@@ -47,7 +47,13 @@ export default async function UsersPage() {
 
       <section className="card p-5 mb-8">
         <h2 className="font-medium mb-4">Create a new login</h2>
-        <CreateUserForm schools={SCHOOLS.filter((s) => s.groupId === me.group_id)} />
+        {me.is_demo ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Creating logins is disabled in the demo.
+          </p>
+        ) : (
+          <CreateUserForm schools={SCHOOLS.filter((s) => s.groupId === me.group_id)} />
+        )}
       </section>
 
       <Suspense fallback={<TableSkeleton />}>

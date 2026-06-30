@@ -91,6 +91,20 @@ export const hi: Record<string, string> = {
   "← Back to {count} matches": "← {count} मिलानों पर वापस जाएँ",
   "This book is marked {status}.": "यह पुस्तक {status} के रूप में चिह्नित है।",
   "No book found for “{code}”.": "“{code}” के लिए कोई पुस्तक नहीं मिली।",
+
+  // ── Demo sandbox ──────────────────────────────────────────────────
+  "See Demo": "डेमो देखें",
+  "Who is this demo for?": "यह डेमो किसके लिए है?",
+  "For an institute": "संस्थान के लिए",
+  "For a parent": "अभिभावक के लिए",
+  "Coming soon": "जल्द आ रहा है",
+  "How do you want to view it?": "आप इसे कैसे देखना चाहते हैं?",
+  "View on laptop": "लैपटॉप पर देखें",
+  "View on mobile": "मोबाइल पर देखें",
+  "Mobile preview": "मोबाइल पूर्वावलोकन",
+  "Switch to laptop view": "लैपटॉप व्यू पर जाएँ",
+  "Exit demo": "डेमो से बाहर निकलें",
+  "Demo — data is temporary": "डेमो — डेटा अस्थायी है",
 };
 
 export const dictionaries: Record<Locale, Record<string, string>> = {

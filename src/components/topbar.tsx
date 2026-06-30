@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { setDepartment, setSchool, logout } from "@/app/actions/auth";
+import { exitDemo } from "@/app/actions/demo";
 import { setLocale } from "@/app/actions/i18n";
 import { markStaffAttendance } from "@/app/actions/staff-attendance";
 import { formatTime } from "@/lib/utils";
@@ -29,6 +30,7 @@ type Props = {
   canMarkAttendance: boolean;
   markedAt: string | null;
   locale: Locale;
+  isDemo?: boolean;
 };
 
 export default function Topbar({
@@ -43,6 +45,7 @@ export default function Topbar({
   canMarkAttendance,
   markedAt,
   locale,
+  isDemo,
 }: Props) {
   const t = useT();
   const deptFormRef = useRef<HTMLFormElement>(null);
@@ -62,6 +65,11 @@ export default function Topbar({
   return (
     <header className="flex items-center justify-between gap-4 border-b border-[color:var(--border)] bg-[color:var(--card)] px-6 py-3">
       <div className="flex items-center gap-6">
+        {isDemo && (
+          <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+            {t("Demo — data is temporary")}
+          </span>
+        )}
         <div className="flex items-center gap-3">
           <span className="text-xs uppercase tracking-wide text-stone-400">{t(unitLabel)}</span>
           {canSwitchSchool ? (
@@ -125,11 +133,19 @@ export default function Topbar({
           <div className="text-sm font-medium">{fullName || email}</div>
           <div className="text-xs text-stone-500">{t(ROLE_LABELS[role])}</div>
         </div>
-        <form action={logout}>
-          <button className="rounded-lg border border-stone-200 bg-stone-100 px-3 py-1.5 text-sm text-stone-900 hover:bg-stone-200">
-            {t("Sign out")}
-          </button>
-        </form>
+        {isDemo ? (
+          <form action={exitDemo}>
+            <button className="rounded-lg border border-amber-300 bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-200">
+              {t("Exit demo")}
+            </button>
+          </form>
+        ) : (
+          <form action={logout}>
+            <button className="rounded-lg border border-stone-200 bg-stone-100 px-3 py-1.5 text-sm text-stone-900 hover:bg-stone-200">
+              {t("Sign out")}
+            </button>
+          </form>
+        )}
       </div>
     </header>
   );

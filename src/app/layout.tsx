@@ -35,15 +35,20 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const [profile, locale] = await Promise.all([getProfile(), getLocale()]);
 
+  // The demo "mobile" view is a bare phone-frame host: it renders the real app
+  // inside an iframe (which gets its own shell), so the outer page must NOT get
+  // the sidebar/topbar even though there's a (demo) profile.
+  const headerStore = await headers();
+  const isFrameHost = (headerStore.get("x-pathname") ?? "").startsWith("/demo/mobile");
+
   return (
     <html lang={locale} className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full">
         <I18nProvider locale={locale}>
-          {profile ? (
+          {profile && !isFrameHost ? (
             <AppShell profile={profile} locale={locale}>{children}</AppShell>
           ) : (
-            // Logged out: the only page reachable (per proxy.ts) is /login,
-            // which renders bare without the sidebar/topbar shell.
+            // Logged out (only /login is reachable, bare) OR the demo frame host.
             children
           )}
         </I18nProvider>
@@ -69,7 +74,13 @@ async function AppShell({
   // Resolve the active school. Leaders without one picked yet get bounced to
   // /select-school. Staff always have one (pinned by their profile).
   const school = await getCurrentSchool(profile);
-  const schools = allowedSchools(profile.role, profile.school_ids, profile.group_id);
+  // A demo's ephemeral school isn't in the static SCHOOLS array, so allowedSchools
+  // returns []. Show just the (synthetic) demo school in the switcher instead.
+  const schools = profile.is_demo
+    ? school
+      ? [school]
+      : []
+    : allowedSchools(profile.role, profile.school_ids, profile.group_id);
   const group = getCurrentGroup(profile);
   if (!school) {
     const headerStore = await headers();
@@ -129,6 +140,7 @@ async function AppShell({
           school={school}
           allowedSchools={schools}
           unitLabel={group.unitLabel}
+          isDemo={profile.is_demo}
           canMarkAttendance={marksOwnAttendance(profile.role)}
           markedAt={markedAt}
           locale={locale}
