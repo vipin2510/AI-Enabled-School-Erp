@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAnonClient } from "@/lib/supabase/anon";
 import { cached } from "@/lib/cache/index";
-import { DEMO_COOKIE, verifyDemo, makeDemoProfile, makeDemoSchool } from "@/lib/demo";
+import {
+  DEMO_COOKIE,
+  verifyDemo,
+  makeDemoProfile,
+  makeDemoSchool,
+} from "@/lib/demo";
 import {
   COOKIE_DEPARTMENT,
   COOKIE_SCHOOL,
@@ -51,7 +56,9 @@ async function loadProfileById(userId: string): Promise<Profile | null> {
     const anon = createAnonClient();
     const { data } = await anon
       .from("profiles")
-      .select("id, email, phone, full_name, role, department, school_ids, group_id, is_active")
+      .select(
+        "id, email, phone, full_name, role, department, school_ids, group_id, is_active",
+      )
       .eq("id", userId)
       .single();
     if (!data) return null;
@@ -92,11 +99,10 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
     if (demo) return makeDemoProfile(demo.demoSchoolId);
 
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return null;
-    return await loadProfileById(user.id);
+    const { data } = await supabase.auth.getClaims();
+    const userId = data?.claims?.sub;
+    if (!userId) return null;
+    return await loadProfileById(userId);
   } catch {
     return null;
   }
@@ -118,7 +124,9 @@ export async function requireRole(...roles: Role[]): Promise<Profile> {
 
 // Gate a department-specific page. Admin/manager pass; staff must belong to the
 // department. Anyone else is sent home.
-export async function requireDepartment(department: Department): Promise<Profile> {
+export async function requireDepartment(
+  department: Department,
+): Promise<Profile> {
   const profile = await requireProfile();
   if (profile.role === "admin" || profile.role === "manager") return profile;
   if (profile.department === department) return profile;
@@ -127,7 +135,9 @@ export async function requireDepartment(department: Department): Promise<Profile
 
 // The department the user is currently working in. Staff are pinned to their
 // own department; admin/manager fall back to the cookie, then to "fees".
-export async function getCurrentDepartment(profile: Profile): Promise<Department> {
+export async function getCurrentDepartment(
+  profile: Profile,
+): Promise<Department> {
   const allowed = allowedDepartments(profile.role, profile.department);
   if (profile.role === "staff") {
     return profile.department ?? allowed[0] ?? "fees";
@@ -144,13 +154,19 @@ export async function getCurrentDepartment(profile: Profile): Promise<Department
 // single assigned school; admin/manager read the cookie, validate against the
 // schools they can see, and fall back to the first allowed school. Returns
 // null if the profile has no school access at all (a configuration bug).
-export async function getCurrentSchool(profile: Profile): Promise<School | null> {
+export async function getCurrentSchool(
+  profile: Profile,
+): Promise<School | null> {
   // Demo: the ephemeral school isn't in the static SCHOOLS array, so synthesize
   // it from the profile (set from the signed cookie). Must come first — it has
   // no cookie to pick and must not bounce to /select-school.
   if (profile.is_demo) return makeDemoSchool(profile.school_ids[0]);
 
-  const allowed = allowedSchools(profile.role, profile.school_ids, profile.group_id);
+  const allowed = allowedSchools(
+    profile.role,
+    profile.school_ids,
+    profile.group_id,
+  );
   if (allowed.length === 0) return null;
 
   if (profile.role === "staff") {

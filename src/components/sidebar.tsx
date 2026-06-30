@@ -40,44 +40,60 @@ export default function Sidebar({
           open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         )}
       >
-      <Link href="/" onClick={close} className="flex items-center gap-3 mb-8 px-2">
-        <Image src={logoSrc} alt={brandName} width={40} height={40} className="rounded-full object-contain" />
-        <div>
-          <div className="text-sm font-semibold leading-tight">{brandName}</div>
-          <div className="text-xs text-stone-500 leading-tight">{brandSub}</div>
-        </div>
-      </Link>
-      <nav className="flex flex-col gap-4">
-        {groups.map((group, gi) => (
-          <div key={group.label ?? gi} className="flex flex-col gap-1">
-            {group.label && (
-              <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-stone-400">
-                {group.label}
-              </div>
-            )}
-            {group.items.map((n) => {
-              const active =
-                path === n.href || (n.href !== "/" && path.startsWith(n.href));
-              return (
-                <Link
-                  key={n.href}
-                  href={n.href}
-                  onClick={close}
-                  data-tour={`nav:${n.href}`}
-                  className={cn(
-                    "px-3 py-2 rounded-lg text-sm transition",
-                    active
-                      ? "bg-stone-900 text-stone-50"
-                      : "text-stone-700 hover:bg-stone-100"
-                  )}
-                >
-                  {n.label}
-                </Link>
-              );
-            })}
+        <Link
+          href="/"
+          onClick={close}
+          className="flex items-center gap-3 mb-8 px-2"
+        >
+          <Image
+            src={logoSrc}
+            alt={brandName}
+            width={40}
+            height={40}
+            className="rounded-full object-contain"
+          />
+          <div>
+            <div className="text-sm font-semibold leading-tight">
+              {brandName}
+            </div>
+            <div className="text-xs text-stone-500 leading-tight">
+              {brandSub}
+            </div>
           </div>
-        ))}
-      </nav>
+        </Link>
+        <nav className="flex flex-col gap-4">
+          {groups.map((group, gi) => (
+            <div key={group.label ?? gi} className="flex flex-col gap-1">
+              {group.label && (
+                <div className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-stone-400">
+                  {group.label}
+                </div>
+              )}
+              {group.items.map((n) => {
+                const active =
+                  path === n.href ||
+                  (n.href !== "/" && path.startsWith(n.href));
+                return (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    onClick={close}
+                    prefetch={false}
+                    data-tour={`nav:${n.href}`}
+                    className={cn(
+                      "px-3 py-2 rounded-lg text-sm transition",
+                      active
+                        ? "bg-stone-900 text-stone-50"
+                        : "text-stone-700 hover:bg-stone-100",
+                    )}
+                  >
+                    {n.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
       </aside>
     </>
   );

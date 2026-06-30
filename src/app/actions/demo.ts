@@ -4,9 +4,9 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createAnonClient } from "@/lib/supabase/anon";
-import { DEMO_GROUP_ID, COOKIE_DEPARTMENT, type Department } from "@/lib/access";
+import { COOKIE_DEPARTMENT, type Department } from "@/lib/access";
 import { DEMO_COOKIE, DEMO_TTL_SECONDS, signDemo, verifyDemo } from "@/lib/demo";
-import { cloneTemplateSchool, teardownDemoSchool } from "@/lib/demo-seed";
+import { currentAcademicYear } from "@/lib/academic-year";
 import { isPhone } from "@/lib/device";
 
 // Basic per-instance, per-IP rate limit so a script can't mass-create demo
@@ -35,29 +35,19 @@ export async function startDemo(): Promise<void> {
   const demoSchoolId = crypto.randomUUID();
   const code = `demo-${demoSchoolId.slice(0, 8)}`;
 
-  // The schools row must exist before any child rows (FK target).
-  const schoolRow: Record<string, unknown> = {
-    id: demoSchoolId,
-    group_id: DEMO_GROUP_ID,
-    code,
-    name: "Demo Public School",
-    location: "Demo City, India",
-    board: "Demo Board",
-    board_code: "DEMO",
-    is_active: true,
-    sort_order: 99,
-  };
-  // Untyped supabase-js client → insert row type is `never`; cast the payload.
-  const { error: schoolErr } = await supabase.from("schools").insert(schoolRow as never);
-  if (schoolErr) {
-    redirect("/login?reason=demo_failed");
-  }
-
-  try {
-    await cloneTemplateSchool(supabase, demoSchoolId);
-  } catch {
-    // Roll back the partially-created demo school so we don't leak rows.
-    await teardownDemoSchool(supabase, demoSchoolId).catch(() => {});
+  // One round-trip: the Postgres function creates the school row and clones the
+  // template's classes/sections/subjects/fee structures/students server-side
+  // (see supabase/migrations/0028_demo_rpc.sql) — instead of ~10 sequential
+  // inserts from here.
+  // Untyped supabase-js client → rpc args type is `never`; cast the payloads.
+  const { error } = await supabase.rpc("clone_demo_school", {
+    p_school_id: demoSchoolId,
+    p_code: code,
+    p_academic_year: currentAcademicYear(),
+  } as never);
+  if (error) {
+    // Best-effort cleanup of any partial rows, then bail.
+    await supabase.rpc("teardown_demo_school", { p_school_id: demoSchoolId } as never);
     redirect("/login?reason=demo_failed");
   }
 
@@ -96,7 +86,8 @@ export async function exitDemo(): Promise<void> {
   const cookieStore = await cookies();
   const demo = await verifyDemo(cookieStore.get(DEMO_COOKIE)?.value);
   if (demo) {
-    await teardownDemoSchool(createAnonClient(), demo.demoSchoolId).catch(() => {});
+    // One round-trip server-side teardown (see 0028_demo_rpc.sql).
+    await createAnonClient().rpc("teardown_demo_school", { p_school_id: demo.demoSchoolId } as never);
   }
   cookieStore.delete(DEMO_COOKIE);
   redirect("/login");

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { teardownDemoSchool } from "@/lib/demo-seed";
 import { DEMO_TTL_SECONDS } from "@/lib/demo";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +36,7 @@ export async function GET(req: Request) {
   let removed = 0;
   for (const s of (data ?? []) as { id: string }[]) {
     try {
-      await teardownDemoSchool(supabase, s.id);
+      await supabase.rpc("teardown_demo_school", { p_school_id: s.id } as never);
       removed++;
     } catch {
       // skip — next sweep retries
