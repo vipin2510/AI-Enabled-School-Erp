@@ -37,3 +37,20 @@ body {
   border-radius: 14px;
   box-shadow: 0 1px 2px rgba(28, 25, 23, 0.04), 0 1px 3px rgba(28, 25, 23, 0.03);
 }
+
+/* Demo guided-tour (driver.js). The message popover gets a THIN branded border;
+   the highlighted section (the focus box) gets a THICKER one so the eye lands on
+   the feature first, then the explanation. */
+.driver-popover.demo-tour-popover {
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+}
+.driver-popover.demo-tour-popover .driver-popover-arrow {
+  border-color: var(--accent);
+}
+/* The focused section (driver raises this element above the overlay). */
+.driver-active-element {
+  outline: 4px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 8px;
+}

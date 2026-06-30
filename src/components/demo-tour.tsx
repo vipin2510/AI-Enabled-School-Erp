@@ -87,6 +87,7 @@ export default function DemoTour({ department }: { department: Department }) {
       const d = driver({
         showProgress: true,
         allowClose: true,
+        popoverClass: "demo-tour-popover",
         overlayColor: "rgba(0,0,0,0.6)",
         nextBtnText: t("Next"),
         prevBtnText: t("Back"),
