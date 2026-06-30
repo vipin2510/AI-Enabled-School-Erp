@@ -37,3 +37,4 @@ See `supabase/migrations/0001_init_fees.sql`. Key tables:
 - `late_fee_settings`
 
 RLS is disabled for v1 (no auth yet). Enable + write policies before going live.
+ch
