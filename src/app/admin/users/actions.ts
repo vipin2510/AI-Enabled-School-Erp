@@ -111,47 +111,77 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
     },
   };
 
-  const { error } = await admin.auth.admin.createUser(payload);
+  const created = await admin.auth.admin.createUser(payload);
+  let userId = created.data?.user?.id ?? null;
+  let clearedLeftover = false;
 
-  if (error) {
+  if (created.error) {
     // auth.users is a single global table (shared across groups). "Already
     // registered" can mean: a real login exists (this or another group), or a
-    // leftover ORPHAN auth user with no profile (a half-failed delete). For an
-    // orphan, reclaim it and retry so the admin isn't stuck on an invisible row.
-    if (isAlreadyRegistered(error.message)) {
-      const { data: existing } = await admin
-        .from("profiles")
-        .select("id, group_id")
-        .or(`phone.eq.${phone},email.eq.${email}`)
-        .limit(1);
-      const prof = existing?.[0] as { id: string; group_id: string | null } | undefined;
-      if (prof) {
-        return {
-          error:
-            prof.group_id === me.group_id
-              ? "That phone number already has a login in this group."
-              : "That phone number is registered under another franchise.",
-        };
-      }
-      // No profile anywhere → orphaned auth user. Clear it and retry once.
-      const orphanId = await findAuthUserIdByEmail(admin, email);
-      if (!orphanId) {
-        return { error: "That number is already registered but couldn't be located to reset. Contact support." };
-      }
-      const del = await admin.auth.admin.deleteUser(orphanId);
-      if (del.error) {
-        return { error: `Couldn't clear a leftover login for that number: ${del.error.message}` };
-      }
-      const retry = await admin.auth.admin.createUser(payload);
-      if (retry.error) return { error: retry.error.message };
-      revalidatePath("/admin/users");
-      return { success: `Login created for ${phone} (cleared a leftover account first).` };
+    // leftover ORPHAN auth user with no profile. For an orphan, reclaim it and
+    // retry so the admin isn't stuck on an invisible row.
+    if (!isAlreadyRegistered(created.error.message)) {
+      return { error: created.error.message };
     }
-    return { error: error.message };
+    const { data: existing } = await admin
+      .from("profiles")
+      .select("id, group_id")
+      .or(`phone.eq.${phone},email.eq.${email}`)
+      .limit(1);
+    const prof = existing?.[0] as { id: string; group_id: string | null } | undefined;
+    if (prof) {
+      return {
+        error:
+          prof.group_id === me.group_id
+            ? "That phone number already has a login in this group."
+            : "That phone number is registered under another franchise.",
+      };
+    }
+    // No profile anywhere → orphaned auth user. Clear it and retry once.
+    const orphanId = await findAuthUserIdByEmail(admin, email);
+    if (!orphanId) {
+      return { error: "That number is already registered but couldn't be located to reset. Contact support." };
+    }
+    const del = await admin.auth.admin.deleteUser(orphanId);
+    if (del.error) {
+      return { error: `Couldn't clear a leftover login for that number: ${del.error.message}` };
+    }
+    const retry = await admin.auth.admin.createUser(payload);
+    if (retry.error) return { error: retry.error.message };
+    userId = retry.data?.user?.id ?? null;
+    clearedLeftover = true;
+  }
+
+  if (!userId) return { error: "The login was created but returned no id — check the Users list." };
+
+  // Write the profile EXPLICITLY rather than trusting the handle_new_user DB
+  // trigger: on this database that trigger isn't creating profiles, which left
+  // every new login as an orphaned auth user (invisible in the admin list).
+  // Upsert on id so it's harmless if the trigger *did* fire on another env.
+  const { error: profErr } = await admin.from("profiles").upsert(
+    {
+      id: userId,
+      email,
+      phone,
+      full_name,
+      role,
+      department,
+      school_ids: finalSchoolIds,
+      group_id: me.group_id,
+      is_active: true,
+    },
+    { onConflict: "id" },
+  );
+  if (profErr) {
+    return { error: `Login created but profile setup failed: ${profErr.message}` };
   }
 
   revalidatePath("/admin/users");
-  return { success: `Login created for ${phone}.` };
+  return {
+    success: clearedLeftover
+      ? `Login created for ${phone} (cleared a leftover account first).`
+      : `Login created for ${phone}.`,
+  };
 }
 
 export async function setUserActive(formData: FormData) {
