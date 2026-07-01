@@ -33,6 +33,26 @@ const CreateUserSchema = z
 
 export type ActionState = { error?: string; success?: string } | undefined;
 
+type AdminClient = ReturnType<typeof createAdminClient>;
+
+function isAlreadyRegistered(msg: string): boolean {
+  return /already.*registered|already been registered|already exists/i.test(msg);
+}
+
+// auth.users has no getByEmail in the JS admin API, so page through it. The
+// tenant is small; this is only hit on the rare "already registered" retry.
+async function findAuthUserIdByEmail(admin: AdminClient, email: string): Promise<string | null> {
+  const wanted = email.toLowerCase();
+  for (let page = 1; page < 50; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error || !data) return null;
+    const hit = data.users.find((u) => (u.email ?? "").toLowerCase() === wanted);
+    if (hit) return hit.id;
+    if (data.users.length < 1000) return null;
+  }
+  return null;
+}
+
 export async function createUser(_prev: ActionState, formData: FormData): Promise<ActionState> {
   // New users are created INSIDE the creating admin's group — a Tagore admin
   // can only mint Tagore logins, scoped to Tagore schools. This is the gate
@@ -74,9 +94,10 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
   // Supabase's email provider (the Phone provider is disabled at the project
   // level). See src/app/actions/auth.ts for the matching login flow.
   const admin = createAdminClient();
-  const { error } = await admin.auth.admin.createUser({
+  const email = `${phone}@phone.local`;
+  const payload = {
     phone,
-    email: `${phone}@phone.local`,
+    email,
     password,
     phone_confirm: true,
     email_confirm: true,
@@ -88,9 +109,44 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
       school_ids: finalSchoolIds,
       group_id: me.group_id,
     },
-  });
+  };
+
+  const { error } = await admin.auth.admin.createUser(payload);
 
   if (error) {
+    // auth.users is a single global table (shared across groups). "Already
+    // registered" can mean: a real login exists (this or another group), or a
+    // leftover ORPHAN auth user with no profile (a half-failed delete). For an
+    // orphan, reclaim it and retry so the admin isn't stuck on an invisible row.
+    if (isAlreadyRegistered(error.message)) {
+      const { data: existing } = await admin
+        .from("profiles")
+        .select("id, group_id")
+        .or(`phone.eq.${phone},email.eq.${email}`)
+        .limit(1);
+      const prof = existing?.[0] as { id: string; group_id: string | null } | undefined;
+      if (prof) {
+        return {
+          error:
+            prof.group_id === me.group_id
+              ? "That phone number already has a login in this group."
+              : "That phone number is registered under another franchise.",
+        };
+      }
+      // No profile anywhere → orphaned auth user. Clear it and retry once.
+      const orphanId = await findAuthUserIdByEmail(admin, email);
+      if (!orphanId) {
+        return { error: "That number is already registered but couldn't be located to reset. Contact support." };
+      }
+      const del = await admin.auth.admin.deleteUser(orphanId);
+      if (del.error) {
+        return { error: `Couldn't clear a leftover login for that number: ${del.error.message}` };
+      }
+      const retry = await admin.auth.admin.createUser(payload);
+      if (retry.error) return { error: retry.error.message };
+      revalidatePath("/admin/users");
+      return { success: `Login created for ${phone} (cleared a leftover account first).` };
+    }
     return { error: error.message };
   }
 
@@ -116,11 +172,12 @@ export async function setUserActive(formData: FormData) {
   revalidatePath("/admin/users");
 }
 
-// Hard-delete a login. The on_auth_user_created trigger inserts a profile
-// row on signup, but the FK cascade (profiles.id -> auth.users.id ON DELETE
-// CASCADE) removes the profile when we delete the auth user. We still nuke
-// the profile row explicitly first in case the cascade isn't set up on a
-// given environment.
+// Hard-delete a login. Delete the AUTH user first: the FK cascade
+// (profiles.id -> auth.users.id ON DELETE CASCADE) removes the profile with
+// it. Doing it in this order — and checking the error — means a failed delete
+// never leaves an orphaned auth user (invisible in the list, but still holding
+// the email/phone and blocking re-creation). The old order (profile first,
+// auth delete ignored) is exactly what produced those orphans.
 export async function deleteUser(formData: FormData) {
   const me = await requireRole("admin");
   if (me.is_demo) return;
@@ -137,8 +194,15 @@ export async function deleteUser(formData: FormData) {
     .maybeSingle();
   if (!target || (target as { group_id: string | null }).group_id !== me.group_id) return;
 
+  const { error } = await admin.auth.admin.deleteUser(id);
+  if (error) {
+    // Don't proceed to remove the profile — leaving both in place keeps the
+    // user visible/recoverable instead of orphaning the auth row.
+    console.error("[admin/users] deleteUser auth delete failed:", error.message);
+    return;
+  }
+  // Belt-and-braces in case ON DELETE CASCADE isn't configured on this env.
   await admin.from("profiles").delete().eq("id", id).eq("group_id", me.group_id);
-  await admin.auth.admin.deleteUser(id);
   revalidatePath("/admin/users");
 }
 
