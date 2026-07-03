@@ -7,11 +7,13 @@ import {
   SCHOOLS,
   type Role,
   type Department,
+  type School,
 } from "@/lib/access";
 import { formatDate } from "@/lib/utils";
 import CreateUserForm from "./create-user-form";
+import EditUserForm from "./edit-user-form";
 import DeleteUserButton from "./delete-user-button";
-import { setUserActive, setUserDepartment } from "./actions";
+import { setUserActive } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -57,13 +59,25 @@ export default async function UsersPage() {
       </section>
 
       <Suspense fallback={<TableSkeleton />}>
-        <UsersTable currentUserId={me.id} groupId={me.group_id} />
+        <UsersTable
+          currentUserId={me.id}
+          groupId={me.group_id}
+          schools={SCHOOLS.filter((s) => s.groupId === me.group_id)}
+        />
       </Suspense>
     </div>
   );
 }
 
-async function UsersTable({ currentUserId, groupId }: { currentUserId: string; groupId: string }) {
+async function UsersTable({
+  currentUserId,
+  groupId,
+  schools,
+}: {
+  currentUserId: string;
+  groupId: string;
+  schools: School[];
+}) {
   let users: ProfileRow[] = [];
   let loadError: string | null = null;
 
@@ -119,28 +133,7 @@ async function UsersTable({ currentUserId, groupId }: { currentUserId: string; g
               <td className="px-4 py-2 text-stone-600">{u.phone || u.email || "—"}</td>
               <td className="px-4 py-2">{ROLE_LABELS[u.role] ?? u.role ?? "—"}</td>
               <td className="px-4 py-2">
-                {u.role === "staff" && u.id !== currentUserId ? (
-                  <form action={setUserDepartment} className="inline-flex items-center gap-1">
-                    <input type="hidden" name="id" value={u.id} />
-                    <select
-                      name="department"
-                      defaultValue={u.department ?? ""}
-                      className="rounded border border-stone-300 bg-white px-1.5 py-0.5 text-xs"
-                      aria-label="Change department"
-                    >
-                      <option value="">—</option>
-                      <option value="fees">Fees</option>
-                      <option value="academics">Academics</option>
-                      <option value="library">Library</option>
-                      <option value="results">Results</option>
-                    </select>
-                    <button className="text-xs text-stone-500 hover:text-stone-900 hover:underline">
-                      Save
-                    </button>
-                  </form>
-                ) : (
-                  <span>{u.department ? (DEPARTMENT_LABELS[u.department] ?? u.department) : "—"}</span>
-                )}
+                <span>{u.department ? (DEPARTMENT_LABELS[u.department] ?? u.department) : "—"}</span>
               </td>
               <td className="px-4 py-2 text-stone-600">
                 {u.role === "admin"
@@ -160,6 +153,18 @@ async function UsersTable({ currentUserId, groupId }: { currentUserId: string; g
                   <span className="text-xs text-stone-400">You</span>
                 ) : (
                   <div className="inline-flex items-center gap-3">
+                    <EditUserForm
+                      user={{
+                        id: u.id,
+                        full_name: u.full_name,
+                        phone: u.phone,
+                        email: u.email,
+                        role: u.role,
+                        department: u.department,
+                        school_ids: u.school_ids ?? [],
+                      }}
+                      schools={schools}
+                    />
                     <form action={setUserActive}>
                       <input type="hidden" name="id" value={u.id} />
                       <input type="hidden" name="active" value={u.is_active ? "false" : "true"} />

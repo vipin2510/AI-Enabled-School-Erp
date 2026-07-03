@@ -184,6 +184,93 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
   };
 }
 
+// Editable access: change a user's role, department and school assignment
+// after creation. Same rules as creation (staff → exactly one school + a
+// department; admin → every school in the group; manager → any subset), and
+// scoped to the caller's own group so no cross-group edits are possible.
+const UpdateUserSchema = z
+  .object({
+    id: z.string().min(1),
+    role: z.enum(["admin", "manager", "staff"]),
+    department: z.enum(["fees", "academics", "library", "results"]).nullable(),
+    school_ids: z.array(z.string().min(1)).min(1, "Select at least one school."),
+  })
+  .refine((d) => d.role !== "staff" || d.department !== null, {
+    message: "Staff must be assigned a department.",
+    path: ["department"],
+  })
+  .refine((d) => d.role !== "staff" || d.school_ids.length === 1, {
+    message: "Staff must be assigned to exactly one school.",
+    path: ["school_ids"],
+  });
+
+export async function updateUserAccess(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const me = await requireRole("admin");
+  if (me.is_demo) return { error: "Editing access is disabled in the demo." };
+  const groupSchoolIds = SCHOOLS.filter((s) => s.groupId === me.group_id).map((s) => s.id);
+
+  const rawDept = String(formData.get("department") ?? "");
+  const rawSchools = formData.getAll("school_ids").map((v) => String(v)).filter(Boolean);
+  const parsed = UpdateUserSchema.safeParse({
+    id: String(formData.get("id") ?? ""),
+    role: String(formData.get("role") ?? ""),
+    department: rawDept === "" ? null : rawDept,
+    school_ids: rawSchools,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  const { id, role, school_ids } = parsed.data;
+  // Never let an admin change their own access (they could lock themselves out).
+  if (id === me.id) return { error: "You can't change your own access." };
+  // Reject any school outside the admin's own group.
+  if (!school_ids.every((sid) => groupSchoolIds.includes(sid))) {
+    return { error: "Unknown school id." };
+  }
+  // Admin/manager are cross-department; admin auto-spans every school.
+  const department = role === "staff" ? parsed.data.department : null;
+  const finalSchoolIds = role === "admin" ? groupSchoolIds : school_ids;
+
+  const admin = createAdminClient();
+  // Verify the target is in the caller's group before mutating (the update is
+  // group-scoped too, but this gives a clear error instead of a silent no-op).
+  const { data: target } = await admin
+    .from("profiles")
+    .select("full_name, phone, group_id")
+    .eq("id", id)
+    .maybeSingle();
+  const t = target as { full_name: string | null; phone: string | null; group_id: string | null } | null;
+  if (!t || t.group_id !== me.group_id) {
+    return { error: "That user isn't in your group." };
+  }
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ role, department, school_ids: finalSchoolIds })
+    .eq("id", id)
+    .eq("group_id", me.group_id);
+  if (error) {
+    return { error: `Couldn't update access: ${error.message}` };
+  }
+
+  // Keep the auth user_metadata in sync with the profile row. Re-send the
+  // existing name/phone so this shallow-merge update doesn't clobber them.
+  await admin.auth.admin.updateUserById(id, {
+    user_metadata: {
+      full_name: t.full_name ?? "",
+      phone: t.phone ?? "",
+      role,
+      department: department ?? "",
+      school_ids: finalSchoolIds,
+      group_id: me.group_id,
+    },
+  });
+
+  revalidatePath("/admin/users");
+  return { success: "Access updated." };
+}
+
 export async function setUserActive(formData: FormData) {
   const me = await requireRole("admin");
   if (me.is_demo) return;
@@ -233,39 +320,5 @@ export async function deleteUser(formData: FormData) {
   }
   // Belt-and-braces in case ON DELETE CASCADE isn't configured on this env.
   await admin.from("profiles").delete().eq("id", id).eq("group_id", me.group_id);
-  revalidatePath("/admin/users");
-}
-
-// Reassign a user's department (staff only — admin/manager are cross-dept
-// so we coerce their department to null). Pass department="" to clear.
-export async function setUserDepartment(formData: FormData) {
-  const me = await requireRole("admin");
-  if (me.is_demo) return;
-  const id = String(formData.get("id") ?? "");
-  const raw = String(formData.get("department") ?? "").trim();
-  if (!id) return;
-
-  const dept = raw === "" ? null : raw;
-  if (dept !== null && !["fees", "academics", "library", "results"].includes(dept)) {
-    return;
-  }
-
-  const admin = createAdminClient();
-  // Read role to enforce: only staff can have a department; admin/manager
-  // are cross-dept and their department must stay null. Scope to the caller's
-  // group so another group's user can't be touched by id.
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("role, group_id")
-    .eq("id", id)
-    .maybeSingle();
-  if (!profile || (profile as { group_id: string | null }).group_id !== me.group_id) return;
-  const finalDept = profile?.role === "staff" ? dept : null;
-
-  await admin
-    .from("profiles")
-    .update({ department: finalDept })
-    .eq("id", id)
-    .eq("group_id", me.group_id);
   revalidatePath("/admin/users");
 }
