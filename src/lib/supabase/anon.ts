@@ -16,7 +16,7 @@ export function createAnonClient() {
   _client = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
+    { db: { schema: "erp" }, auth: { persistSession: false, autoRefreshToken: false } },
   );
   return _client;
 }

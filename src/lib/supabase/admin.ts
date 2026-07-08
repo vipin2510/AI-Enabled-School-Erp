@@ -12,6 +12,7 @@ export function createAdminClient() {
     );
   }
   return createServiceClient(url, key, {
+    db: { schema: "erp" },
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
