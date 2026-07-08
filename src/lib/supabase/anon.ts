@@ -9,11 +9,11 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 // RLS is currently permissive (see CLAUDE.md), so this client and the
 // per-request one see the same rows; the only difference is that this one
 // doesn't try to refresh the user session.
-let _client: ReturnType<typeof createSupabaseClient> | null = null;
+let _client: ReturnType<typeof createSupabaseClient<any, "erp">> | null = null;
 
 export function createAnonClient() {
   if (_client) return _client;
-  _client = createSupabaseClient(
+  _client = createSupabaseClient<any, "erp">(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     { db: { schema: "erp" }, auth: { persistSession: false, autoRefreshToken: false } },
