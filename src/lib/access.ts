@@ -263,6 +263,7 @@ export const DEPARTMENT_NAV: Record<Department, NavItem[]> = {
     { href: "/receipts", label: "Receipts" },
     { href: "/settings/late-fee", label: "Settings", leaderOnly: true },
     { href: "/settings/fees-print-layout", label: "Print Layout", leaderOnly: true },
+    { href: "/settings/document-fonts", label: "Document Fonts", leaderOnly: true },
   ],
   academics: [
     { href: "/academics", label: "Dashboard" },
@@ -273,6 +274,7 @@ export const DEPARTMENT_NAV: Record<Department, NavItem[]> = {
     { href: "/academics/timetable", label: "Timetable" },
     { href: "/academics/signatures", label: "Signatures", leaderOnly: true },
     { href: "/academics/id-cards", label: "ID Cards" },
+    { href: "/settings/document-fonts", label: "Document Fonts", leaderOnly: true },
   ],
   library: [
     { href: "/library/dashboard", label: "Dashboard" },

@@ -1,5 +1,6 @@
 /* eslint-disable jsx-a11y/alt-text */
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
+import { boldOf } from "@/lib/pdf-settings";
 
 export type IdCardStudent = {
   full_name: string;
@@ -36,14 +37,16 @@ function fmtDob(s: string | null): string {
   const d = new Date(s);
   if (isNaN(d.getTime())) return s;
   const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()}`;
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
-function stylesFor(cardW: number, cardH: number) {
-  // Scale type to the card so 6×9cm and larger both read well.
-  const base = Math.max(5, Math.min(8, cardW / 24));
+function stylesFor(cardW: number, cardH: number, font = "Helvetica", fontScale = 1) {
+  // Scale type to the card so 6×9cm and larger both read well. `fontScale` is
+  // the per-school size multiplier from settings.
+  const base = Math.max(5, Math.min(8, cardW / 24)) * fontScale;
+  const bold = boldOf(font);
   return StyleSheet.create({
-    page: { padding: 16, flexDirection: "row", flexWrap: "wrap", alignContent: "flex-start" },
+    page: { padding: 16, flexDirection: "row", flexWrap: "wrap", alignContent: "flex-start", fontFamily: font },
     card: {
       width: cardW,
       height: cardH,
@@ -67,14 +70,14 @@ function stylesFor(cardW: number, cardH: number) {
     schoolName: {
       color: "#ffffff",
       fontSize: base + 1.5,
-      fontFamily: "Helvetica-Bold",
+      fontFamily: bold,
       textAlign: "center",
       letterSpacing: 0.4,
     },
     cityLine: {
       color: "#ffffff",
       fontSize: base + 0.5,
-      fontFamily: "Helvetica-Bold",
+      fontFamily: bold,
       textAlign: "center",
       letterSpacing: 0.3,
     },
@@ -87,7 +90,7 @@ function stylesFor(cardW: number, cardH: number) {
     schoolCodeLine: {
       color: "#ffffff",
       fontSize: base - 0.8,
-      fontFamily: "Helvetica-Bold",
+      fontFamily: bold,
       textAlign: "center",
       marginTop: 1,
     },
@@ -101,7 +104,7 @@ function stylesFor(cardW: number, cardH: number) {
     contactCell: {
       color: "#ffffff",
       fontSize: base - 1.5,
-      fontFamily: "Helvetica-Bold",
+      fontFamily: bold,
     },
 
     // ── Body ─────────────────────────────────────────────────────────────
@@ -113,13 +116,13 @@ function stylesFor(cardW: number, cardH: number) {
       marginBottom: 4,
     },
     admBlock: { flexDirection: "column" },
-    admText: { fontSize: base, fontFamily: "Helvetica-Bold", color: "#111111" },
+    admText: { fontSize: base, fontFamily: bold, color: "#111111" },
     categoryBadge: {
       marginTop: 2,
       paddingHorizontal: 4,
       paddingVertical: 1,
       fontSize: base - 1.5,
-      fontFamily: "Helvetica-Bold",
+      fontFamily: bold,
       color: "#ffffff",
       backgroundColor: NAME_GREEN,
       alignSelf: "flex-start",
@@ -128,12 +131,12 @@ function stylesFor(cardW: number, cardH: number) {
     sessionBlock: { flexDirection: "column", alignItems: "flex-end" },
     sessionLabel: {
       fontSize: base - 0.5,
-      fontFamily: "Helvetica-Bold",
+      fontFamily: bold,
       color: "#c0392b",
     },
     sessionValue: {
       fontSize: base + 0.5,
-      fontFamily: "Helvetica-Bold",
+      fontFamily: bold,
       color: "#c0392b",
     },
 
@@ -169,7 +172,7 @@ function stylesFor(cardW: number, cardH: number) {
 
     name: {
       fontSize: base + 3,
-      fontFamily: "Helvetica-Bold",
+      fontFamily: bold,
       color: NAME_GREEN,
       textAlign: "center",
       marginTop: 1,
@@ -181,13 +184,13 @@ function stylesFor(cardW: number, cardH: number) {
     label: {
       width: cardW * 0.34,
       fontSize: base - 0.2,
-      fontFamily: "Helvetica-Bold",
+      fontFamily: bold,
       color: "#111111",
     },
     value: {
       flex: 1,
       fontSize: base - 0.2,
-      fontFamily: "Helvetica-Bold",
+      fontFamily: bold,
       color: "#111111",
     },
 
@@ -302,6 +305,8 @@ export function IdCardSheet({
   cardW,
   cardH,
   perPage,
+  font = "Helvetica",
+  fontScale = 1,
 }: {
   students: IdCardStudent[];
   session: string;
@@ -310,8 +315,10 @@ export function IdCardSheet({
   cardW: number;
   cardH: number;
   perPage: number;
+  font?: string;
+  fontScale?: number;
 }) {
-  const styles = stylesFor(cardW, cardH);
+  const styles = stylesFor(cardW, cardH, font, fontScale);
   const pages: IdCardStudent[][] = [];
   for (let i = 0; i < students.length; i += perPage) {
     pages.push(students.slice(i, i + perPage));

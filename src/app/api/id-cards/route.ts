@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { assetDataUrl } from "@/lib/pdf-assets";
+import { loadSchoolPdfSettings } from "@/lib/pdf-settings";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole, getCurrentSchoolId } from "@/lib/auth";
 import { findSchool } from "@/lib/access";
@@ -168,6 +169,9 @@ export async function GET(req: Request) {
     })
   );
 
+  // Per-school configurable ID-card font (family + size multiplier).
+  const pdfSettings = await loadSchoolPdfSettings(supabase, schoolId);
+
   const buf = await renderToBuffer(
     IdCardSheet({
       students: cards,
@@ -177,6 +181,8 @@ export async function GET(req: Request) {
       cardW: wCm * CM,
       cardH: hCm * CM,
       perPage: studentId ? 1 : perPage,
+      font: pdfSettings.id_card_font_family,
+      fontScale: pdfSettings.id_card_font_scale,
     }) as never
   );
 

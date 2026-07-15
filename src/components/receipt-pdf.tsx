@@ -86,11 +86,11 @@ const BOX_PAD_X = 18;
 // All sizes are derived from `scale` so denser grids shrink uniformly.
 // Border widths stay at 1 (hairlines) — scaling them below 1 makes the cut
 // guides vanish on print.
-function makeStyles(scale: number) {
+function makeStyles(scale: number, fontFamily = "Helvetica") {
   const u = (n: number) => n * scale;
   return StyleSheet.create({
     page: {
-      fontFamily: "Helvetica",
+      fontFamily,
       fontSize: u(9),
       flexDirection: "column",
     },
@@ -186,10 +186,10 @@ function inr(n: number | string) {
 }
 
 function fmtDate(s: string) {
-  return new Date(s).toLocaleDateString("en-IN", {
+  return new Date(s).toLocaleDateString("en-GB", {
     timeZone: "Asia/Kolkata",
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
     year: "numeric",
   });
 }
@@ -341,11 +341,15 @@ export function ReceiptPdf({
   logoDataUrl,
   layout = DEFAULT_RECEIPT_LAYOUT,
   branding = DEFAULT_RECEIPT_BRANDING,
+  fontFamily = "Helvetica",
+  fontScale = 1,
 }: {
   invoice: Invoice;
   logoDataUrl: string;
   layout?: ReceiptLayout;
   branding?: ReceiptBranding;
+  fontFamily?: string;
+  fontScale?: number;
 }) {
   const t = computeTiling(layout);
   const { cols, rows, perPage } = t;
@@ -355,8 +359,9 @@ export function ReceiptPdf({
   // lays out in the cell's *swapped* dimensions — width = box height, height =
   // box width — and the scale follows those swapped dims against the ~198×140
   // baseline so the type fills the rotated card instead of the upright cell.
-  const contentScale = Math.min(1.5, Math.max(0.4, Math.min(t.boxHmm / 198, t.boxWmm / 140)));
-  const styles = makeStyles(contentScale);
+  const contentScale =
+    Math.min(1.5, Math.max(0.4, Math.min(t.boxHmm / 198, t.boxWmm / 140))) * fontScale;
+  const styles = makeStyles(contentScale, fontFamily);
 
   // We print exactly the School and Student copy — nothing more. On a grid
   // with more than two cells (e.g. 2×2) the two copies fill the top row and

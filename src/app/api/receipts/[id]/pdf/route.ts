@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
-import path from "node:path";
-import fs from "node:fs/promises";
+import { assetDataUrl } from "@/lib/pdf-assets";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile, getCurrentSchoolId } from "@/lib/auth";
 import { findSchool, findGroup, DEMO_GROUP } from "@/lib/access";
 import { makeDemoSchool } from "@/lib/demo";
 import { getFeePrintLayout } from "@/lib/cache";
+import { loadSchoolPdfSettings } from "@/lib/pdf-settings";
 import { ReceiptPdf, type ReceiptBranding } from "@/components/receipt-pdf";
 
 export const dynamic = "force-dynamic";
@@ -41,10 +41,7 @@ export async function GET(
   const school = profile.is_demo ? makeDemoSchool(schoolId) : findSchool(schoolId);
   const group = profile.is_demo ? DEMO_GROUP : school ? findGroup(school.groupId) : null;
   const logoRel = group?.logoPath ?? "/letterhead/aps-logo.jpeg";
-  const logoPath = path.join(process.cwd(), "public", logoRel);
-  const logoBytes = await fs.readFile(logoPath);
-  const mime = logoRel.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg";
-  const logoDataUrl = `data:${mime};base64,${logoBytes.toString("base64")}`;
+  const logoDataUrl = await assetDataUrl(logoRel);
 
   // Header text from the school record (name + affiliation + code/phone).
   const branding: ReceiptBranding | undefined = school
@@ -66,8 +63,18 @@ export async function GET(
   // the historic 2-up portrait if unset or the table isn't migrated yet.
   const layout = await getFeePrintLayout(schoolId);
 
+  // Per-school configurable receipt font (family + size multiplier).
+  const pdfSettings = await loadSchoolPdfSettings(supabase, schoolId);
+
   const buf = await renderToBuffer(
-    ReceiptPdf({ invoice: invoice as never, logoDataUrl, layout, branding }) as never
+    ReceiptPdf({
+      invoice: invoice as never,
+      logoDataUrl,
+      layout,
+      branding,
+      fontFamily: pdfSettings.receipt_font_family,
+      fontScale: pdfSettings.receipt_font_scale,
+    }) as never
   );
 
   return new NextResponse(buf as unknown as BodyInit, {
