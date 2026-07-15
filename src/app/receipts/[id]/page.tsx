@@ -6,6 +6,7 @@ import { inr, formatDate } from "@/lib/utils";
 import ReceiptStatus from "./receipt-status";
 import { DownloadButton } from "@/components/ui/download-button";
 import { PreviewButton } from "@/components/ui/preview-button";
+import { DeleteReceiptButton } from "./delete-receipt-button";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,7 @@ export default async function ReceiptPage({
           >
             ⤓ Download PDF
           </DownloadButton>
+          {profile.role === "admin" && <DeleteReceiptButton invoiceId={invoice.id} />}
         </div>
       </div>
 
