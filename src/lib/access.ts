@@ -271,6 +271,7 @@ export const DEPARTMENT_NAV: Record<Department, NavItem[]> = {
     { href: "/academics/classes", label: "Classes & Sections" },
     { href: "/academics/subjects", label: "Subjects" },
     { href: "/academics/timetable", label: "Timetable" },
+    { href: "/academics/signatures", label: "Signatures", leaderOnly: true },
     { href: "/academics/id-cards", label: "ID Cards" },
   ],
   library: [

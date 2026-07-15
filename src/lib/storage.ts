@@ -26,3 +26,29 @@ export async function uploadStudentPhoto(
 
   return admin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 }
+
+const SIGNATURE_BUCKET = "signatures";
+
+// Upload a signature image (class-teacher or principal) to the public
+// `signatures` bucket and return its public URL. Service-role client bypasses
+// RLS. Returns null for an empty/absent file so callers can leave it blank.
+export async function uploadSignature(
+  scope: string, // e.g. `${schoolId}/${classId}-${section}` or `${schoolId}/principal`
+  file: File | null
+): Promise<string | null> {
+  if (!file || file.size === 0) return null;
+
+  const admin = createAdminClient();
+  const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "");
+  // Time-stamped name busts the CDN cache when a signature is replaced.
+  const path = `${scope}-${Date.now()}.${ext || "png"}`;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+
+  const { error } = await admin.storage.from(SIGNATURE_BUCKET).upload(path, bytes, {
+    contentType: file.type || "image/png",
+    upsert: true,
+  });
+  if (error) throw new Error(error.message);
+
+  return admin.storage.from(SIGNATURE_BUCKET).getPublicUrl(path).data.publicUrl;
+}
