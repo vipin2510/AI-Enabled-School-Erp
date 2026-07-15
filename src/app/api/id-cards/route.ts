@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
-import path from "node:path";
-import fs from "node:fs/promises";
+import { assetDataUrl } from "@/lib/pdf-assets";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole, getCurrentSchoolId } from "@/lib/auth";
 import { findSchool } from "@/lib/access";
@@ -16,6 +15,10 @@ import {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+// Upper bound on students rendered into a single ID-card sheet per invocation.
+// Comfortably above any real class/section; guards against a runaway render.
+const MAX_SHEET = 120;
 
 const STUDENT_SELECT =
   "id, full_name, admission_no, section, date_of_birth, blood_group, father_name, contact_number, address, category, student_photo_url, classes(display_name)";
@@ -47,6 +50,41 @@ function toCard(r: Row): IdCardStudent {
     category: r.category ?? "regular",
     photoUrl: r.student_photo_url,
   };
+}
+
+// Fetch a remote image and inline it as a base64 data URL. @react-pdf otherwise
+// fetches each image itself *during* render — serially, with no timeout — so a
+// single unreachable/slow/corrupt photo throws and fails the entire sheet
+// ("Download failed"). Resolving them here in parallel, tolerating failures,
+// means a bad photo just falls back to the PHOTO placeholder instead of a 500.
+// Downsize a Supabase-hosted photo to ID-card resolution via the storage
+// image-transform endpoint. Originals are multi-hundred-KB phone photos; a card
+// needs ~300px. This cuts the bytes we fetch, base64-encode, and serialise into
+// the PDF by ~75% — the dominant per-render cost for a class sheet. Non-Supabase
+// or already-parameterised URLs are left untouched.
+function cardPhotoUrl(url: string | null): string | null {
+  if (!url) return null;
+  if (!url.includes("/storage/v1/object/public/") || url.includes("?")) return url;
+  return url.replace("/object/public/", "/render/image/public/") + "?width=300&quality=70";
+}
+
+async function fetchImageDataUrl(url: string | null): Promise<string | null> {
+  if (!url) return null;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(url, { signal: controller.signal }).finally(() =>
+      clearTimeout(timer)
+    );
+    if (!res.ok) return null;
+    const contentType = res.headers.get("content-type") ?? "";
+    if (!contentType.startsWith("image/")) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length === 0) return null;
+    return `data:${contentType};base64,${buf.toString("base64")}`;
+  } catch {
+    return null; // network error, timeout, abort — degrade to placeholder
+  }
 }
 
 // GET /api/id-cards?studentId=...                          → single card
@@ -90,13 +128,22 @@ export async function GET(req: Request) {
     const { data } = await q;
     rows = (data ?? []) as unknown as Row[];
     if (rows.length === 0) return NextResponse.json({ error: "No students found" }, { status: 404 });
+    // Guardrail: the whole sheet is rendered synchronously in one function
+    // invocation (@react-pdf is CPU-bound). A real class is well under this;
+    // a larger request is almost certainly a mistake and would burn a huge
+    // amount of function CPU. Narrow by section instead.
+    if (rows.length > MAX_SHEET) {
+      return NextResponse.json(
+        { error: `Too many students (${rows.length}) for one sheet. Filter by section (max ${MAX_SHEET}).` },
+        { status: 413 }
+      );
+    }
     filename = `id-cards-class.pdf`;
   } else {
     return NextResponse.json({ error: "Provide studentId or classId" }, { status: 400 });
   }
 
-  const logoPath = path.join(process.cwd(), "public", "letterhead", "aps-logo.jpeg");
-  const logoDataUrl = `data:image/jpeg;base64,${(await fs.readFile(logoPath)).toString("base64")}`;
+  const logoDataUrl = await assetDataUrl("letterhead/aps-logo.jpeg");
 
   // Header info for the card — driven by the active school so each branch
   // prints its own identity (Kondagaon / Pharasgaon / Chipawand).
@@ -112,9 +159,18 @@ export async function GET(req: Request) {
     email: meta?.email,
   };
 
+  // Resolve every student photo to an inlined data URL in parallel, tolerating
+  // failures, before handing them to the (synchronous) PDF renderer.
+  const cards = rows.map(toCard);
+  await Promise.all(
+    cards.map(async (c) => {
+      c.photoUrl = await fetchImageDataUrl(cardPhotoUrl(c.photoUrl));
+    })
+  );
+
   const buf = await renderToBuffer(
     IdCardSheet({
-      students: rows.map(toCard),
+      students: cards,
       session: currentAcademicYear(),
       school,
       logoDataUrl,
