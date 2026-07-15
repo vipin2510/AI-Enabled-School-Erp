@@ -1,14 +1,22 @@
 /* eslint-disable jsx-a11y/alt-text */
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
-import type { Timetable } from "@/lib/timetable";
+import { periodsForDay, MAX_PERIOD } from "@/lib/timetable";
 
 export type TimetableMeta = {
-  className: string;
+  title: string; // e.g. class name or teacher name
   schoolName: string;
   schoolLocation: string;
   schoolParentNote?: string | null;
   academicYear: string;
 };
+
+export type Day = { n: number; name: string; full: string };
+
+// key `${day}-${period}` → cell content
+export type ClassCell = { subject: string; teacher: string };
+export type ClassGrid = Record<string, ClassCell>;
+// teacher view: a slot can hold more than one class (scheduling conflicts show up)
+export type TeacherGrid = Record<string, string[]>;
 
 const styles = StyleSheet.create({
   page: { padding: 24, fontSize: 8, fontFamily: "Helvetica", color: "#1c1917" },
@@ -34,41 +42,30 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderRadius: 3,
   },
-  metaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  metaCell: { fontSize: 8 },
-  metaLabel: { color: "#78716c", fontSize: 7, textTransform: "uppercase" },
 
   table: { borderWidth: 1, borderColor: "#d6d3d1", borderRadius: 3, overflow: "hidden" },
   thead: { flexDirection: "row", backgroundColor: "#0f172a" },
   th: { padding: 4, fontWeight: 700, fontSize: 7.5, color: "#ffffff", textAlign: "center" },
   tr: { flexDirection: "row", borderTopWidth: 1, borderTopColor: "#e7e5e4" },
   trAlt: { backgroundColor: "#fafaf9" },
-  td: { padding: 4, fontSize: 7.5, textAlign: "center" },
+  td: { padding: 4, fontSize: 7.5, textAlign: "center", justifyContent: "center" },
 
-  dayCell: { width: 38, fontWeight: 700, justifyContent: "center" },
+  dayCell: { width: 60, fontWeight: 700, justifyContent: "center", textAlign: "left" },
   periodCell: { flex: 1, justifyContent: "center" },
-  lunchRow: {
-    flexDirection: "row",
-    backgroundColor: "#fef3c7",
-    borderTopWidth: 1,
-    borderTopColor: "#e7e5e4",
-    paddingVertical: 4,
-    justifyContent: "center",
-  },
-  lunchText: { fontSize: 7.5, fontWeight: 700, color: "#92400e", letterSpacing: 1 },
+  ctCell: { flex: 1, justifyContent: "center", backgroundColor: "#ecfdf5" },
+  offCell: { flex: 1, justifyContent: "center", backgroundColor: "#f5f5f4" },
 
   subjectName: { fontWeight: 700 },
   teacherName: { fontSize: 6.5, color: "#57534e", marginTop: 1 },
-  freeText: { color: "#a8a29e", fontStyle: "italic" },
+  ctLabel: { fontSize: 6.5, fontWeight: 700, color: "#065f46" },
+  freeText: { color: "#a8a29e" },
 
   legend: { marginTop: 12, fontSize: 7, color: "#57534e" },
-  sigRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 28 },
-  sigBox: {
-    width: 140,
+  sigRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 24 },
+  sigBox: { width: 150, alignItems: "center" },
+  sigImg: { height: 30, marginBottom: 2, objectFit: "contain" },
+  sigLine: {
+    width: 150,
     borderTopWidth: 1,
     borderTopColor: "#78716c",
     paddingTop: 3,
@@ -77,125 +74,169 @@ const styles = StyleSheet.create({
   },
 });
 
-function timeRange(start: string, end: string): string {
-  return `${start}\n–\n${end}`;
+function Header({ meta, logoDataUrl }: { meta: TimetableMeta; logoDataUrl: string }) {
+  return (
+    <View style={styles.headerRow}>
+      <Image src={logoDataUrl} style={styles.logo} />
+      <View>
+        <Text style={styles.schoolName}>{meta.schoolName.toUpperCase()}</Text>
+        <Text style={styles.schoolSub}>{meta.schoolLocation}</Text>
+        {meta.schoolParentNote ? <Text style={styles.schoolSub}>{meta.schoolParentNote}</Text> : null}
+      </View>
+    </View>
+  );
 }
 
-export function TimetablePdf({
+function PeriodHead() {
+  const periods = Array.from({ length: MAX_PERIOD }, (_, i) => i + 1);
+  return (
+    <View style={styles.thead}>
+      <Text style={[styles.th, styles.dayCell]}>Day</Text>
+      {periods.map((p) => (
+        <Text key={p} style={[styles.th, styles.periodCell]}>
+          P{p}
+          {p === 1 ? "\n(CT)" : ""}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+export function ClassTimetablePdf({
   meta,
-  timetable,
+  days,
+  grid,
+  classTeacherName,
   logoDataUrl,
+  classTeacherSignatureUrl,
+  principalSignatureUrl,
 }: {
   meta: TimetableMeta;
-  timetable: Timetable;
+  days: Day[];
+  grid: ClassGrid;
+  classTeacherName: string | null;
   logoDataUrl: string;
+  classTeacherSignatureUrl?: string | null;
+  principalSignatureUrl?: string | null;
 }) {
-  const { slots, lunchSlot, days, grid } = timetable;
-  // Insert the lunch column between morning and afternoon periods so the
-  // printout matches the on-screen grid.
-  const renderRow = (dayIndex: number, label: string, alt: boolean) => {
-    const cells: React.ReactNode[] = [];
-    cells.push(
-      <View key="day" style={[styles.td, styles.dayCell]}>
-        <Text>{label}</Text>
-      </View>
-    );
-    for (const slot of slots) {
-      const cell = grid[dayIndex][slot.index - 1];
-      cells.push(
-        <View key={`p-${slot.index}`} style={[styles.td, styles.periodCell]}>
-          {"free" in cell ? (
-            <Text style={styles.freeText}>Free</Text>
-          ) : (
-            <>
-              <Text style={styles.subjectName}>{cell.subject}</Text>
-              {cell.teacher ? <Text style={styles.teacherName}>{cell.teacher}</Text> : null}
-            </>
-          )}
-        </View>
-      );
-    }
-    return (
-      <View key={`row-${dayIndex}`} style={[styles.tr, alt ? styles.trAlt : {}]}>
-        {cells}
-      </View>
-    );
-  };
-
+  const periods = Array.from({ length: MAX_PERIOD }, (_, i) => i + 1);
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={styles.page}>
-        <View style={styles.headerRow}>
-          <Image src={logoDataUrl} style={styles.logo} />
-          <View>
-            <Text style={styles.schoolName}>{meta.schoolName.toUpperCase()}</Text>
-            <Text style={styles.schoolSub}>{meta.schoolLocation}</Text>
-            {meta.schoolParentNote ? (
-              <Text style={styles.schoolSub}>{meta.schoolParentNote}</Text>
-            ) : null}
-          </View>
-        </View>
-
+        <Header meta={meta} logoDataUrl={logoDataUrl} />
         <Text style={styles.title}>
-          CLASS TIMETABLE · {meta.className.toUpperCase()} · {meta.academicYear}
+          CLASS TIMETABLE · {meta.title.toUpperCase()} · {meta.academicYear}
         </Text>
 
-        <View style={styles.metaRow}>
-          <View style={styles.metaCell}>
-            <Text style={styles.metaLabel}>Variant</Text>
-            <Text style={{ fontWeight: 700 }}>{timetable.label}</Text>
-          </View>
-          <View style={styles.metaCell}>
-            <Text style={styles.metaLabel}>Days / week</Text>
-            <Text style={{ fontWeight: 700 }}>{days.length}</Text>
-          </View>
-          <View style={styles.metaCell}>
-            <Text style={styles.metaLabel}>Periods / day</Text>
-            <Text style={{ fontWeight: 700 }}>{slots.length}</Text>
-          </View>
-          <View style={styles.metaCell}>
-            <Text style={styles.metaLabel}>First bell</Text>
-            <Text style={{ fontWeight: 700 }}>{slots[0]?.startTime ?? "—"}</Text>
-          </View>
-          <View style={styles.metaCell}>
-            <Text style={styles.metaLabel}>Lunch</Text>
-            <Text style={{ fontWeight: 700 }}>
-              {lunchSlot ? `${lunchSlot.startTime} – ${lunchSlot.endTime}` : "—"}
-            </Text>
-          </View>
+        <View style={styles.table}>
+          <PeriodHead />
+          {days.map((d, di) => (
+            <View key={d.n} style={[styles.tr, di % 2 === 1 ? styles.trAlt : {}]}>
+              <View style={[styles.td, styles.dayCell]}>
+                <Text>{d.full}</Text>
+              </View>
+              {periods.map((p) => {
+                if (p === 1) {
+                  return (
+                    <View key={p} style={[styles.td, styles.ctCell]}>
+                      <Text style={styles.ctLabel}>Class Teacher</Text>
+                      {classTeacherName ? <Text style={styles.teacherName}>{classTeacherName}</Text> : null}
+                    </View>
+                  );
+                }
+                if (p > periodsForDay(d.n)) {
+                  return <View key={p} style={[styles.td, styles.offCell]} />;
+                }
+                const cell = grid[`${d.n}-${p}`];
+                return (
+                  <View key={p} style={[styles.td, styles.periodCell]}>
+                    {cell && (cell.subject || cell.teacher) ? (
+                      <>
+                        {cell.subject ? <Text style={styles.subjectName}>{cell.subject}</Text> : null}
+                        {cell.teacher ? <Text style={styles.teacherName}>{cell.teacher}</Text> : null}
+                      </>
+                    ) : (
+                      <Text style={styles.freeText}>—</Text>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          ))}
         </View>
 
-        <View style={styles.table}>
-          <View style={styles.thead}>
-            <Text style={[styles.th, styles.dayCell]}>Day</Text>
-            {slots.map((s) => (
-              <Text key={s.index} style={[styles.th, styles.periodCell]}>
-                P{s.index}{"\n"}
-                {timeRange(s.startTime, s.endTime)}
-              </Text>
-            ))}
+        <View style={styles.sigRow}>
+          <View style={styles.sigBox}>
+            {classTeacherSignatureUrl ? <Image src={classTeacherSignatureUrl} style={styles.sigImg} /> : null}
+            <Text style={styles.sigLine}>Class Teacher{classTeacherName ? ` · ${classTeacherName}` : ""}</Text>
           </View>
+          <View style={styles.sigBox}>
+            <Text style={styles.sigLine}>Academic Coordinator</Text>
+          </View>
+          <View style={styles.sigBox}>
+            {principalSignatureUrl ? <Image src={principalSignatureUrl} style={styles.sigImg} /> : null}
+            <Text style={styles.sigLine}>Principal</Text>
+          </View>
+        </View>
+      </Page>
+    </Document>
+  );
+}
 
-          {days.map((d, di) => renderRow(di, d, di % 2 === 1))}
+export function TeacherTimetablePdf({
+  meta,
+  days,
+  grid,
+  logoDataUrl,
+}: {
+  meta: TimetableMeta;
+  days: Day[];
+  grid: TeacherGrid;
+  logoDataUrl: string;
+}) {
+  const periods = Array.from({ length: MAX_PERIOD }, (_, i) => i + 1);
+  return (
+    <Document>
+      <Page size="A4" orientation="landscape" style={styles.page}>
+        <Header meta={meta} logoDataUrl={logoDataUrl} />
+        <Text style={styles.title}>
+          TEACHER TIMETABLE · {meta.title.toUpperCase()} · {meta.academicYear}
+        </Text>
 
-          {lunchSlot ? (
-            <View style={styles.lunchRow}>
-              <Text style={styles.lunchText}>
-                LUNCH BREAK · {lunchSlot.startTime} – {lunchSlot.endTime}
-              </Text>
+        <View style={styles.table}>
+          <PeriodHead />
+          {days.map((d, di) => (
+            <View key={d.n} style={[styles.tr, di % 2 === 1 ? styles.trAlt : {}]}>
+              <View style={[styles.td, styles.dayCell]}>
+                <Text>{d.full}</Text>
+              </View>
+              {periods.map((p) => {
+                if (p > periodsForDay(d.n)) {
+                  return <View key={p} style={[styles.td, styles.offCell]} />;
+                }
+                const entries = grid[`${d.n}-${p}`] ?? [];
+                return (
+                  <View key={p} style={[styles.td, styles.periodCell]}>
+                    {entries.length ? (
+                      entries.map((e, i) => (
+                        <Text key={i} style={i === 0 ? styles.subjectName : styles.teacherName}>
+                          {e}
+                        </Text>
+                      ))
+                    ) : (
+                      <Text style={styles.freeText}>—</Text>
+                    )}
+                  </View>
+                );
+              })}
             </View>
-          ) : null}
+          ))}
         </View>
 
         <Text style={styles.legend}>
-          Generated by Pathshala ERP. This timetable is a suggestion — adjust manually before pinning to the noticeboard.
+          Shows this teacher&apos;s periods across every class. Period 1 (CT) entries come from
+          class-teacher assignments.
         </Text>
-
-        <View style={styles.sigRow}>
-          <Text style={styles.sigBox}>Class Teacher</Text>
-          <Text style={styles.sigBox}>Academic Coordinator</Text>
-          <Text style={styles.sigBox}>Principal</Text>
-        </View>
       </Page>
     </Document>
   );

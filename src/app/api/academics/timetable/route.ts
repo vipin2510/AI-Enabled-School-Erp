@@ -1,55 +1,70 @@
 import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
-import path from "node:path";
-import fs from "node:fs/promises";
-import { requireDepartment } from "@/lib/auth";
-import { getCurrentSchool } from "@/lib/auth";
+import { requireDepartment, getCurrentSchoolId, getCurrentSchool } from "@/lib/auth";
 import { currentAcademicYear } from "@/lib/results";
-import { TimetablePdf, type TimetableMeta } from "@/components/timetable-pdf";
-import type { Timetable } from "@/lib/timetable";
+import { createClient } from "@/lib/supabase/server";
+import { assetDataUrl } from "@/lib/pdf-assets";
+import { loadSchoolPdfSettings } from "@/lib/pdf-settings";
+import { DAYS } from "@/lib/timetable";
+import { ClassTimetablePdf, type ClassGrid, type TimetableMeta } from "@/components/timetable-pdf";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Timetables aren't persisted — the client posts the chosen variant + class name
-// and we render it on the fly. We trust the shape because both the generator
-// and the PDF live in the same codebase; we only sanity-check what we need.
-function isTimetable(x: unknown): x is Timetable {
-  if (!x || typeof x !== "object") return false;
-  const t = x as Timetable;
-  return (
-    typeof t.label === "string" &&
-    Array.isArray(t.slots) &&
-    Array.isArray(t.days) &&
-    Array.isArray(t.grid)
-  );
-}
-
-export async function POST(req: Request) {
+// GET /api/academics/timetable?classId=&section=  → class-wise timetable PDF
+export async function GET(req: Request) {
   const profile = await requireDepartment("academics");
+  const schoolId = await getCurrentSchoolId(profile);
   const school = await getCurrentSchool(profile);
+  const url = new URL(req.url);
+  const classId = url.searchParams.get("classId") ?? "";
+  const section = url.searchParams.get("section") ?? "";
+  if (!classId) return NextResponse.json({ error: "Missing classId" }, { status: 400 });
 
-  let body: { className?: string; timetable?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  const supabase = await createClient();
+  const [{ data: klass }, { data: slots }, { data: ct }, { data: profiles }, settings] =
+    await Promise.all([
+      supabase.from("classes").select("display_name").eq("school_id", schoolId).eq("id", classId).maybeSingle(),
+      supabase
+        .from("timetable_slots")
+        .select("day, period, subject_name, teacher_id")
+        .eq("school_id", schoolId)
+        .eq("class_id", classId)
+        .eq("section", section),
+      supabase
+        .from("class_teachers")
+        .select("teacher_id, signature_url")
+        .eq("school_id", schoolId)
+        .eq("class_id", classId)
+        .eq("section", section)
+        .maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("group_id", profile.group_id)
+        .contains("school_ids", [schoolId]),
+      loadSchoolPdfSettings(supabase, schoolId),
+    ]);
+
+  if (!klass) return NextResponse.json({ error: "Class not found" }, { status: 404 });
+
+  const nameById = new Map(
+    ((profiles ?? []) as { id: string; full_name: string | null }[]).map((p) => [p.id, p.full_name || ""])
+  );
+
+  const grid: ClassGrid = {};
+  for (const s of (slots ?? []) as { day: number; period: number; subject_name: string | null; teacher_id: string | null }[]) {
+    grid[`${s.day}-${s.period}`] = {
+      subject: s.subject_name ?? "",
+      teacher: s.teacher_id ? nameById.get(s.teacher_id) ?? "" : "",
+    };
   }
 
-  const className = typeof body.className === "string" ? body.className.trim() : "";
-  if (!className) {
-    return NextResponse.json({ error: "Missing className" }, { status: 400 });
-  }
-  if (!isTimetable(body.timetable)) {
-    return NextResponse.json({ error: "Invalid timetable payload" }, { status: 400 });
-  }
-
-  const logoPath = path.join(process.cwd(), "public", "letterhead", "aps-logo.jpeg");
-  const logoBytes = await fs.readFile(logoPath);
-  const logoDataUrl = `data:image/jpeg;base64,${logoBytes.toString("base64")}`;
+  const classTeacherName = ct?.teacher_id ? nameById.get(ct.teacher_id) ?? null : null;
+  const logoDataUrl = await assetDataUrl("letterhead/aps-logo.jpeg");
 
   const meta: TimetableMeta = {
-    className,
+    title: `${klass.display_name}${section ? ` · ${section}` : ""}`,
     schoolName: school?.name ?? "Adeshwar Public School",
     schoolLocation: school?.location ?? "",
     schoolParentNote: school?.parentNote ?? null,
@@ -57,12 +72,19 @@ export async function POST(req: Request) {
   };
 
   const buf = await renderToBuffer(
-    TimetablePdf({ meta, timetable: body.timetable, logoDataUrl }) as never
+    ClassTimetablePdf({
+      meta,
+      days: DAYS,
+      grid,
+      classTeacherName,
+      logoDataUrl,
+      classTeacherSignatureUrl: ct?.signature_url ?? null,
+      principalSignatureUrl: settings.principal_signature_url,
+    }) as never
   );
 
   const safe = (s: string) => s.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
-  const filename = `timetable-${safe(className)}-${safe(body.timetable.label)}.pdf`;
-
+  const filename = `timetable-${safe(meta.title)}.pdf`;
   return new NextResponse(buf as unknown as BodyInit, {
     headers: {
       "Content-Type": "application/pdf",
