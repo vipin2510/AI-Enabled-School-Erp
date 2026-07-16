@@ -59,14 +59,16 @@ function stylesFor(cardW: number, cardH: number, font = "Helvetica", fontScale =
       position: "relative",
     },
 
-    // ── Header (green block with school identity) ────────────────────────
+    // ── Header (green block: logo · centered school identity) ────────────
     header: {
       backgroundColor: GREEN,
       paddingTop: 5,
       paddingBottom: 4,
-      paddingHorizontal: 6,
+      paddingHorizontal: 5,
+      flexDirection: "row",
       alignItems: "center",
     },
+    headerText: { flex: 1, alignItems: "center" },
     schoolName: {
       color: "#ffffff",
       fontSize: base + 1.5,
@@ -103,8 +105,9 @@ function stylesFor(cardW: number, cardH: number, font = "Helvetica", fontScale =
     },
     contactCell: {
       color: "#ffffff",
-      fontSize: base - 1.5,
+      fontSize: base - 1.9,
       fontFamily: bold,
+      paddingHorizontal: 2,
     },
 
     // ── Body ─────────────────────────────────────────────────────────────
@@ -194,6 +197,18 @@ function stylesFor(cardW: number, cardH: number, font = "Helvetica", fontScale =
       color: "#111111",
     },
 
+    // School logo at the left of the green header.
+    headerLogo: {
+      width: base * 3,
+      height: base * 3,
+      borderRadius: base * 1.5,
+    },
+
+    // Principal signature, bottom-right of the body.
+    sigArea: { marginTop: "auto", alignItems: "flex-end", paddingTop: 2 },
+    sigImg: { height: base * 2.6, width: base * 6.5, objectFit: "contain" },
+    sigLabel: { fontSize: base - 0.8, fontFamily: bold, color: "#111111" },
+
     // ── Footer (yellow bar) ──────────────────────────────────────────────
     footer: {
       height: 4,
@@ -208,32 +223,37 @@ function Card({
   school,
   logoDataUrl,
   styles,
+  principalSignatureUrl,
 }: {
   s: IdCardStudent;
   session: string;
   school: IdCardSchool;
   logoDataUrl: string;
   styles: ReturnType<typeof stylesFor>;
+  principalSignatureUrl?: string | null;
 }) {
   const fullCity = [school.addressLine, school.pinCode].filter(Boolean).join(" ");
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.schoolName}>{school.name.toUpperCase()}</Text>
-        <Text style={styles.cityLine}>{school.cityLine.toUpperCase()}</Text>
-        {school.affiliation && (
-          <Text style={styles.headerSmall}>({school.affiliation.toUpperCase()})</Text>
-        )}
-        {school.schoolCode && (
-          <Text style={styles.schoolCodeLine}>School Code: {school.schoolCode}</Text>
-        )}
-        {fullCity && <Text style={styles.headerSmall}>{fullCity}</Text>}
-        {(school.mobile || school.email) && (
-          <View style={styles.contactRow}>
-            <Text style={styles.contactCell}>{school.mobile ? `Mob: ${school.mobile}` : ""}</Text>
-            <Text style={styles.contactCell}>{school.email ? `Email- ${school.email}` : ""}</Text>
-          </View>
-        )}
+        <Image src={logoDataUrl} style={styles.headerLogo} />
+        <View style={styles.headerText}>
+          <Text style={styles.schoolName}>{school.name.toUpperCase()}</Text>
+          <Text style={styles.cityLine}>{school.cityLine.toUpperCase()}</Text>
+          {school.affiliation && (
+            <Text style={styles.headerSmall}>({school.affiliation.toUpperCase()})</Text>
+          )}
+          {school.schoolCode && (
+            <Text style={styles.schoolCodeLine}>School Code: {school.schoolCode}</Text>
+          )}
+          {fullCity && <Text style={styles.headerSmall}>{fullCity}</Text>}
+          {(school.mobile || school.email) && (
+            <View style={styles.contactRow}>
+              <Text style={styles.contactCell}>{school.mobile ? `Mob: ${school.mobile}` : ""}</Text>
+              <Text style={styles.contactCell}>{school.email ? `Email- ${school.email}` : ""}</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <View style={styles.body}>
@@ -273,6 +293,11 @@ function Card({
         <Row styles={styles} label="BLOOD GP" value={s.blood_group || "—"} />
         <Row styles={styles} label="ADDRESS" value={s.address || "—"} />
         <Row styles={styles} label="CONTACT NO" value={s.contact_number || "—"} />
+
+        <View style={styles.sigArea}>
+          {principalSignatureUrl ? <Image src={principalSignatureUrl} style={styles.sigImg} /> : null}
+          <Text style={styles.sigLabel}>Principal</Text>
+        </View>
       </View>
 
       <View style={styles.footer} />
@@ -307,6 +332,7 @@ export function IdCardSheet({
   perPage,
   font = "Helvetica",
   fontScale = 1,
+  principalSignatureUrl = null,
 }: {
   students: IdCardStudent[];
   session: string;
@@ -317,6 +343,7 @@ export function IdCardSheet({
   perPage: number;
   font?: string;
   fontScale?: number;
+  principalSignatureUrl?: string | null;
 }) {
   const styles = stylesFor(cardW, cardH, font, fontScale);
   const pages: IdCardStudent[][] = [];
@@ -330,7 +357,15 @@ export function IdCardSheet({
       {pages.map((group, pi) => (
         <Page key={pi} size="A4" style={styles.page}>
           {group.map((s, i) => (
-            <Card key={i} s={s} session={session} school={school} logoDataUrl={logoDataUrl} styles={styles} />
+            <Card
+              key={i}
+              s={s}
+              session={session}
+              school={school}
+              logoDataUrl={logoDataUrl}
+              styles={styles}
+              principalSignatureUrl={principalSignatureUrl}
+            />
           ))}
         </Page>
       ))}

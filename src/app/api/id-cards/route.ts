@@ -66,7 +66,11 @@ function toCard(r: Row): IdCardStudent {
 function cardPhotoUrl(url: string | null): string | null {
   if (!url) return null;
   if (!url.includes("/storage/v1/object/public/") || url.includes("?")) return url;
-  return url.replace("/object/public/", "/render/image/public/") + "?width=300&quality=70";
+  // NOTE: `resize=contain` is required — a width-only transform on this project
+  // does NOT scale height proportionally (it returns e.g. 300×<original-height>,
+  // a distorted sliver). `contain` bounds the width AND keeps the aspect ratio;
+  // the card's own objectFit:cover then frames it.
+  return url.replace("/object/public/", "/render/image/public/") + "?width=400&resize=contain&quality=75";
 }
 
 async function fetchImageDataUrl(url: string | null): Promise<string | null> {
@@ -183,6 +187,7 @@ export async function GET(req: Request) {
       perPage: studentId ? 1 : perPage,
       font: pdfSettings.id_card_font_family,
       fontScale: pdfSettings.id_card_font_scale,
+      principalSignatureUrl: pdfSettings.principal_signature_url,
     }) as never
   );
 
