@@ -139,14 +139,21 @@ async function seedSchoolFeeStructure(classId: string, schoolId: string) {
     "July", "August", "September", "October", "November", "December",
   ];
   // Apr-start session: month 1 of the structure = April.
+  // due_date is required for late fees to accrue (the collect form skips any
+  // component without one). Apr–Dec fall in the AY's start year, Jan–Mar the
+  // next; the day is the 10th (the collect form overrides it with the
+  // configurable monthly_due_day, so only the month/year need to be right).
+  const startYear = Number(ay.slice(0, 4));
   const monthly = Array.from({ length: 12 }, (_, i) => {
     const monthIdx = ((3 + i) % 12) + 1;
+    const dueYear = monthIdx >= 4 ? startYear : startYear + 1;
     return {
       structure_id: fs.id,
       kind: "monthly" as const,
       label: `Monthly Fee — ${MONTHS[monthIdx - 1]}`,
       period_index: monthIdx,
       amount: 0,
+      due_date: `${dueYear}-${String(monthIdx).padStart(2, "0")}-10`,
       is_refundable: false,
       is_one_time: false,
       sort_order: 100 + i,
