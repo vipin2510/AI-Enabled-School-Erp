@@ -147,6 +147,14 @@ export default async function ReceiptPage({
                 {invoice.late_fee_waived ? "₹0" : inr(invoice.late_fee)}
               </td>
             </tr>
+            {Number(invoice.discount) > 0 && (
+              <tr>
+                <td className="px-3 py-2 text-right">
+                  Discount{invoice.discount_reason ? ` (${invoice.discount_reason})` : ""}
+                </td>
+                <td className="px-3 py-2 text-right">− {inr(invoice.discount)}</td>
+              </tr>
+            )}
             <tr className="border-t border-stone-200 font-semibold">
               <td className="px-3 py-2 text-right">Total Paid</td>
               <td className="px-3 py-2 text-right">{inr(invoice.amount_paid)}</td>
