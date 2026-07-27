@@ -33,7 +33,11 @@ const R2_SECRET_ACCESS_KEY = need("R2_SECRET_ACCESS_KEY");
 const R2_BUCKET = need("R2_BUCKET");
 const R2_PUBLIC_BASE = need("R2_PUBLIC_BASE_URL").replace(/\/+$/, "");
 
-const PUBLIC_PREFIX = `${SUPABASE_URL.replace(/\/+$/, "")}/storage/v1/object/public/`;
+// Any Supabase public-storage URL contains this marker; the object key is
+// everything after it. Matching on the marker (rather than the current
+// project's exact host) also migrates files still hosted on an older Supabase
+// project that earlier photos were uploaded to.
+const PUBLIC_MARKER = "/storage/v1/object/public/";
 
 function need(name: string): string {
   const v = process.env[name];
@@ -72,11 +76,13 @@ function contentTypeFor(key: string): string {
 // an external URL we don't own).
 async function migrateUrl(oldUrl: string | null): Promise<string | null> {
   if (!oldUrl) return null;
-  if (!oldUrl.startsWith(PUBLIC_PREFIX)) return oldUrl; // already migrated / foreign
+  if (oldUrl.startsWith(`${R2_PUBLIC_BASE}/`)) return oldUrl; // already on R2
+  const idx = oldUrl.indexOf(PUBLIC_MARKER);
+  if (idx === -1) return oldUrl; // not a Supabase public URL we can migrate
   const cached = migrated.get(oldUrl);
   if (cached) return cached;
 
-  const key = oldUrl.slice(PUBLIC_PREFIX.length); // e.g. student-photos/<id>/student-….jpg
+  const key = oldUrl.slice(idx + PUBLIC_MARKER.length); // e.g. student-photos/<id>/student-….jpg
   const newUrl = `${R2_PUBLIC_BASE}/${key}`;
 
   if (DRY_RUN) {
@@ -110,12 +116,23 @@ async function migrateTable<T extends Record<string, unknown>>(
   urlCols: string[]
 ) {
   console.log(`\n== ${table} (${urlCols.join(", ")}) ==`);
-  const { data, error } = await supabase.from(table).select([idCol, ...urlCols].join(", "));
-  if (error) {
-    console.error(`  query failed: ${error.message}`);
-    return;
+  // PostgREST caps a select at 1000 rows, so page through the whole table —
+  // otherwise rows past the first 1000 silently never get migrated.
+  const PAGE = 1000;
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from(table)
+      .select([idCol, ...urlCols].join(", "))
+      .range(from, from + PAGE - 1);
+    if (error) {
+      console.error(`  query failed: ${error.message}`);
+      return;
+    }
+    const batch = (data ?? []) as unknown as T[];
+    rows.push(...batch);
+    if (batch.length < PAGE) break;
   }
-  const rows = (data ?? []) as unknown as T[];
   let updated = 0;
   for (const row of rows) {
     const patch: Record<string, string> = {};
