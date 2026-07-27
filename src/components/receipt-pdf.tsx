@@ -30,6 +30,8 @@ type Invoice = {
   late_fee_waived: boolean;
   waiver_amount: number;
   waiver_reason: string | null;
+  discount: number;
+  discount_reason: string | null;
   total: number;
   amount_paid: number;
   payment_mode: string | null;
@@ -317,6 +319,14 @@ function ReceiptCopy({
             {invoice.late_fee_waived ? inr(0) : inr(invoice.late_fee)}
           </Text>
         </View>
+        {Number(invoice.discount) > 0 && (
+          <View style={styles.tr}>
+            <Text style={[styles.td, styles.colDesc, { textAlign: "right" }]}>
+              Discount{invoice.discount_reason ? ` (${invoice.discount_reason})` : ""}
+            </Text>
+            <Text style={[styles.td, styles.colAmt]}>- {inr(invoice.discount)}</Text>
+          </View>
+        )}
         <View style={[styles.tr, styles.totalRow]}>
           <Text style={[styles.td, styles.colDesc, { textAlign: "right" }]}>Total Paid</Text>
           <Text style={[styles.td, styles.colAmt]}>{inr(invoice.amount_paid)}</Text>

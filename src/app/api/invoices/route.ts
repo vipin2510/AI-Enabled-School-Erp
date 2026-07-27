@@ -39,6 +39,10 @@ const BodySchema = z.object({
   total: z.number().nonnegative(),
   late_fee_waived: z.boolean().default(false),
   waiver_reason: z.string().nullable().optional(),
+  // Cashier-entered discount off the payable. Accepted but clamped server-side
+  // to never exceed subtotal + late fee.
+  discount: z.number().nonnegative().optional(),
+  discount_reason: z.string().nullable().optional(),
   payment_mode: z.enum(["cash", "upi", "card", "bank", "cheque"]),
   payment_ref: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
@@ -223,7 +227,10 @@ export async function POST(req: Request) {
   //    fees are never larger than the principal in practice; protects against
   //    a tampered client inflating revenue.
   const lateFee = body.late_fee_waived ? 0 : Math.min(Number(body.late_fee), subtotal);
-  const total = subtotal + lateFee;
+  // Discount comes off the payable (subtotal + late fee). Clamp to that bound
+  // so a tampered client can't drive the total negative.
+  const discount = Math.min(Math.max(0, Number(body.discount ?? 0)), subtotal + lateFee);
+  const total = subtotal + lateFee - discount;
   if (total <= 0) {
     return NextResponse.json({ error: "Nothing to collect." }, { status: 400 });
   }
@@ -253,6 +260,8 @@ export async function POST(req: Request) {
     payment_ref: body.payment_ref ?? null,
     late_fee_waived: body.late_fee_waived,
     waiver_reason: body.waiver_reason ?? null,
+    discount,
+    discount_reason: discount > 0 ? body.discount_reason ?? null : null,
     notes: body.notes ?? null,
     // Stamp who generated the receipt. Always the signed-in user — the client
     // cannot set this (the form field is read-only), so body.created_by is

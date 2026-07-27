@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { inr, daysBetween } from "@/lib/utils";
 import type { FeeKind } from "@/lib/types";
+import { setBusFee } from "../actions";
 
 type Component = {
   id: string;
@@ -172,6 +173,8 @@ export default function CollectForm({
   const [showBus, setShowBus] = useState(busAvailable);
   const [lateFeeWaived, setLateFeeWaived] = useState(false);
   const [waiverReason, setWaiverReason] = useState("");
+  const [discountInput, setDiscountInput] = useState("");
+  const [discountReason, setDiscountReason] = useState("");
   const [paymentMode, setPaymentMode] = useState("cash");
   const [paymentRef, setPaymentRef] = useState("");
   const [notes, setNotes] = useState("");
@@ -282,6 +285,22 @@ export default function CollectForm({
     });
   };
 
+  // After the per-month bus fee is edited we re-read it from the server (the
+  // invoice API prices bus rows off the DB value, so the edit must persist
+  // first). Drop any selected bus months — they carry the old rate — and open
+  // the card so the freshly-priced months are visible.
+  const onBusFeeSaved = () => {
+    setSelected((prev) => {
+      const next = { ...prev };
+      for (const [id, item] of Object.entries(prev)) {
+        if (item.scope === "bus") delete next[id];
+      }
+      return next;
+    });
+    setShowBus(true);
+    router.refresh();
+  };
+
   // --- Totals ---
   const today = new Date();
   const items = Object.values(selected);
@@ -313,7 +332,11 @@ export default function CollectForm({
   const lateFeeRaw = lateFeePerComponent.reduce((s, n) => s + n, 0);
   const lateFee = lateFeeWaived ? 0 : lateFeeRaw;
 
-  const total = subtotal + lateFee;
+  // Discount comes off the payable and is clamped to it so the total never
+  // goes negative. The server re-clamps the same way on submit.
+  const payableBeforeDiscount = subtotal + lateFee;
+  const discount = Math.max(0, Math.min(Math.round(Number(discountInput) || 0), payableBeforeDiscount));
+  const total = payableBeforeDiscount - discount;
 
   // --- Submit ---
   const submit = async () => {
@@ -359,6 +382,8 @@ export default function CollectForm({
           late_fee_waived: lateFeeWaived,
           waiver_reason:
             waiverAmount > 0 ? waiverReason || autoWaiverReason || null : null,
+          discount,
+          discount_reason: discount > 0 ? discountReason || null : null,
           payment_mode: paymentMode,
           payment_ref: paymentRef || null,
           notes: notes || null,
@@ -512,8 +537,8 @@ export default function CollectForm({
             </Button>
           ))}
 
-        {busAvailable &&
-          (showBus ? (
+        {busAvailable ? (
+          showBus ? (
             <div className="space-y-2">
               <BusFeesCard
                 components={busComponents}
@@ -523,6 +548,13 @@ export default function CollectForm({
                 onToggle={(c) => toggleItem(c, "bus")}
                 onSelectAll={selectAllBusMonths}
                 isHidden={isHiddenMonthly}
+                editor={
+                  <BusFeeEditor
+                    studentId={studentId}
+                    current={busFeeAmount}
+                    onSaved={onBusFeeSaved}
+                  />
+                }
               />
               <button
                 type="button"
@@ -536,7 +568,16 @@ export default function CollectForm({
             <Button variant="secondary" type="button" onClick={toggleBus}>
               + Add bus fees
             </Button>
-          ))}
+          )
+        ) : (
+          // No bus fee on file yet — let the cashier set one right here.
+          <BusFeeEditor
+            studentId={studentId}
+            current={null}
+            onSaved={onBusFeeSaved}
+            triggerLabel="+ Set bus fee"
+          />
+        )}
       </div>
 
       <aside className="space-y-4">
@@ -564,6 +605,9 @@ export default function CollectForm({
               value={lateFeeWaived ? `− ${inr(lateFeeRaw)} (waived)` : inr(lateFee)}
               muted={lateFeeWaived}
             />
+            {discount > 0 && (
+              <Row label="Discount" value={`− ${inr(discount)}`} muted />
+            )}
             <div className="border-t border-stone-200 my-2" />
             <Row label="Payable" value={inr(total)} bold />
           </div>
@@ -591,6 +635,24 @@ export default function CollectForm({
                 onChange={(e) => setWaiverReason(e.target.value)}
               />
             )}
+
+            <div>
+              <label className="block text-xs text-stone-500 mb-1">Discount (₹)</label>
+              <Input
+                inputMode="numeric"
+                placeholder="0"
+                value={discountInput}
+                onChange={(e) => setDiscountInput(e.target.value.replace(/[^\d]/g, ""))}
+              />
+              {discount > 0 && (
+                <Input
+                  className="mt-2"
+                  placeholder="Reason for discount (printed on receipt)"
+                  value={discountReason}
+                  onChange={(e) => setDiscountReason(e.target.value)}
+                />
+              )}
+            </div>
 
             <div className="grid grid-cols-2 gap-2">
               <Select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
@@ -637,7 +699,7 @@ export default function CollectForm({
               </Button>
               <Button
                 className="flex-1"
-                disabled={!items.length || submitting}
+                disabled={!items.length || submitting || total <= 0}
                 onClick={submit}
                 type="button"
               >
@@ -764,6 +826,7 @@ function BusFeesCard({
   onToggle,
   onSelectAll,
   isHidden,
+  editor,
 }: {
   components: Component[];
   selected: Record<string, SelectedItem>;
@@ -772,6 +835,7 @@ function BusFeesCard({
   onToggle: (c: Component) => void;
   onSelectAll: () => void;
   isHidden: (c: Component) => boolean;
+  editor?: ReactNode;
 }) {
   const visible = components.filter((c) => !isHidden(c));
   return (
@@ -783,7 +847,8 @@ function BusFeesCard({
             {inr(busFeeAmount)} / month — pick the months to collect for.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {editor}
           <Button variant="secondary" type="button" onClick={onSelectAll}>
             All months
           </Button>
@@ -826,6 +891,79 @@ function BusFeesCard({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// Inline editor for the student's per-month bus fee, right on the collect
+// screen. The invoice API prices bus rows off the DB `bus_fee_amount`, so we
+// persist via the shared `setBusFee` action and let the parent re-read it
+// (via router.refresh) rather than trusting a client-only value. Blank / 0
+// clears the bus fee. Renders as a small "Edit" (or `triggerLabel`) button
+// that reveals a ₹ input.
+function BusFeeEditor({
+  studentId,
+  current,
+  onSaved,
+  triggerLabel = "Edit ₹/month",
+}: {
+  studentId: string;
+  current: number | null;
+  onSaved: () => void;
+  triggerLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState<string>(current == null ? "" : String(current));
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setPending(true);
+    setError(null);
+    const fd = new FormData();
+    fd.set("student_id", studentId);
+    fd.set("amount", value);
+    const res = await setBusFee(undefined, fd);
+    setPending(false);
+    if (res?.error) {
+      setError(res.error);
+      return;
+    }
+    setOpen(false);
+    onSaved();
+  }
+
+  if (!open) {
+    return (
+      <Button variant="secondary" type="button" onClick={() => setOpen(true)}>
+        {triggerLabel}
+      </Button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-stone-400">Bus ₹</span>
+        <Input
+          inputMode="numeric"
+          placeholder="—"
+          value={value}
+          onChange={(e) => setValue(e.target.value.replace(/[^\d]/g, ""))}
+          className="w-20 py-1 tabular-nums"
+        />
+        <Button type="button" onClick={save} disabled={pending}>
+          {pending ? "…" : "Save"}
+        </Button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="text-xs text-stone-500 hover:text-stone-900"
+        >
+          Cancel
+        </button>
+      </div>
+      {error && <div className="text-xs text-red-600">{error}</div>}
     </div>
   );
 }

@@ -444,6 +444,8 @@ CREATE TABLE erp.invoices (
     payment_ref text,
     waiver_reason text,
     late_fee_waived boolean DEFAULT false NOT NULL,
+    discount numeric(12,2) DEFAULT 0 NOT NULL,
+    discount_reason text,
     notes text,
     created_by text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
