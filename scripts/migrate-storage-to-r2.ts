@@ -99,7 +99,13 @@ async function migrateUrl(oldUrl: string | null): Promise<string | null> {
   const bytes = new Uint8Array(await src.arrayBuffer());
   const put = await r2.fetch(
     `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET}/${key}`,
-    { method: "PUT", body: bytes, headers: { "Content-Type": contentTypeFor(key) } }
+    {
+      method: "PUT",
+      body: bytes,
+      // R2 rejects a PUT without Content-Length (HTTP 411) when fetch would
+      // otherwise stream the body chunked.
+      headers: { "Content-Type": contentTypeFor(key), "Content-Length": String(bytes.byteLength) },
+    }
   );
   if (!put.ok) {
     console.warn(`  SKIP (R2 ${put.status}): ${key} — ${await put.text().catch(() => "")}`);

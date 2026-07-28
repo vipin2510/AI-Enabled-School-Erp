@@ -61,7 +61,13 @@ async function putObject(
       // Uint8Array is a valid fetch body at runtime; the DOM lib's generic
       // BufferSource typing doesn't line up, so cast.
       body: bytes as unknown as BodyInit,
-      headers: { "Content-Type": contentType },
+      headers: {
+        "Content-Type": contentType,
+        // R2/S3 reject a PUT without Content-Length (HTTP 411). On Vercel's
+        // serverless runtime fetch streams the body chunked and omits it, so
+        // set it explicitly from the known byte length.
+        "Content-Length": String(bytes.byteLength),
+      },
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
