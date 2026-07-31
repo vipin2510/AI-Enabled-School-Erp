@@ -157,6 +157,41 @@ export function getFeePrintLayout(schoolId: string): Promise<FeePrintLayout> {
   );
 }
 
+// Cashbook opening balance — one row per school, set once (the April-1 opening
+// cash) and rarely touched. Read on the cashbook page to seed the running
+// cash-in-hand. Cached 30 min; the setOpeningBalance action busts the tag.
+export type CashbookSettings = {
+  opening_balance: number;
+  opening_date: string | null;
+};
+const CASHBOOK_DEFAULTS: CashbookSettings = {
+  opening_balance: 0,
+  opening_date: null,
+};
+export function getCashbookSettings(schoolId: string): Promise<CashbookSettings> {
+  return cached(
+    `cashbook_settings:${schoolId}`,
+    [tagFor.cashbookSettings(schoolId)],
+    1800,
+    async () => {
+      const supabase = createAnonClient();
+      // Table may not exist yet on pre-migration deployments — fall back to
+      // zero opening so the page never crashes.
+      const { data, error } = await supabase
+        .from("cashbook_settings")
+        .select("opening_balance, opening_date")
+        .eq("school_id", schoolId)
+        .maybeSingle();
+      if (error || !data) return CASHBOOK_DEFAULTS;
+      const d = data as Partial<CashbookSettings>;
+      return {
+        opening_balance: Number(d.opening_balance ?? 0),
+        opening_date: d.opening_date ?? null,
+      };
+    },
+  );
+}
+
 // "Has THIS user marked attendance today?" — hit on every request by the
 // shell (topbar) for managers/staff. The value flips at most once per day,
 // per user; cache for 60s so the topbar redraw doesn't re-hit the DB on

@@ -54,7 +54,7 @@ export default async function CollectFeePage({
       .order("created_at", { ascending: true })
       .limit(1);
 
-  const [schoolRowsRes, hostelPrimaryRes, hostelFallbackRes, paidRes, busPaidRes, invoicesRes, lateFeeSettings] =
+  const [schoolRowsRes, hostelPrimaryRes, hostelFallbackRes, paidRes, busPaidRes, invoicesRes, openingDuesRes, lateFeeSettings] =
     await Promise.all([
       supabase
         .from("fee_structures")
@@ -99,6 +99,14 @@ export default async function CollectFeePage({
         .eq("student_id", studentId)
         .eq("academic_year", AY)
         .neq("payment_status", "void"),
+      // Carry-forward opening dues (imported from a prior session's balance
+      // sheet). Summed across any years and added to Outstanding. Tolerant of
+      // the table not existing on pre-migration deployments.
+      supabase
+        .from("student_opening_dues")
+        .select("amount")
+        .eq("school_id", schoolId)
+        .eq("student_id", studentId),
       getLateFeeSettings(schoolId),
     ]);
 
@@ -147,7 +155,12 @@ export default async function CollectFeePage({
   const hostelAnnual = student.is_hosteller ? Number(hostelStruct?.total_amount ?? 0) : 0;
   const busAnnual = student.bus_fee_amount ? Number(student.bus_fee_amount) * 11 : 0;
   const annualTotal = schoolAnnual + hostelAnnual + busAnnual;
-  const outstanding = Math.max(0, annualTotal - paidThisAY);
+  // Carry-forward dues from a prior session (imported balance sheet). Added on
+  // top of this session's outstanding so the cashier sees the full amount owed.
+  const openingDues = (
+    (openingDuesRes.data ?? []) as { amount: number | string }[]
+  ).reduce((s, r) => s + Number(r.amount || 0), 0);
+  const outstanding = Math.max(0, annualTotal - paidThisAY) + openingDues;
   const inr = (n: number) =>
     `₹${Math.round(n).toLocaleString("en-IN")}`;
 
@@ -173,8 +186,11 @@ export default async function CollectFeePage({
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
             <div className="text-[10px] uppercase tracking-wide text-amber-700">Outstanding</div>
             <div className="mt-0.5 text-base font-semibold tabular-nums text-amber-800">
-              {annualTotal > 0 ? inr(outstanding) : "—"}
+              {annualTotal > 0 || openingDues > 0 ? inr(outstanding) : "—"}
             </div>
+            {openingDues > 0 && (
+              <div className="text-[10px] text-amber-700">incl. {inr(openingDues)} b/f</div>
+            )}
           </div>
           <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
             <div className="text-[10px] uppercase tracking-wide text-stone-500">Session total</div>

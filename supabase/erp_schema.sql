@@ -637,6 +637,74 @@ CREATE TABLE erp.student_bus_fee_months (
 
 
 --
+-- Name: cashbook_settings; Type: TABLE; Schema: public; Owner: - (migration 0032)
+--
+
+CREATE TABLE erp.cashbook_settings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    school_id uuid NOT NULL,
+    opening_balance numeric(12,2) DEFAULT 0 NOT NULL,
+    opening_date date,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: cashbook_expenses; Type: TABLE; Schema: public; Owner: - (migration 0032)
+--
+
+CREATE TABLE erp.cashbook_expenses (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    school_id uuid NOT NULL,
+    spent_on date DEFAULT ((now() AT TIME ZONE 'Asia/Kolkata'::text))::date NOT NULL,
+    mode text DEFAULT 'cash'::text NOT NULL,
+    category text,
+    description text NOT NULL,
+    amount numeric(12,2) NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT cashbook_expenses_amount_check CHECK ((amount >= (0)::numeric)),
+    CONSTRAINT cashbook_expenses_mode_check CHECK ((mode = ANY (ARRAY['cash'::text, 'cheque'::text, 'upi'::text, 'inb'::text])))
+);
+
+
+--
+-- Name: bank_deposits; Type: TABLE; Schema: public; Owner: - (migration 0032)
+--
+
+CREATE TABLE erp.bank_deposits (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    school_id uuid NOT NULL,
+    deposited_on date DEFAULT ((now() AT TIME ZONE 'Asia/Kolkata'::text))::date NOT NULL,
+    amount numeric(12,2) NOT NULL,
+    bank_name text,
+    deposit_receipt_no text,
+    reference text,
+    notes text,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT bank_deposits_amount_check CHECK ((amount >= (0)::numeric))
+);
+
+
+--
+-- Name: student_opening_dues; Type: TABLE; Schema: public; Owner: - (migration 0033)
+--
+
+CREATE TABLE erp.student_opening_dues (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    school_id uuid NOT NULL,
+    student_id uuid NOT NULL,
+    academic_year text NOT NULL,
+    amount numeric(12,2) DEFAULT 0 NOT NULL,
+    breakdown jsonb,
+    source text DEFAULT 'import 2025-26'::text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: students; Type: TABLE; Schema: public; Owner: -
 --
 

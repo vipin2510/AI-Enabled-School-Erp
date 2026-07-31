@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed:students": "tsx scripts/seed-students.ts",
+    "import:balances": "tsx scripts/import-balance-fees.ts",
     "create:admin": "tsx scripts/create-admin.ts",
     "pdfs:build": "tsx scripts/build-requirements-pdfs.tsx"
   },
