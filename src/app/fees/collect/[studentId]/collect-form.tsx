@@ -109,6 +109,10 @@ type SelectedItem = {
   component: Component;
   scope: "school" | "hostel" | "bus";
   waived: boolean;
+  // Auto-selected and locked (can't be unticked) — used for tuition (monthly)
+  // rows while the hostel section is active: a hosteller's tuition is billed
+  // together with hostel, so it's force-included.
+  locked?: boolean;
 };
 
 export default function CollectForm({
@@ -168,7 +172,33 @@ export default function CollectForm({
     }));
   }, [busAvailable, busFeeAmount]);
 
-  const [selected, setSelected] = useState<Record<string, SelectedItem>>({});
+  // Tuition (monthly school) components that ride along, locked, while the
+  // hostel section is active — a hosteller's tuition is billed with hostel.
+  const lockableTuition = useMemo<Component[]>(() => {
+    if (!schoolStruct) return [];
+    return schoolStruct.fee_structure_components.filter(
+      (c) =>
+        c.kind === "monthly" &&
+        (isNewAdmission || !NEW_ADMISSION_ONLY_KINDS.has(c.kind)) &&
+        !isHiddenMonthly(c) &&
+        !paidSet.has(c.id),
+    );
+  }, [schoolStruct, isNewAdmission, paidSet]);
+
+  const lockedItem = (c: Component): SelectedItem => ({
+    component: c,
+    scope: "school",
+    waived: studentCategory === "rte",
+    locked: true,
+  });
+
+  // Seed with locked tuition when the hostel section starts open (hosteller).
+  const [selected, setSelected] = useState<Record<string, SelectedItem>>(() => {
+    if (!hostelDefaultOpen) return {};
+    const init: Record<string, SelectedItem> = {};
+    for (const c of lockableTuition) init[c.id] = lockedItem(c);
+    return init;
+  });
   const [showHostel, setShowHostel] = useState(hostelDefaultOpen);
   const [showBus, setShowBus] = useState(busAvailable);
   const [lateFeeWaived, setLateFeeWaived] = useState(false);
@@ -195,6 +225,8 @@ export default function CollectForm({
 
   const toggleItem = (c: Component, scope: "school" | "hostel" | "bus") => {
     setSelected((prev) => {
+      // Locked (hostel-linked tuition) rows can't be unticked directly.
+      if (prev[c.id]?.locked) return prev;
       const next = { ...prev };
       if (next[c.id]) delete next[c.id];
       else next[c.id] = newItem(c, scope);
@@ -254,17 +286,24 @@ export default function CollectForm({
 
   const toggleHostel = () => {
     setShowHostel((open) => {
-      if (open) {
-        // Hiding hostel: drop any selected hostel items so totals stay correct.
-        setSelected((prev) => {
-          const next = { ...prev };
-          for (const [id, item] of Object.entries(prev)) {
-            if (item.scope === "hostel") delete next[id];
+      const willOpen = !open;
+      setSelected((prev) => {
+        const next = { ...prev };
+        if (willOpen) {
+          // Opening hostel: auto-select + lock tuition (billed with hostel).
+          for (const c of lockableTuition) {
+            if (!next[c.id]?.locked) next[c.id] = lockedItem(c);
           }
-          return next;
-        });
-      }
-      return !open;
+        } else {
+          // Closing: drop hostel items AND the auto-locked tuition so totals
+          // reflect what's visible.
+          for (const [id, item] of Object.entries(prev)) {
+            if (item.scope === "hostel" || item.locked) delete next[id];
+          }
+        }
+        return next;
+      });
+      return willOpen;
     });
   };
 
@@ -764,6 +803,7 @@ function ComponentGroup({
           const isPaid = paidSet.has(c.id);
           const isSelected = !!selected[c.id];
           const waived = selected[c.id]?.waived;
+          const locked = !!selected[c.id]?.locked;
           return (
             <div
               key={c.id}
@@ -782,20 +822,21 @@ function ComponentGroup({
                   <input
                     type="checkbox"
                     checked={isSelected}
-                    disabled={isPaid}
+                    disabled={isPaid || locked}
                     onChange={() => onToggle(c, scope)}
                     className="h-4 w-4 accent-stone-900"
                   />
                   <span className="text-sm">
                     {c.label}
                     {isPaid && <span className="ml-2 text-xs text-stone-400">(paid)</span>}
+                    {locked && <span className="ml-2 text-xs text-stone-400">(with hostel)</span>}
                   </span>
                 </span>
                 <span className={`text-sm font-medium ${waived ? "line-through text-stone-400" : ""}`}>
                   {inr(c.amount)}
                 </span>
               </label>
-              {isSelected && (
+              {isSelected && !locked && (
                 <div className="mt-1 ml-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                   <button
                     type="button"

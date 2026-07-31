@@ -4,6 +4,7 @@ import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { currentAcademicYear } from "@/lib/academic-year";
 import { getLateFeeSettings } from "@/lib/cache";
 import CollectForm from "./collect-form";
+import FeeKindControl from "./fee-kind-control";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +25,27 @@ export default async function CollectFeePage({
   const { data: student } = await supabase
     .from("students")
     .select(
-      "id, full_name, section, father_name, contact_number, is_hosteller, is_new_admission, category, bus_fee_amount, class_id, classes(id, code, display_name, group_label, ordinal)"
+      "id, full_name, section, father_name, contact_number, is_hosteller, is_new_admission, category, bus_fee_amount, class_id, status, fee_kind, classes(id, code, display_name, group_label, ordinal)"
     )
     .eq("school_id", schoolId)
     .eq("id", studentId)
     .single();
 
   if (!student) notFound();
+
+  // Frozen students (e.g. after a TC was issued) can't be collected from — only
+  // their history remains. Show a notice instead of the collect form.
+  if (student.status !== "active") {
+    return (
+      <div className="max-w-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight">{student.full_name}</h1>
+        <div className="mt-4 rounded-lg border border-stone-300 bg-stone-50 px-4 py-4 text-sm text-stone-700">
+          This student is <strong>frozen</strong> ({student.status}) and can no longer be collected from
+          — typically because a Transfer Certificate has been issued. Past receipts remain viewable under Receipts.
+        </div>
+      </div>
+    );
+  }
 
   const klass = (student as unknown as {
     classes: { id: string; code: string; display_name: string; group_label: string | null } | null;
@@ -164,6 +179,13 @@ export default async function CollectFeePage({
   const inr = (n: number) =>
     `₹${Math.round(n).toLocaleString("en-IN")}`;
 
+  // Effective fee kind: the saved per-student choice wins; until it's set we
+  // fall back to the is_new_admission flag. This gates one-time charges in the
+  // form (registration/admission only for "new").
+  const feeKind: "new" | "old" | null =
+    (student.fee_kind as "new" | "old" | null) ?? null;
+  const effectiveNew = (feeKind ?? (student.is_new_admission ? "new" : "old")) === "new";
+
   return (
     <div className="max-w-5xl">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -175,6 +197,9 @@ export default async function CollectFeePage({
             {student.is_hosteller ? " · Hosteller" : ""}
             {student.is_new_admission ? " · New Admission" : ""}
           </p>
+          <div className="mt-2 max-w-[220px]">
+            <FeeKindControl studentId={student.id} current={feeKind} isAdmin={profile.role === "admin"} />
+          </div>
         </div>
         <div className="grid grid-cols-3 gap-2 text-right text-xs">
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
@@ -211,7 +236,7 @@ export default async function CollectFeePage({
         paidComponentIds={Array.from(paidComponentIds)}
         paidBusMonths={paidBusMonths}
         lateFeeSettings={lateFeeSettings}
-        isNewAdmission={!!student.is_new_admission}
+        isNewAdmission={effectiveNew}
         studentCategory={(student.category ?? "regular") as "regular" | "rte" | "staff_child"}
         busFeeAmount={student.bus_fee_amount ?? null}
         defaultCollectedBy={profile.full_name ?? ""}

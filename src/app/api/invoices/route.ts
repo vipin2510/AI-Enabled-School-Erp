@@ -74,7 +74,7 @@ export async function POST(req: Request) {
   //    where a known UUID from another tenant gets posted here.
   const { data: student, error: studentErr } = await supabase
     .from("students")
-    .select("id, bus_fee_amount")
+    .select("id, bus_fee_amount, status")
     .eq("school_id", schoolId)
     .eq("id", body.student_id)
     .maybeSingle();
@@ -83,6 +83,10 @@ export async function POST(req: Request) {
   }
   if (!student) {
     return NextResponse.json({ error: "Student not found in this school." }, { status: 404 });
+  }
+  // Frozen students (e.g. TC issued) are blocked from new collection.
+  if (student.status !== "active") {
+    return NextResponse.json({ error: "This student is frozen (e.g. TC issued) and cannot be collected from." }, { status: 400 });
   }
 
   // 2) Idempotency: if the form already created an invoice for this key,

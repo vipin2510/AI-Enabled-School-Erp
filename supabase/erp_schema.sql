@@ -734,7 +734,49 @@ CREATE TABLE erp.students (
     father_mobile text,
     mother_mobile text,
     category text DEFAULT 'regular'::text NOT NULL,
-    CONSTRAINT students_category_check CHECK ((category = ANY (ARRAY['regular'::text, 'rte'::text, 'staff_child'::text])))
+    fee_kind text,
+    CONSTRAINT students_category_check CHECK ((category = ANY (ARRAY['regular'::text, 'rte'::text, 'staff_child'::text]))),
+    CONSTRAINT students_fee_kind_check CHECK (((fee_kind IS NULL) OR (fee_kind = ANY (ARRAY['new'::text, 'old'::text]))))
+);
+
+
+--
+-- Name: transfer_certificates; Type: TABLE; Schema: public; Owner: - (migration 0034)
+--
+
+CREATE TABLE erp.transfer_certificates (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    school_id uuid NOT NULL,
+    student_id uuid NOT NULL,
+    academic_year text NOT NULL,
+    tc_no text,
+    status text DEFAULT 'requested'::text NOT NULL,
+    admission_no text,
+    student_name text,
+    father_name text,
+    mother_name text,
+    date_of_birth date,
+    caste text,
+    admission_date date,
+    date_of_leaving date,
+    school_days_attended text,
+    studying_class text,
+    last_exam_class text,
+    last_exam_year text,
+    last_exam_result text,
+    promoted_to_class text,
+    admitted_in text,
+    conduct text DEFAULT 'Good'::text,
+    reason text,
+    remarks text,
+    no_dues_amount numeric(12,2) DEFAULT 0,
+    requested_by uuid,
+    requested_at timestamp with time zone DEFAULT now() NOT NULL,
+    issued_by text,
+    issued_on date,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT transfer_certificates_status_check CHECK ((status = ANY (ARRAY['requested'::text, 'issued'::text, 'cancelled'::text])))
 );
 
 

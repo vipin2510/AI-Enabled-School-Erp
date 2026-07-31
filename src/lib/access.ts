@@ -274,6 +274,7 @@ export const DEPARTMENT_NAV: Record<Department, NavItem[]> = {
     { href: "/academics/subjects", label: "Subjects" },
     { href: "/academics/timetable", label: "Timetable" },
     { href: "/academics/signatures", label: "Signatures", leaderOnly: true },
+    { href: "/academics/tc", label: "Transfer Certificates", leaderOnly: true },
     { href: "/academics/id-cards", label: "ID Cards" },
     { href: "/settings/document-fonts", label: "Document Fonts", leaderOnly: true },
   ],
