@@ -57,7 +57,7 @@ export default function AttendancePicker({
       <div>
         <label className="mb-1 block text-xs font-medium text-stone-600">Section</label>
         <select className={field} value={section} onChange={(e) => setSection(e.target.value)} disabled={!sections.length}>
-          <option value="">{sections.length ? "— Select —" : "No sections"}</option>
+          <option value="">{sections.length ? "None" : "No sections"}</option>
           {sections.map((s) => (
             <option key={s} value={s}>
               {s}

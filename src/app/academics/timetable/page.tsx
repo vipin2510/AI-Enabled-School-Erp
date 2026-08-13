@@ -6,6 +6,7 @@ import TimetableBuilder, {
   type Teacher,
   type TimetableSlotSeed,
 } from "./timetable-builder";
+import TimetablePicker from "./picker";
 
 export const dynamic = "force-dynamic";
 
@@ -44,34 +45,38 @@ export default async function TimetablePage({
     (sectionsByClass[s.class_id] ??= []).push(s.name);
   }
 
-  // Load the selected class's subjects, class teacher and existing grid.
+  // Load the selected class's subjects and both timetable grids (regular +
+  // remedial) plus the remedial validity window.
   let subjects: string[] = [];
-  let classTeacherName: string | null = null;
-  let initialSlots: TimetableSlotSeed[] = [];
+  let regularSlots: TimetableSlotSeed[] = [];
+  let remedialSlots: TimetableSlotSeed[] = [];
+  let remedialStart: string | null = null;
+  let remedialEnd: string | null = null;
   const selectedClass = classOptions.find((c) => c.id === classId) ?? null;
 
   if (selectedClass) {
-    const [{ data: subs }, { data: ct }, { data: slots }] = await Promise.all([
+    const [{ data: subs }, { data: slots }, { data: remMeta }] = await Promise.all([
       supabase.from("subjects").select("name").eq("school_id", schoolId).eq("class_id", classId).order("name"),
       supabase
-        .from("class_teachers")
-        .select("teacher_id")
+        .from("timetable_slots")
+        .select("day, period, subject_name, teacher_id, kind")
+        .eq("school_id", schoolId)
+        .eq("class_id", classId)
+        .eq("section", section),
+      supabase
+        .from("remedial_timetables")
+        .select("start_date, end_date")
         .eq("school_id", schoolId)
         .eq("class_id", classId)
         .eq("section", section)
         .maybeSingle(),
-      supabase
-        .from("timetable_slots")
-        .select("day, period, subject_name, teacher_id")
-        .eq("school_id", schoolId)
-        .eq("class_id", classId)
-        .eq("section", section),
     ]);
     subjects = ((subs ?? []) as { name: string }[]).map((s) => s.name);
-    initialSlots = (slots ?? []) as TimetableSlotSeed[];
-    if (ct?.teacher_id) {
-      classTeacherName = teacherList.find((t) => t.id === ct.teacher_id)?.name ?? null;
-    }
+    const allSlots = (slots ?? []) as (TimetableSlotSeed & { kind?: string })[];
+    regularSlots = allSlots.filter((s) => (s.kind ?? "regular") !== "remedial");
+    remedialSlots = allSlots.filter((s) => s.kind === "remedial");
+    remedialStart = remMeta?.start_date ?? null;
+    remedialEnd = remMeta?.end_date ?? null;
   }
 
   const field = "rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm";
@@ -81,12 +86,10 @@ export default async function TimetablePage({
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Timetable</h1>
         <p className="mt-1 text-sm text-stone-500">
-          Build and save each class&apos;s weekly timetable. Period 1 every day is the class
-          teacher (set in{" "}
-          <Link href="/academics/signatures" className="text-accent hover:underline">
-            Signatures
-          </Link>
-          ). Mon–Fri run 8 periods, Saturday 5. Download class-wise or teacher-wise PDFs.
+          Build and save each class&apos;s weekly timetable. Every period is editable. Switch to
+          the <span className="font-medium">Remedial</span> tab for a separate non-curricular
+          timetable with its own date range. Mon–Fri run 8 periods, Saturday 5. Download
+          class-wise or teacher-wise PDFs.
         </p>
       </header>
 
@@ -100,32 +103,13 @@ export default async function TimetablePage({
         </div>
       ) : (
         <>
-          {/* Class + section picker (navigates via query params). */}
-          <form method="get" className="card mb-5 flex flex-wrap items-end gap-3 p-4">
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-stone-500">Class</span>
-              <select name="classId" defaultValue={classId} className={field}>
-                <option value="">— pick a class —</option>
-                {classOptions.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.display_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-stone-500">Section</span>
-              <select name="section" defaultValue={section} className={field}>
-                <option value="">— none —</option>
-                {(sectionsByClass[classId] ?? []).map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button className="rounded-lg bg-stone-900 px-4 py-2 text-sm text-stone-50">Open</button>
-          </form>
+          {/* Class + section picker — client-side so sections show instantly. */}
+          <TimetablePicker
+            classes={classOptions.map((c) => ({ id: c.id, display_name: c.display_name }))}
+            sectionsByClass={sectionsByClass}
+            initialClassId={classId}
+            initialSection={section}
+          />
 
           {selectedClass ? (
             <TimetableBuilder
@@ -134,8 +118,10 @@ export default async function TimetablePage({
               className={`${selectedClass.display_name}${section ? ` · ${section}` : ""}`}
               subjects={subjects}
               teachers={teacherList}
-              classTeacherName={classTeacherName}
-              initialSlots={initialSlots}
+              regularSlots={regularSlots}
+              remedialSlots={remedialSlots}
+              remedialStart={remedialStart}
+              remedialEnd={remedialEnd}
               days={DAYS}
             />
           ) : (

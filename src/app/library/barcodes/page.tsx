@@ -22,7 +22,7 @@ export default async function BarcodesPage() {
           Print QR labels to stick on books. Scan them at the desk to issue or return.
         </p>
       </header>
-      <LabelDownload count={count ?? 0} />
+      <LabelDownload count={count ?? 0} batchSize={300} />
     </div>
   );
 }

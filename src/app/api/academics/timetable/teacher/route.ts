@@ -21,18 +21,14 @@ export async function GET(req: Request) {
   if (!teacherId) return NextResponse.json({ error: "Missing teacherId" }, { status: 400 });
 
   const supabase = await createClient();
-  const [{ data: teacher }, { data: classes }, { data: slots }, { data: cts }] = await Promise.all([
+  const [{ data: teacher }, { data: classes }, { data: slots }] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", teacherId).maybeSingle(),
     supabase.from("classes").select("id, display_name").eq("school_id", schoolId),
     supabase
       .from("timetable_slots")
       .select("class_id, section, day, period, subject_name")
       .eq("school_id", schoolId)
-      .eq("teacher_id", teacherId),
-    supabase
-      .from("class_teachers")
-      .select("class_id, section")
-      .eq("school_id", schoolId)
+      .eq("kind", "regular")
       .eq("teacher_id", teacherId),
   ]);
 
@@ -48,7 +44,7 @@ export async function GET(req: Request) {
     (grid[k] ??= []).push(text);
   };
 
-  // Regular teaching slots.
+  // Teaching slots across every class (period 1 is a normal slot now).
   for (const s of (slots ?? []) as {
     class_id: string;
     section: string;
@@ -58,11 +54,6 @@ export async function GET(req: Request) {
   }[]) {
     const subj = s.subject_name ? `: ${s.subject_name}` : "";
     push(s.day, s.period, `${label(s.class_id, s.section)}${subj}`);
-  }
-
-  // Class-teacher first periods — every working day, period 1.
-  for (const ct of (cts ?? []) as { class_id: string; section: string }[]) {
-    for (const d of DAYS) push(d.n, 1, `${label(ct.class_id, ct.section)}: CT`);
   }
 
   const logoDataUrl = await assetDataUrl("letterhead/aps-logo.jpeg");

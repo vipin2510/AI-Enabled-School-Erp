@@ -120,6 +120,7 @@ export default async function AttendancePage({
               date={date}
               students={students}
               initial={initial}
+              alreadyMarked={alreadyMarked}
             />
           )}
         </div>

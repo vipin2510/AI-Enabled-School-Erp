@@ -33,12 +33,13 @@ export function addDays(dateStr: string, days: number): string {
   return todayStr(d);
 }
 
+// Weekday + DD/MM/YYYY, e.g. "Sun, 27/05/2026".
 export function prettyDate(dateStr: string): string {
-  return parseLocal(dateStr).toLocaleDateString("en-IN", {
+  return parseLocal(dateStr).toLocaleDateString("en-GB", {
     timeZone: TIME_ZONE,
     weekday: "short",
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
     year: "numeric",
   });
 }

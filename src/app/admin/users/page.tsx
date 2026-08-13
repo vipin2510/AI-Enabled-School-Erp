@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -129,7 +130,11 @@ async function UsersTable({
         <tbody>
           {users.map((u) => (
             <tr key={u.id} className="border-t border-stone-100">
-              <td className="px-4 py-2 font-medium">{u.full_name || "—"}</td>
+              <td className="px-4 py-2 font-medium">
+                <Link href={`/admin/staff/${u.id}`} className="text-stone-900 hover:text-accent hover:underline">
+                  {u.full_name || "—"}
+                </Link>
+              </td>
               <td className="px-4 py-2 text-stone-600">{u.phone || u.email || "—"}</td>
               <td className="px-4 py-2">{ROLE_LABELS[u.role] ?? u.role ?? "—"}</td>
               <td className="px-4 py-2">

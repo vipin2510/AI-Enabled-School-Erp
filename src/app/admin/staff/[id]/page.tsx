@@ -11,6 +11,7 @@ import {
 } from "@/lib/access";
 import { formatTime, formatDate } from "@/lib/utils";
 import { todayStr } from "@/lib/attendance";
+import { DAYS, periodsForDay, MAX_PERIOD } from "@/lib/timetable";
 
 export const dynamic = "force-dynamic";
 
@@ -44,21 +45,36 @@ export default async function StaffProfilePage({
   const schoolId = await getCurrentSchoolId(me);
   const supabase = await createClient();
 
-  const [{ data: profileRow }, { data: marksData }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, full_name, email, phone, role, department, school_ids, group_id, is_active, created_at")
-      .eq("id", id)
-      .maybeSingle(),
-    supabase
-      .from("staff_attendance")
-      .select("date, marked_at, latitude, longitude")
-      .eq("profile_id", id)
-      .eq("school_id", schoolId)
-      .order("date", { ascending: false })
-      .order("marked_at", { ascending: false })
-      .limit(180),
-  ]);
+  const [{ data: profileRow }, { data: marksData }, { data: slotRows }, { data: ctRows }, { data: classRows }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, full_name, email, phone, role, department, school_ids, group_id, is_active, created_at")
+        .eq("id", id)
+        .maybeSingle(),
+      supabase
+        .from("staff_attendance")
+        .select("date, marked_at, latitude, longitude")
+        .eq("profile_id", id)
+        .eq("school_id", schoolId)
+        .order("date", { ascending: false })
+        .order("marked_at", { ascending: false })
+        .limit(180),
+      // This teacher's periods across every class (regular timetable).
+      supabase
+        .from("timetable_slots")
+        .select("class_id, section, day, period, subject_name")
+        .eq("school_id", schoolId)
+        .eq("kind", "regular")
+        .eq("teacher_id", id),
+      // Classes where this teacher is the class teacher.
+      supabase
+        .from("class_teachers")
+        .select("class_id, section")
+        .eq("school_id", schoolId)
+        .eq("teacher_id", id),
+      supabase.from("classes").select("id, display_name, ordinal").eq("school_id", schoolId).order("ordinal"),
+    ]);
 
   // Don't let an admin view a staffer outside their own group via a direct URL.
   if (!profileRow || (profileRow as { group_id: string | null }).group_id !== me.group_id) {
@@ -76,6 +92,37 @@ export default async function StaffProfilePage({
 
   const daysAll = new Set(marks.map((m) => m.date));
   const days30 = new Set(marks.filter((m) => m.date >= cutoff30Str).map((m) => m.date));
+
+  // Teaching data derived from the timetable.
+  type Slot = { class_id: string; section: string; day: number; period: number; subject_name: string | null };
+  const slots = (slotRows ?? []) as Slot[];
+  const cts = (ctRows ?? []) as { class_id: string; section: string }[];
+  const classNameById = new Map(
+    ((classRows ?? []) as { id: string; display_name: string }[]).map((c) => [c.id, c.display_name])
+  );
+  const classLabel = (classId: string, section: string) =>
+    `${classNameById.get(classId) ?? "?"}${section ? `-${section}` : ""}`;
+
+  const subjectsTaught = Array.from(
+    new Set(slots.map((s) => s.subject_name?.trim()).filter((s): s is string => !!s))
+  ).sort();
+
+  const classesTaught = Array.from(
+    new Set([
+      ...slots.map((s) => classLabel(s.class_id, s.section)),
+      ...cts.map((c) => classLabel(c.class_id, c.section)),
+    ])
+  ).sort();
+
+  // Weekly grid: `${day}-${period}` → list of "Class-Section: Subject" entries.
+  const teacherGrid: Record<string, string[]> = {};
+  for (const s of slots) {
+    const k = `${s.day}-${s.period}`;
+    const subj = s.subject_name ? `: ${s.subject_name}` : "";
+    (teacherGrid[k] ??= []).push(`${classLabel(s.class_id, s.section)}${subj}`);
+  }
+  const periods = Array.from({ length: MAX_PERIOD }, (_, i) => i + 1);
+  const hasTimetable = slots.length > 0;
 
   const schoolLabel = (sid: string) =>
     SCHOOLS.find((s) => s.id === sid)?.location.split(",")[0] ?? sid.slice(0, 8);
@@ -141,6 +188,111 @@ export default async function StaffProfilePage({
             value={marks[0] ? `${formatDate(marks[0].date)} · ${formatTime(marks[0].marked_at)}` : "—"}
           />
         </div>
+      </section>
+
+      <section className="card mb-6 p-5">
+        <h2 className="mb-3 text-sm font-semibold text-stone-800">Teaching</h2>
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+          <div>
+            <dt className="mb-1.5 text-xs text-stone-500">Subjects taught</dt>
+            <dd className="flex flex-wrap gap-1.5">
+              {subjectsTaught.length ? (
+                subjectsTaught.map((s) => (
+                  <span key={s} className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-700">
+                    {s}
+                  </span>
+                ))
+              ) : (
+                <span className="text-sm text-stone-400">—</span>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="mb-1.5 text-xs text-stone-500">Classes taught</dt>
+            <dd className="flex flex-wrap gap-1.5">
+              {classesTaught.length ? (
+                classesTaught.map((c) => (
+                  <span key={c} className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-700">
+                    {c}
+                  </span>
+                ))
+              ) : (
+                <span className="text-sm text-stone-400">—</span>
+              )}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="card mb-6 overflow-hidden p-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
+          <div>
+            <h2 className="text-sm font-semibold text-stone-800">Weekly timetable</h2>
+            <p className="mt-0.5 text-xs text-stone-500">
+              This teacher&apos;s periods across every class (regular timetable).
+            </p>
+          </div>
+          {hasTimetable && (
+            <a
+              href={`/api/academics/timetable/teacher?teacherId=${profile.id}`}
+              className="rounded-lg border border-stone-200 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-200"
+            >
+              ⤓ Teacher timetable PDF
+            </a>
+          )}
+        </div>
+        {hasTimetable ? (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-xs">
+              <thead>
+                <tr>
+                  <th className="border border-stone-200 bg-stone-50 px-2 py-1.5 text-left font-medium">Day</th>
+                  {periods.map((p) => (
+                    <th key={p} className="border border-stone-200 bg-stone-50 px-2 py-1.5 font-medium">
+                      P{p}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {DAYS.map((d) => (
+                  <tr key={d.n}>
+                    <td className="border border-stone-200 bg-stone-50 px-2 py-1.5 font-medium whitespace-nowrap">
+                      {d.full}
+                    </td>
+                    {periods.map((p) => {
+                      if (p > periodsForDay(d.n)) {
+                        return (
+                          <td key={p} className="border border-stone-200 bg-stone-100 px-2 py-1.5 text-center text-stone-300">
+                            —
+                          </td>
+                        );
+                      }
+                      const entries = teacherGrid[`${d.n}-${p}`] ?? [];
+                      return (
+                        <td key={p} className="border border-stone-200 px-2 py-1.5 align-top">
+                          {entries.length ? (
+                            entries.map((e, i) => (
+                              <div key={i} className="text-stone-700">
+                                {e}
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-stone-300">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="px-5 py-6 text-sm text-stone-500">
+            No timetable periods assigned to this teacher yet.
+          </p>
+        )}
       </section>
 
       <section className="card overflow-hidden p-0">

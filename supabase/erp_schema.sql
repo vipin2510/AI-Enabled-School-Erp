@@ -637,6 +637,74 @@ CREATE TABLE erp.student_bus_fee_months (
 
 
 --
+-- Name: cashbook_settings; Type: TABLE; Schema: public; Owner: - (migration 0032)
+--
+
+CREATE TABLE erp.cashbook_settings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    school_id uuid NOT NULL,
+    opening_balance numeric(12,2) DEFAULT 0 NOT NULL,
+    opening_date date,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: cashbook_expenses; Type: TABLE; Schema: public; Owner: - (migration 0032)
+--
+
+CREATE TABLE erp.cashbook_expenses (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    school_id uuid NOT NULL,
+    spent_on date DEFAULT ((now() AT TIME ZONE 'Asia/Kolkata'::text))::date NOT NULL,
+    mode text DEFAULT 'cash'::text NOT NULL,
+    category text,
+    description text NOT NULL,
+    amount numeric(12,2) NOT NULL,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT cashbook_expenses_amount_check CHECK ((amount >= (0)::numeric)),
+    CONSTRAINT cashbook_expenses_mode_check CHECK ((mode = ANY (ARRAY['cash'::text, 'cheque'::text, 'upi'::text, 'inb'::text])))
+);
+
+
+--
+-- Name: bank_deposits; Type: TABLE; Schema: public; Owner: - (migration 0032)
+--
+
+CREATE TABLE erp.bank_deposits (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    school_id uuid NOT NULL,
+    deposited_on date DEFAULT ((now() AT TIME ZONE 'Asia/Kolkata'::text))::date NOT NULL,
+    amount numeric(12,2) NOT NULL,
+    bank_name text,
+    deposit_receipt_no text,
+    reference text,
+    notes text,
+    created_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT bank_deposits_amount_check CHECK ((amount >= (0)::numeric))
+);
+
+
+--
+-- Name: student_opening_dues; Type: TABLE; Schema: public; Owner: - (migration 0033)
+--
+
+CREATE TABLE erp.student_opening_dues (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    school_id uuid NOT NULL,
+    student_id uuid NOT NULL,
+    academic_year text NOT NULL,
+    amount numeric(12,2) DEFAULT 0 NOT NULL,
+    breakdown jsonb,
+    source text DEFAULT 'import 2025-26'::text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: students; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -666,7 +734,49 @@ CREATE TABLE erp.students (
     father_mobile text,
     mother_mobile text,
     category text DEFAULT 'regular'::text NOT NULL,
-    CONSTRAINT students_category_check CHECK ((category = ANY (ARRAY['regular'::text, 'rte'::text, 'staff_child'::text])))
+    fee_kind text,
+    CONSTRAINT students_category_check CHECK ((category = ANY (ARRAY['regular'::text, 'rte'::text, 'staff_child'::text]))),
+    CONSTRAINT students_fee_kind_check CHECK (((fee_kind IS NULL) OR (fee_kind = ANY (ARRAY['new'::text, 'old'::text]))))
+);
+
+
+--
+-- Name: transfer_certificates; Type: TABLE; Schema: public; Owner: - (migration 0034)
+--
+
+CREATE TABLE erp.transfer_certificates (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    school_id uuid NOT NULL,
+    student_id uuid NOT NULL,
+    academic_year text NOT NULL,
+    tc_no text,
+    status text DEFAULT 'requested'::text NOT NULL,
+    admission_no text,
+    student_name text,
+    father_name text,
+    mother_name text,
+    date_of_birth date,
+    caste text,
+    admission_date date,
+    date_of_leaving date,
+    school_days_attended text,
+    studying_class text,
+    last_exam_class text,
+    last_exam_year text,
+    last_exam_result text,
+    promoted_to_class text,
+    admitted_in text,
+    conduct text DEFAULT 'Good'::text,
+    reason text,
+    remarks text,
+    no_dues_amount numeric(12,2) DEFAULT 0,
+    requested_by uuid,
+    requested_at timestamp with time zone DEFAULT now() NOT NULL,
+    issued_by text,
+    issued_on date,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT transfer_certificates_status_check CHECK ((status = ANY (ARRAY['requested'::text, 'issued'::text, 'cancelled'::text])))
 );
 
 
