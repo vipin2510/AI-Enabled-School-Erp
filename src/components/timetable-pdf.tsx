@@ -95,7 +95,6 @@ function PeriodHead() {
       {periods.map((p) => (
         <Text key={p} style={[styles.th, styles.periodCell]}>
           P{p}
-          {p === 1 ? "\n(CT)" : ""}
         </Text>
       ))}
     </View>
@@ -136,14 +135,6 @@ export function ClassTimetablePdf({
                 <Text>{d.full}</Text>
               </View>
               {periods.map((p) => {
-                if (p === 1) {
-                  return (
-                    <View key={p} style={[styles.td, styles.ctCell]}>
-                      <Text style={styles.ctLabel}>Class Teacher</Text>
-                      {classTeacherName ? <Text style={styles.teacherName}>{classTeacherName}</Text> : null}
-                    </View>
-                  );
-                }
                 if (p > periodsForDay(d.n)) {
                   return <View key={p} style={[styles.td, styles.offCell]} />;
                 }
@@ -234,8 +225,7 @@ export function TeacherTimetablePdf({
         </View>
 
         <Text style={styles.legend}>
-          Shows this teacher&apos;s periods across every class. Period 1 (CT) entries come from
-          class-teacher assignments.
+          Shows this teacher&apos;s periods across every class.
         </Text>
       </Page>
     </Document>

@@ -19,30 +19,32 @@ export function inr(amount: number | string | null | undefined) {
 // where the server runs (Vercel functions run in UTC).
 export const TIME_ZONE = "Asia/Kolkata";
 
+// Numeric day/month/year in IST, e.g. "27/05/2026" (DD/MM/YYYY).
 export function formatDate(d: string | Date | null | undefined) {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;
   if (isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-IN", {
+  return date.toLocaleDateString("en-GB", {
     timeZone: TIME_ZONE,
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
     year: "numeric",
   });
 }
 
-// Date + time in IST, e.g. "27 May 2026, 02:15 pm".
+// Date + time in IST, e.g. "27/05/2026, 02:15 pm".
 export function formatDateTime(d: string | Date | null | undefined) {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;
   if (isNaN(date.getTime())) return "";
-  return date.toLocaleString("en-IN", {
+  return date.toLocaleString("en-GB", {
     timeZone: TIME_ZONE,
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: true,
   });
 }
 

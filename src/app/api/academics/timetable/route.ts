@@ -19,10 +19,11 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const classId = url.searchParams.get("classId") ?? "";
   const section = url.searchParams.get("section") ?? "";
+  const kind = url.searchParams.get("kind") === "remedial" ? "remedial" : "regular";
   if (!classId) return NextResponse.json({ error: "Missing classId" }, { status: 400 });
 
   const supabase = await createClient();
-  const [{ data: klass }, { data: slots }, { data: ct }, { data: profiles }, settings] =
+  const [{ data: klass }, { data: slots }, { data: ct }, { data: profiles }, { data: remMeta }, settings] =
     await Promise.all([
       supabase.from("classes").select("display_name").eq("school_id", schoolId).eq("id", classId).maybeSingle(),
       supabase
@@ -30,7 +31,8 @@ export async function GET(req: Request) {
         .select("day, period, subject_name, teacher_id")
         .eq("school_id", schoolId)
         .eq("class_id", classId)
-        .eq("section", section),
+        .eq("section", section)
+        .eq("kind", kind),
       supabase
         .from("class_teachers")
         .select("teacher_id, signature_url")
@@ -43,6 +45,15 @@ export async function GET(req: Request) {
         .select("id, full_name")
         .eq("group_id", profile.group_id)
         .contains("school_ids", [schoolId]),
+      kind === "remedial"
+        ? supabase
+            .from("remedial_timetables")
+            .select("start_date, end_date")
+            .eq("school_id", schoolId)
+            .eq("class_id", classId)
+            .eq("section", section)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
       loadSchoolPdfSettings(supabase, schoolId),
     ]);
 
@@ -63,8 +74,14 @@ export async function GET(req: Request) {
   const classTeacherName = ct?.teacher_id ? nameById.get(ct.teacher_id) ?? null : null;
   const logoDataUrl = await assetDataUrl("letterhead/aps-logo.jpeg");
 
+  const remWindow =
+    kind === "remedial" && (remMeta?.start_date || remMeta?.end_date)
+      ? ` · Remedial (${remMeta?.start_date ?? "…"} → ${remMeta?.end_date ?? "…"})`
+      : kind === "remedial"
+      ? " · Remedial"
+      : "";
   const meta: TimetableMeta = {
-    title: `${klass.display_name}${section ? ` · ${section}` : ""}`,
+    title: `${klass.display_name}${section ? ` · ${section}` : ""}${remWindow}`,
     schoolName: school?.name ?? "Adeshwar Public School",
     schoolLocation: school?.location ?? "",
     schoolParentNote: school?.parentNote ?? null,
