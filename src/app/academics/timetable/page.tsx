@@ -6,6 +6,7 @@ import TimetableBuilder, {
   type Teacher,
   type TimetableSlotSeed,
 } from "./timetable-builder";
+import TimetablePicker from "./picker";
 
 export const dynamic = "force-dynamic";
 
@@ -102,32 +103,13 @@ export default async function TimetablePage({
         </div>
       ) : (
         <>
-          {/* Class + section picker (navigates via query params). */}
-          <form method="get" className="card mb-5 flex flex-wrap items-end gap-3 p-4">
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-stone-500">Class</span>
-              <select name="classId" defaultValue={classId} className={field}>
-                <option value="">— pick a class —</option>
-                {classOptions.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.display_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-stone-500">Section</span>
-              <select name="section" defaultValue={section} className={field}>
-                <option value="">None</option>
-                {(sectionsByClass[classId] ?? []).map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button className="rounded-lg bg-stone-900 px-4 py-2 text-sm text-stone-50">Open</button>
-          </form>
+          {/* Class + section picker — client-side so sections show instantly. */}
+          <TimetablePicker
+            classes={classOptions.map((c) => ({ id: c.id, display_name: c.display_name }))}
+            sectionsByClass={sectionsByClass}
+            initialClassId={classId}
+            initialSection={section}
+          />
 
           {selectedClass ? (
             <TimetableBuilder
