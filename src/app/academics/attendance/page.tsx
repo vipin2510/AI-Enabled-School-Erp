@@ -115,6 +115,10 @@ export default async function AttendancePage({
             <div className="card p-6 text-sm text-stone-600">No students in this section.</div>
           ) : (
             <AttendanceForm
+              // Remount on any class/section/date change so the marks state is
+              // re-seeded from that day's saved data — otherwise React keeps the
+              // component mounted and the previous day's marks persist.
+              key={`${class_id}-${section}-${date}`}
               classId={class_id!}
               section={section!}
               date={date}
