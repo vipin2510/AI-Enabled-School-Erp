@@ -113,6 +113,11 @@ export default async function TimetablePage({
 
           {selectedClass ? (
             <TimetableBuilder
+              // Remount on any class/section change so the grid state is
+              // re-seeded from that section's saved slots. Without this key React
+              // keeps the mounted builder and its useState-seeded cells persist,
+              // so switching from A to B shows (and could re-save) A's grid.
+              key={`${classId}-${section}`}
               classId={classId}
               section={section}
               className={`${selectedClass.display_name}${section ? ` · ${section}` : ""}`}
