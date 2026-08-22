@@ -40,6 +40,76 @@ export function getClasses(schoolId: string): Promise<ClassRow[]> {
   );
 }
 
+// Sections for a school (across all classes). Read on the attendance,
+// timetable, collect and results pickers — change at most a couple of times a
+// year, so a 10-minute TTL is safe. The classes editor busts this tag on any
+// section add/rename/delete.
+type SectionRow = { class_id: string; name: string };
+export function getSections(schoolId: string): Promise<SectionRow[]> {
+  return cached(
+    `sections:${schoolId}`,
+    [tagFor.sections(schoolId)],
+    600,
+    async () => {
+      const supabase = createAnonClient();
+      const { data, error } = await supabase
+        .from("sections")
+        .select("class_id, name")
+        .eq("school_id", schoolId)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as SectionRow[];
+    },
+  );
+}
+
+// Subjects for a school (across all classes). Read on the timetable, subjects
+// and results pages. Same change cadence as classes/sections — 10-minute TTL;
+// the subjects editor busts this tag.
+type SubjectRow = { class_id: string; name: string; category: string | null };
+export function getSubjects(schoolId: string): Promise<SubjectRow[]> {
+  return cached(
+    `subjects:${schoolId}`,
+    [tagFor.subjects(schoolId)],
+    600,
+    async () => {
+      const supabase = createAnonClient();
+      const { data, error } = await supabase
+        .from("subjects")
+        .select("class_id, name, category")
+        .eq("school_id", schoolId)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as SubjectRow[];
+    },
+  );
+}
+
+// Active teachers (profiles) for a school within its group — the timetable
+// builder's teacher dropdowns. Staff lists change rarely; 5-minute TTL. Not
+// tag-busted on user creation (accept up to 5 min before a brand-new teacher
+// appears in the dropdown), which keeps the admin flow untouched.
+type TeacherRow = { id: string; full_name: string | null };
+export function getTeachers(schoolId: string, groupId: string): Promise<TeacherRow[]> {
+  return cached(
+    `teachers:${schoolId}:${groupId}`,
+    [tagFor.teachers(schoolId)],
+    300,
+    async () => {
+      const supabase = createAnonClient();
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("group_id", groupId)
+        .eq("is_active", true)
+        .contains("school_ids", [schoolId])
+        .order("full_name");
+      if (error) throw error;
+      return (data ?? []) as TeacherRow[];
+    },
+  );
+}
+
 // Fee structures + their components for a school + AY. Source of truth for
 // the Collect Fee page and the Fees dashboard's per-class monthly amount.
 // Edited rarely; aggressive TTL is safe because the editor busts the tag on
