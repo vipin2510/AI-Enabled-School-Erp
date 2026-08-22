@@ -1,8 +1,12 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { currentAcademicYear } from "@/lib/academic-year";
 import { getLateFeeSettings } from "@/lib/cache";
+import { DownloadButton } from "@/components/ui/download-button";
+import { PreviewButton } from "@/components/ui/preview-button";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 import CollectForm from "./collect-form";
 import FeeKindControl from "./fee-kind-control";
 
@@ -186,8 +190,22 @@ export default async function CollectFeePage({
     (student.fee_kind as "new" | "old" | null) ?? null;
   const effectiveNew = (feeKind ?? (student.is_new_admission ? "new" : "old")) === "new";
 
+  const classCrumbHref = `/fees/collect?class_id=${student.class_id}${
+    student.section ? `&section=${encodeURIComponent(student.section)}` : ""
+  }`;
+
   return (
     <div className="max-w-5xl">
+      <Breadcrumb
+        items={[
+          { label: "Collect Fee", href: "/fees/collect" },
+          {
+            label: `${klass?.display_name ?? "Class"}${student.section ? ` · ${student.section}` : ""}`,
+            href: classCrumbHref,
+          },
+          { label: student.full_name },
+        ]}
+      />
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs text-stone-500">Collect Fee</div>
@@ -200,6 +218,29 @@ export default async function CollectFeePage({
           <div className="mt-2 max-w-[220px]">
             <FeeKindControl studentId={student.id} current={feeKind} isAdmin={profile.role === "admin"} />
           </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <DownloadButton
+              url={`/api/fees/report/${student.id}/pdf`}
+              filename={`fee-statement-${student.full_name}.pdf`}
+              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+            >
+              ⤓ Download fee report
+            </DownloadButton>
+            <PreviewButton
+              url={`/api/fees/report/${student.id}/pdf`}
+              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+            >
+              Preview
+            </PreviewButton>
+            {profile.role === "admin" && (
+              <Link
+                href={`/academics/tc/${student.id}`}
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              >
+                Generate TC
+              </Link>
+            )}
+          </div>
         </div>
         <div className="grid grid-cols-3 gap-2 text-right text-xs">
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
@@ -209,7 +250,7 @@ export default async function CollectFeePage({
             </div>
           </div>
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-            <div className="text-[10px] uppercase tracking-wide text-amber-700">Outstanding</div>
+            <div className="text-[10px] uppercase tracking-wide text-amber-700">Overall Fee Due</div>
             <div className="mt-0.5 text-base font-semibold tabular-nums text-amber-800">
               {annualTotal > 0 || openingDues > 0 ? inr(outstanding) : "—"}
             </div>

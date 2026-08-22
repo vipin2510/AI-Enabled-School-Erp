@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { getClasses } from "@/lib/cache";
+import { getClasses, getSections } from "@/lib/cache";
 import { deleteStudent } from "./actions";
 import { ConfirmButton } from "@/components/ui/confirm-button";
+import { DownloadButton } from "@/components/ui/download-button";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +16,11 @@ const PAGE_SIZE = 50;
 export default async function StudentsAdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; class?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; class?: string; section?: string; page?: string }>;
 }) {
   const profile = await requireDepartment("academics");
   const schoolId = await getCurrentSchoolId(profile);
-  const { q, class: classFilter, page: pageParam } = await searchParams;
+  const { q, class: classFilter, section: sectionFilter, page: pageParam } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
@@ -38,13 +39,17 @@ export default async function StudentsAdminPage({
     .range(from, to);
   if (q) query = query.or(`full_name.ilike.%${q}%,admission_no.ilike.%${q}%`);
   if (classFilter) query = query.eq("class_id", classFilter);
+  if (sectionFilter) query = query.eq("section", sectionFilter);
 
-  // Page the live student list (typed search hits this); classes dropdown is
-  // cached because it changes maybe twice a year.
-  const [{ data: students, count }, classes] = await Promise.all([
+  // Page the live student list (typed search hits this); classes + sections
+  // dropdowns are cached because they change maybe twice a year.
+  const [{ data: students, count }, classes, sections] = await Promise.all([
     query,
     getClasses(schoolId),
+    getSections(schoolId),
   ]);
+  // Distinct section names across the school (A, B, …) for the filter.
+  const sectionNames = [...new Set(sections.map((s) => s.name))].sort();
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const showingFrom = total === 0 ? 0 : from + 1;
@@ -54,6 +59,7 @@ export default async function StudentsAdminPage({
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (classFilter) params.set("class", classFilter);
+    if (sectionFilter) params.set("section", sectionFilter);
     if (n > 1) params.set("page", String(n));
     const qs = params.toString();
     return qs ? `/academics/students?${qs}` : "/academics/students";
@@ -65,9 +71,19 @@ export default async function StudentsAdminPage({
     const p = new URLSearchParams();
     if (q) p.set("q", q);
     if (classFilter) p.set("class", classFilter);
+    if (sectionFilter) p.set("section", sectionFilter);
     if (page > 1) p.set("page", String(page));
     const qs = p.toString();
     return qs ? `?${qs}` : "";
+  })();
+
+  // Filters carried to the export routes (whole filtered set, not just the page).
+  const exportQs = (() => {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (classFilter) p.set("class", classFilter);
+    if (sectionFilter) p.set("section", sectionFilter);
+    return p.toString();
   })();
 
   return (
@@ -81,12 +97,28 @@ export default async function StudentsAdminPage({
               : `Showing ${showingFrom}–${showingTo} of ${total}`}
           </p>
         </div>
-        <Link
-          href="/academics/students/new"
-          className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50"
-        >
-          + Add student
-        </Link>
+        <div className="flex items-center gap-2">
+          <DownloadButton
+            url={`/api/academics/students-export?format=xlsx${exportQs ? `&${exportQs}` : ""}`}
+            filename="students.xlsx"
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+          >
+            ⤓ Excel
+          </DownloadButton>
+          <DownloadButton
+            url={`/api/academics/students-export?format=pdf${exportQs ? `&${exportQs}` : ""}`}
+            filename="students.pdf"
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+          >
+            ⤓ PDF
+          </DownloadButton>
+          <Link
+            href="/academics/students/new"
+            className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50"
+          >
+            + Add student
+          </Link>
+        </div>
       </header>
 
       <form className="flex gap-3 mb-4" action="/academics/students">
@@ -105,6 +137,18 @@ export default async function StudentsAdminPage({
           {classes?.map((c) => (
             <option key={c.id} value={c.id}>
               {c.display_name}
+            </option>
+          ))}
+        </select>
+        <select
+          name="section"
+          defaultValue={sectionFilter ?? ""}
+          className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm"
+        >
+          <option value="">All sections</option>
+          {sectionNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
             </option>
           ))}
         </select>
