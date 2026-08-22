@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { inr, formatDate } from "@/lib/utils";
 import { decideExpense } from "./actions";
 import SubmitForm from "./submit-form";
+import { DownloadButton } from "@/components/ui/download-button";
+import { PreviewButton } from "@/components/ui/preview-button";
 
 export const dynamic = "force-dynamic";
 
@@ -84,13 +86,24 @@ export default async function ExpensesPage() {
       </section>
 
       <section className="card overflow-hidden p-0">
-        <div className="px-5 py-3">
-          <h2 className="text-sm font-semibold text-stone-800">
-            {isAdmin ? "All submissions" : "Your submissions"}
-          </h2>
-          <p className="mt-0.5 text-xs text-stone-500">
-            {expenses.length} entries · most recent first
-          </p>
+        <div className="flex items-center justify-between px-5 py-3">
+          <div>
+            <h2 className="text-sm font-semibold text-stone-800">
+              {isAdmin ? "All submissions" : "Your submissions"}
+            </h2>
+            <p className="mt-0.5 text-xs text-stone-500">
+              {expenses.length} entries · most recent first
+            </p>
+          </div>
+          {expenses.length > 0 && (
+            <DownloadButton
+              url="/api/fees/expenses-export"
+              filename="expenses.csv"
+              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+            >
+              ⤓ Download all
+            </DownloadButton>
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
@@ -103,6 +116,7 @@ export default async function ExpensesPage() {
                 <th className="px-3 py-2 text-right font-medium">Amount</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">Decision</th>
+                <th className="px-3 py-2 font-medium">Voucher</th>
                 {isAdmin && <th className="px-5 py-2 text-right font-medium">Action</th>}
               </tr>
             </thead>
@@ -149,6 +163,23 @@ export default async function ExpensesPage() {
                       <span className="text-xs text-stone-400">—</span>
                     )}
                   </td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <PreviewButton
+                        url={`/api/fees/expenses/${e.id}/voucher/pdf`}
+                        className="text-xs text-stone-600 hover:underline"
+                      >
+                        View
+                      </PreviewButton>
+                      <DownloadButton
+                        url={`/api/fees/expenses/${e.id}/voucher/pdf`}
+                        filename={`expense-voucher-${e.id.slice(0, 8)}.pdf`}
+                        className="text-xs text-stone-600 hover:underline"
+                      >
+                        ⤓
+                      </DownloadButton>
+                    </div>
+                  </td>
                   {isAdmin && (
                     <td className="px-5 py-2 text-right">
                       {e.status === "pending" ? (
@@ -163,7 +194,7 @@ export default async function ExpensesPage() {
               {expenses.length === 0 && (
                 <tr>
                   <td
-                    colSpan={isAdmin ? 8 : 6}
+                    colSpan={isAdmin ? 9 : 7}
                     className="px-5 py-10 text-center text-stone-500"
                   >
                     {isAdmin

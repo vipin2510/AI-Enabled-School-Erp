@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { bustTag, tagFor } from "@/lib/cache/index";
 import { currentAcademicYear } from "@/lib/academic-year";
 
 // Admin/manager only — adds a new class to the currently active school.
@@ -36,6 +37,8 @@ export async function addClass(formData: FormData) {
 
   await seedSchoolFeeStructure(cls.id, schoolId);
 
+  await bustTag(tagFor.classes(schoolId));
+  await bustTag(tagFor.feeStructures(schoolId));
   revalidatePath("/academics/classes");
   revalidatePath("/academics/subjects");
   revalidatePath("/fees/structures");
@@ -64,6 +67,8 @@ export async function updateClass(formData: FormData) {
     .eq("school_id", schoolId)
     .eq("id", id);
 
+  await bustTag(tagFor.classes(schoolId));
+  await bustTag(tagFor.feeStructures(schoolId));
   revalidatePath("/academics/classes");
   revalidatePath("/academics/subjects");
   revalidatePath("/fees/structures");
@@ -88,6 +93,11 @@ export async function removeClass(formData: FormData) {
     .eq("school_id", schoolId)
     .eq("id", id);
 
+  // Sections, subjects and fee structures cascade on delete — flush all of them.
+  await bustTag(tagFor.classes(schoolId));
+  await bustTag(tagFor.sections(schoolId));
+  await bustTag(tagFor.subjects(schoolId));
+  await bustTag(tagFor.feeStructures(schoolId));
   revalidatePath("/academics/classes");
   revalidatePath("/academics/subjects");
   revalidatePath("/fees/structures");
@@ -109,6 +119,7 @@ export async function updateSection(formData: FormData) {
     .eq("school_id", schoolId)
     .eq("id", id);
 
+  await bustTag(tagFor.sections(schoolId));
   revalidatePath("/academics/classes");
 }
 
@@ -195,6 +206,7 @@ export async function addSection(formData: FormData) {
 
   const supabase = await createClient();
   await supabase.from("sections").insert({ class_id, name, school_id: schoolId });
+  await bustTag(tagFor.sections(schoolId));
   revalidatePath("/academics/classes");
 }
 
@@ -206,6 +218,7 @@ export async function removeSection(formData: FormData) {
 
   const supabase = await createClient();
   await supabase.from("sections").delete().eq("school_id", schoolId).eq("id", id);
+  await bustTag(tagFor.sections(schoolId));
   revalidatePath("/academics/classes");
 }
 
@@ -220,6 +233,7 @@ export async function addSubject(formData: FormData) {
 
   const supabase = await createClient();
   await supabase.from("subjects").insert({ class_id, name, category, school_id: schoolId });
+  await bustTag(tagFor.subjects(schoolId));
   revalidatePath("/academics/subjects");
 }
 
@@ -231,5 +245,6 @@ export async function removeSubject(formData: FormData) {
 
   const supabase = await createClient();
   await supabase.from("subjects").delete().eq("school_id", schoolId).eq("id", id);
+  await bustTag(tagFor.subjects(schoolId));
   revalidatePath("/academics/subjects");
 }

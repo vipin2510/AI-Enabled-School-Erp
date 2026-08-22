@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { addBook, deleteBook } from "../actions";
 import BookImport from "./book-import";
 import { ConfirmButton } from "@/components/ui/confirm-button";
+import { DownloadButton } from "@/components/ui/download-button";
 
 export const dynamic = "force-dynamic";
 
@@ -57,9 +58,18 @@ export default async function CatalogPage({
           <h1 className="text-2xl font-semibold tracking-tight">Catalog</h1>
           <p className="mt-1 text-sm text-stone-500">{books?.length ?? 0} book(s)</p>
         </div>
-        <Link href="/library/barcodes" className="text-sm text-accent hover:underline">
-          Print labels →
-        </Link>
+        <div className="flex items-center gap-3">
+          <DownloadButton
+            url={`/api/library/catalog/pdf${q ? `?q=${encodeURIComponent(q)}` : ""}`}
+            filename="library-catalogue.pdf"
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+          >
+            ⤓ Export PDF
+          </DownloadButton>
+          <Link href="/library/barcodes" className="text-sm text-accent hover:underline">
+            Print labels →
+          </Link>
+        </div>
       </header>
 
       <div className="card mb-4 space-y-4 p-5">

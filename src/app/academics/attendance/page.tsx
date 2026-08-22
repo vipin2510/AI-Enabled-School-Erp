@@ -1,5 +1,6 @@
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getClasses, getSections } from "@/lib/cache";
 import { isSunday, prettyDate, todayStr } from "@/lib/attendance";
 import AttendancePicker from "./picker";
 import AttendanceForm from "./attendance-form";
@@ -19,21 +20,15 @@ export default async function AttendancePage({
   const date = rawDate || todayStr();
   const supabase = await createClient();
 
-  const [{ data: classes }, { data: sections }] = await Promise.all([
-    supabase
-      .from("classes")
-      .select("id, display_name, ordinal")
-      .eq("school_id", schoolId)
-      .order("ordinal"),
-    supabase
-      .from("sections")
-      .select("class_id, name")
-      .eq("school_id", schoolId)
-      .order("name"),
+  // Classes + sections are cached reference data (change a couple of times a
+  // year); the per-date marks below stay live.
+  const [classes, sections] = await Promise.all([
+    getClasses(schoolId),
+    getSections(schoolId),
   ]);
 
   const sectionsByClass: Record<string, string[]> = {};
-  for (const s of (sections ?? []) as SectionRow[]) {
+  for (const s of sections as SectionRow[]) {
     (sectionsByClass[s.class_id] ??= []).push(s.name);
   }
 

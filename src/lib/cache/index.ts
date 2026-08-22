@@ -61,6 +61,8 @@ export async function bustTag(tag: string): Promise<void> {
 // every caller for tag literals.
 export const tagFor = {
   classes: (schoolId: string) => `s:${schoolId}:classes`,
+  sections: (schoolId: string) => `s:${schoolId}:sections`,
+  teachers: (schoolId: string) => `s:${schoolId}:teachers`,
   feeStructures: (schoolId: string) => `s:${schoolId}:fee_structures`,
   lateFeeSettings: (schoolId: string) => `s:${schoolId}:late_fee_settings`,
   feePrintSettings: (schoolId: string) => `s:${schoolId}:fee_print_settings`,

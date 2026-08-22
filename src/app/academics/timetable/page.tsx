@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getClasses, getSections, getSubjects, getTeachers } from "@/lib/cache";
 import { DAYS } from "@/lib/timetable";
 import TimetableBuilder, {
   type Teacher,
@@ -24,24 +25,20 @@ export default async function TimetablePage({
   const classId = sp.classId ?? "";
   const section = sp.section ?? "";
 
-  const [{ data: classes }, { data: sections }, { data: teachers }] = await Promise.all([
-    supabase.from("classes").select("id, display_name, ordinal").eq("school_id", schoolId).order("ordinal"),
-    supabase.from("sections").select("class_id, name").eq("school_id", schoolId).order("name"),
-    supabase
-      .from("profiles")
-      .select("id, full_name")
-      .eq("group_id", profile.group_id)
-      .eq("is_active", true)
-      .contains("school_ids", [schoolId])
-      .order("full_name"),
+  // Reference data (classes/sections/teachers) is cached per-school — it changes
+  // a couple of times a year, so there's no reason to re-query it on every open.
+  const [classes, sections, teachers] = await Promise.all([
+    getClasses(schoolId),
+    getSections(schoolId),
+    getTeachers(schoolId, profile.group_id),
   ]);
 
-  const classOptions = (classes ?? []) as ClassRow[];
-  const teacherList = ((teachers ?? []) as { id: string; full_name: string | null }[]).map(
+  const classOptions = classes as ClassRow[];
+  const teacherList = teachers.map(
     (t): Teacher => ({ id: t.id, name: t.full_name || "(unnamed)" })
   );
   const sectionsByClass: Record<string, string[]> = {};
-  for (const s of (sections ?? []) as { class_id: string; name: string }[]) {
+  for (const s of sections) {
     (sectionsByClass[s.class_id] ??= []).push(s.name);
   }
 
@@ -55,8 +52,10 @@ export default async function TimetablePage({
   const selectedClass = classOptions.find((c) => c.id === classId) ?? null;
 
   if (selectedClass) {
-    const [{ data: subs }, { data: slots }, { data: remMeta }] = await Promise.all([
-      supabase.from("subjects").select("name").eq("school_id", schoolId).eq("class_id", classId).order("name"),
+    // Subjects are cached reference data; the timetable slots + remedial window
+    // are live (they change on every save) so they stay on the request client.
+    const [allSubjects, { data: slots }, { data: remMeta }] = await Promise.all([
+      getSubjects(schoolId),
       supabase
         .from("timetable_slots")
         .select("day, period, subject_name, teacher_id, kind")
@@ -71,7 +70,7 @@ export default async function TimetablePage({
         .eq("section", section)
         .maybeSingle(),
     ]);
-    subjects = ((subs ?? []) as { name: string }[]).map((s) => s.name);
+    subjects = allSubjects.filter((s) => s.class_id === classId).map((s) => s.name);
     const allSlots = (slots ?? []) as (TimetableSlotSeed & { kind?: string })[];
     regularSlots = allSlots.filter((s) => (s.kind ?? "regular") !== "remedial");
     remedialSlots = allSlots.filter((s) => s.kind === "remedial");
@@ -113,6 +112,11 @@ export default async function TimetablePage({
 
           {selectedClass ? (
             <TimetableBuilder
+              // Remount on any class/section change so the grid state is
+              // re-seeded from that section's saved slots. Without this key React
+              // keeps the mounted builder and its useState-seeded cells persist,
+              // so switching from A to B shows (and could re-save) A's grid.
+              key={`${classId}-${section}`}
               classId={classId}
               section={section}
               className={`${selectedClass.display_name}${section ? ` · ${section}` : ""}`}

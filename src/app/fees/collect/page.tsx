@@ -2,7 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { currentAcademicYear } from "@/lib/academic-year";
-import { getClasses, getFeeStructures } from "@/lib/cache";
+import { getClasses, getFeeStructures, getSections } from "@/lib/cache";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 import BusFeeInline from "./bus-fee-inline";
 
 export const dynamic = "force-dynamic";
@@ -12,17 +13,18 @@ type PayState = "paid" | "partial" | "due" | "unknown";
 export default async function CollectFeePicker({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; class_id?: string }>;
+  searchParams: Promise<{ q?: string; class_id?: string; section?: string }>;
 }) {
   const profile = await requireDepartment("fees");
   const schoolId = await getCurrentSchoolId(profile);
-  const { q, class_id } = await searchParams;
+  const { q, class_id, section } = await searchParams;
   const supabase = await createClient();
   const AY = currentAcademicYear();
 
-  // Cached: classes change a couple of times a year; no point re-fetching on
-  // every keystroke in the picker.
-  const classes = await getClasses(schoolId);
+  // Cached: classes + sections change a couple of times a year; no point
+  // re-fetching on every keystroke in the picker.
+  const [classes, sections] = await Promise.all([getClasses(schoolId), getSections(schoolId)]);
+  const sectionNames = [...new Set(sections.map((s) => s.name))].sort();
 
   let query = supabase
     .from("students")
@@ -38,6 +40,7 @@ export default async function CollectFeePicker({
     );
   }
   if (class_id) query = query.eq("class_id", class_id);
+  if (section) query = query.eq("section", section);
 
   const { data, error: studentsErr } = await query;
   if (studentsErr) throw studentsErr;
@@ -49,6 +52,7 @@ export default async function CollectFeePicker({
 
   return (
     <div className="max-w-3xl">
+      <Breadcrumb items={[{ label: "Fees", href: "/fees" }, { label: "Collect Fee" }]} />
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Collect Fee</h1>
         <p className="text-stone-500 text-sm">
@@ -72,6 +76,18 @@ export default async function CollectFeePicker({
           {(classes ?? []).map((c) => (
             <option key={c.id} value={c.id}>
               {c.display_name}
+            </option>
+          ))}
+        </select>
+        <select
+          name="section"
+          defaultValue={section ?? ""}
+          className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm"
+        >
+          <option value="">All sections</option>
+          {sectionNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
             </option>
           ))}
         </select>
