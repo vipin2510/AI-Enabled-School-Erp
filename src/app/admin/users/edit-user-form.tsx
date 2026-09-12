@@ -17,6 +17,7 @@ type EditUser = {
   email: string | null;
   role: Role;
   department: Department | null;
+  departments: Department[];
   school_ids: string[];
 };
 
@@ -41,9 +42,22 @@ export default function EditUserForm({
   const [multiSchools, setMultiSchools] = useState<string[]>(
     user.school_ids.length ? user.school_ids : schools.map((s) => s.id),
   );
+  // Staff can be assigned one OR more departments.
+  const [depts, setDepts] = useState<string[]>(
+    user.departments.length
+      ? user.departments
+      : user.department
+        ? [user.department]
+        : [],
+  );
 
   const toggleSchool = (id: string) =>
     setMultiSchools((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+
+  const toggleDept = (id: string) =>
+    setDepts((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
 
@@ -104,22 +118,26 @@ export default function EditUserForm({
               </Field>
 
               <Field label="Department">
-                <select
-                  name="department"
-                  disabled={role !== "staff"}
-                  className={inputCls}
-                  defaultValue={user.department ?? ""}
-                  key={role}
-                >
-                  <option value="">
-                    {role === "staff" ? "Select…" : "All (admin/manager)"}
-                  </option>
-                  {DEPARTMENTS.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
+                {role === "staff" ? (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 rounded-lg border border-stone-300 bg-white px-3 py-2">
+                    {DEPARTMENTS.map((d) => (
+                      <label key={d.id} className="flex items-center gap-1.5 text-sm">
+                        <input
+                          type="checkbox"
+                          name="departments"
+                          value={d.id}
+                          checked={depts.includes(d.id)}
+                          onChange={() => toggleDept(d.id)}
+                        />
+                        <span>{d.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-500">
+                    All (admin/manager)
+                  </div>
+                )}
               </Field>
 
               <fieldset className="rounded-lg border border-stone-200 p-3">

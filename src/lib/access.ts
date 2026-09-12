@@ -305,10 +305,15 @@ export function isDepartment(value: string | null | undefined): value is Departm
   );
 }
 
-// Which departments a profile may switch between.
-export function allowedDepartments(role: Role, department: Department | null): Department[] {
+// Which departments a profile may open / switch between. Admin & manager span
+// every department; a Layer-3 staff account is limited to the department(s)
+// explicitly assigned to it — which may now be MORE THAN ONE (a staffer can
+// cover e.g. Fees and Library on the same login). Returned in DEPARTMENTS order
+// so the switcher and dashboards are stable regardless of how they were stored.
+export function allowedDepartments(role: Role, departments: Department[]): Department[] {
   if (role === "admin" || role === "manager") {
     return DEPARTMENTS.map((d) => d.id);
   }
-  return department ? [department] : [];
+  const set = new Set(departments);
+  return DEPARTMENTS.map((d) => d.id).filter((d) => set.has(d));
 }

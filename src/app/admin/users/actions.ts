@@ -4,7 +4,14 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SCHOOLS } from "@/lib/access";
+import { DEPARTMENTS, SCHOOLS, type Department } from "@/lib/access";
+
+// Drop duplicates and normalise to DEPARTMENTS order so the stored array is
+// stable regardless of the checkbox order the form submitted them in.
+function dedupeDepartments(depts: Department[]): Department[] {
+  const set = new Set(depts);
+  return DEPARTMENTS.map((d) => d.id).filter((d) => set.has(d));
+}
 
 const CreateUserSchema = z
   .object({
@@ -14,7 +21,10 @@ const CreateUserSchema = z
     password: z.string().min(6, "Password must be at least 6 characters."),
     full_name: z.string().trim().min(1, "Name is required."),
     role: z.enum(["admin", "manager", "staff"]),
-    department: z.enum(["fees", "academics", "library", "results"]).nullable(),
+    // Staff can be assigned one OR more departments (e.g. Fees + Library on the
+    // same login). Admin/manager span every department, so this is ignored/empty
+    // for them (cleared server-side below).
+    departments: z.array(z.enum(["fees", "academics", "library", "results"])),
     // Don't use z.string().uuid() — Zod 4 enforces RFC 4122 versioned UUIDs
     // (positions 13 and 17 must be 1-8 / 8-b). The seeded school ids are
     // synthetic (00000000-…-000000000001) and don't satisfy that. The refine
@@ -22,9 +32,9 @@ const CreateUserSchema = z
     // value to the known list, not just to "any UUID".
     school_ids: z.array(z.string().min(1)).min(1, "Select at least one school."),
   })
-  .refine((d) => d.role !== "staff" || d.department !== null, {
-    message: "Staff must be assigned a department.",
-    path: ["department"],
+  .refine((d) => d.role !== "staff" || d.departments.length >= 1, {
+    message: "Staff must be assigned at least one department.",
+    path: ["departments"],
   })
   .refine((d) => d.role !== "staff" || d.school_ids.length === 1, {
     message: "Staff must be assigned to exactly one school.",
@@ -65,14 +75,14 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
   }
   const groupSchoolIds = SCHOOLS.filter((s) => s.groupId === me.group_id).map((s) => s.id);
 
-  const rawDept = String(formData.get("department") ?? "");
+  const rawDepts = formData.getAll("departments").map((v) => String(v)).filter(Boolean);
   const rawSchools = formData.getAll("school_ids").map((v) => String(v)).filter(Boolean);
   const parsed = CreateUserSchema.safeParse({
     phone: String(formData.get("phone") ?? "").replace(/\D/g, ""),
     password: String(formData.get("password") ?? ""),
     full_name: String(formData.get("full_name") ?? ""),
     role: String(formData.get("role") ?? ""),
-    department: rawDept === "" ? null : rawDept,
+    departments: rawDepts,
     school_ids: rawSchools,
   });
 
@@ -85,8 +95,11 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
   if (!school_ids.every((id) => groupSchoolIds.includes(id))) {
     return { error: "Unknown school id." };
   }
-  // Admin/manager are cross-department, so clear any department for them.
-  const department = role === "staff" ? parsed.data.department : null;
+  // Admin/manager are cross-department, so clear any department for them. Staff
+  // keep their assigned list; `department` (singular) mirrors the first entry so
+  // existing reads/PDFs/displays stay correct.
+  const departments = role === "staff" ? dedupeDepartments(parsed.data.departments) : [];
+  const department = departments[0] ?? null;
   // Admin sees every school in their group regardless of what the form said.
   const finalSchoolIds = role === "admin" ? groupSchoolIds : school_ids;
 
@@ -105,6 +118,7 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
       full_name,
       role,
       department: department ?? "",
+      departments,
       phone,
       school_ids: finalSchoolIds,
       group_id: me.group_id,
@@ -166,6 +180,7 @@ export async function createUser(_prev: ActionState, formData: FormData): Promis
       full_name,
       role,
       department,
+      departments,
       school_ids: finalSchoolIds,
       group_id: me.group_id,
       is_active: true,
@@ -192,12 +207,12 @@ const UpdateUserSchema = z
   .object({
     id: z.string().min(1),
     role: z.enum(["admin", "manager", "staff"]),
-    department: z.enum(["fees", "academics", "library", "results"]).nullable(),
+    departments: z.array(z.enum(["fees", "academics", "library", "results"])),
     school_ids: z.array(z.string().min(1)).min(1, "Select at least one school."),
   })
-  .refine((d) => d.role !== "staff" || d.department !== null, {
-    message: "Staff must be assigned a department.",
-    path: ["department"],
+  .refine((d) => d.role !== "staff" || d.departments.length >= 1, {
+    message: "Staff must be assigned at least one department.",
+    path: ["departments"],
   })
   .refine((d) => d.role !== "staff" || d.school_ids.length === 1, {
     message: "Staff must be assigned to exactly one school.",
@@ -209,12 +224,12 @@ export async function updateUserAccess(_prev: ActionState, formData: FormData): 
   if (me.is_demo) return { error: "Editing access is disabled in the demo." };
   const groupSchoolIds = SCHOOLS.filter((s) => s.groupId === me.group_id).map((s) => s.id);
 
-  const rawDept = String(formData.get("department") ?? "");
+  const rawDepts = formData.getAll("departments").map((v) => String(v)).filter(Boolean);
   const rawSchools = formData.getAll("school_ids").map((v) => String(v)).filter(Boolean);
   const parsed = UpdateUserSchema.safeParse({
     id: String(formData.get("id") ?? ""),
     role: String(formData.get("role") ?? ""),
-    department: rawDept === "" ? null : rawDept,
+    departments: rawDepts,
     school_ids: rawSchools,
   });
   if (!parsed.success) {
@@ -228,8 +243,10 @@ export async function updateUserAccess(_prev: ActionState, formData: FormData): 
   if (!school_ids.every((sid) => groupSchoolIds.includes(sid))) {
     return { error: "Unknown school id." };
   }
-  // Admin/manager are cross-department; admin auto-spans every school.
-  const department = role === "staff" ? parsed.data.department : null;
+  // Admin/manager are cross-department; admin auto-spans every school. Staff
+  // keep their assigned department list, with `department` mirroring the first.
+  const departments = role === "staff" ? dedupeDepartments(parsed.data.departments) : [];
+  const department = departments[0] ?? null;
   const finalSchoolIds = role === "admin" ? groupSchoolIds : school_ids;
 
   const admin = createAdminClient();
@@ -247,7 +264,7 @@ export async function updateUserAccess(_prev: ActionState, formData: FormData): 
 
   const { error } = await admin
     .from("profiles")
-    .update({ role, department, school_ids: finalSchoolIds })
+    .update({ role, department, departments, school_ids: finalSchoolIds })
     .eq("id", id)
     .eq("group_id", me.group_id);
   if (error) {
@@ -262,6 +279,7 @@ export async function updateUserAccess(_prev: ActionState, formData: FormData): 
       phone: t.phone ?? "",
       role,
       department: department ?? "",
+      departments,
       school_ids: finalSchoolIds,
       group_id: me.group_id,
     },

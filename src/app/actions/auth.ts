@@ -82,14 +82,15 @@ export async function idleLogout() {
   redirect("/login?reason=idle");
 }
 
-// Switch the active department (admin/manager only). Validates against the
+// Switch the active department. Admin/manager span all departments; a staffer
+// assigned more than one can switch between those. Validates against the
 // caller's allowed departments before writing the cookie.
 export async function setDepartment(formData: FormData) {
   const dept = String(formData.get("department") ?? "");
   const profile = await getProfile();
   if (!profile) redirect("/login");
 
-  if (isDepartment(dept) && allowedDepartments(profile.role, profile.department).includes(dept)) {
+  if (isDepartment(dept) && allowedDepartments(profile.role, profile.departments).includes(dept)) {
     const cookieStore = await cookies();
     cookieStore.set(COOKIE_DEPARTMENT, dept, {
       httpOnly: true,

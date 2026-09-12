@@ -22,6 +22,7 @@ type Profile = {
   phone: string | null;
   role: Role;
   department: Department | null;
+  departments: Department[] | null;
   school_ids: string[] | null;
   is_active: boolean;
   created_at: string;
@@ -49,7 +50,7 @@ export default async function StaffProfilePage({
     await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name, email, phone, role, department, school_ids, group_id, is_active, created_at")
+        .select("id, full_name, email, phone, role, department, departments, school_ids, group_id, is_active, created_at")
         .eq("id", id)
         .maybeSingle(),
       supabase
@@ -81,6 +82,17 @@ export default async function StaffProfilePage({
     notFound();
   }
   const profile = profileRow as Profile;
+  // Department(s) this account covers — prefer the array, fall back to the
+  // singular column for rows predating it.
+  const profileDepartments: Department[] =
+    profile.departments && profile.departments.length > 0
+      ? profile.departments
+      : profile.department
+        ? [profile.department]
+        : [];
+  const departmentLabel = profileDepartments
+    .map((d) => DEPARTMENT_LABELS[d] ?? d)
+    .join(", ");
   const marks = (marksData ?? []) as Mark[];
 
   // Aggregates: days present in the last 30 days and overall in the fetched
@@ -139,9 +151,7 @@ export default async function StaffProfilePage({
           </h1>
           <p className="mt-1 text-sm text-stone-500">
             {ROLE_LABELS[profile.role] ?? profile.role}
-            {profile.department
-              ? ` · ${DEPARTMENT_LABELS[profile.department] ?? profile.department}`
-              : ""}
+            {departmentLabel ? ` · ${departmentLabel}` : ""}
             {profile.is_active ? "" : " · Inactive"}
           </p>
         </div>
@@ -161,8 +171,8 @@ export default async function StaffProfilePage({
           <Detail label="Email" value={profile.email} />
           <Detail label="Role" value={ROLE_LABELS[profile.role] ?? profile.role} />
           <Detail
-            label="Department"
-            value={profile.department ? DEPARTMENT_LABELS[profile.department] ?? profile.department : null}
+            label={profileDepartments.length > 1 ? "Departments" : "Department"}
+            value={departmentLabel || null}
           />
           <Detail
             label="Schools"

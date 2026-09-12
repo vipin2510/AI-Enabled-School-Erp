@@ -72,7 +72,7 @@ async function AppShell({
 }) {
   const t = await getT();
   const department = await getCurrentDepartment(profile);
-  const allowed = allowedDepartments(profile.role, profile.department);
+  const allowed = allowedDepartments(profile.role, profile.departments);
   const isLeader = profile.role === "admin" || profile.role === "manager";
 
   // Resolve the active school. Leaders without one picked yet get bounced to

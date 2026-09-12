@@ -25,6 +25,7 @@ type ProfileRow = {
   full_name: string | null;
   role: Role;
   department: Department | null;
+  departments: Department[] | null;
   school_ids: string[] | null;
   is_active: boolean;
   created_at: string;
@@ -32,6 +33,15 @@ type ProfileRow = {
 
 const schoolLabel = (id: string) =>
   SCHOOLS.find((s) => s.id === id)?.location.split(",")[0] ?? id.slice(0, 8);
+
+// The department(s) a row covers. Prefer the new array; fall back to the
+// singular `department` for rows that predate it.
+const rowDepartments = (u: ProfileRow): Department[] =>
+  u.departments && u.departments.length > 0
+    ? u.departments
+    : u.department
+      ? [u.department]
+      : [];
 
 export default async function UsersPage() {
   // The Create-User form is the priority: it MUST render even if loading the
@@ -88,7 +98,7 @@ async function UsersTable({
     const { data, error } = await supabase
       .from("profiles")
       .select(
-        "id, email, phone, full_name, role, department, school_ids, is_active, created_at",
+        "id, email, phone, full_name, role, department, departments, school_ids, is_active, created_at",
       )
       .eq("group_id", groupId)
       .order("created_at", { ascending: true });
@@ -138,7 +148,9 @@ async function UsersTable({
               <td className="px-4 py-2 text-stone-600">{u.phone || u.email || "—"}</td>
               <td className="px-4 py-2">{ROLE_LABELS[u.role] ?? u.role ?? "—"}</td>
               <td className="px-4 py-2">
-                <span>{u.department ? (DEPARTMENT_LABELS[u.department] ?? u.department) : "—"}</span>
+                <span>
+                  {rowDepartments(u).map((d) => DEPARTMENT_LABELS[d] ?? d).join(", ") || "—"}
+                </span>
               </td>
               <td className="px-4 py-2 text-stone-600">
                 {u.role === "admin"
@@ -166,6 +178,7 @@ async function UsersTable({
                         email: u.email,
                         role: u.role,
                         department: u.department,
+                        departments: rowDepartments(u),
                         school_ids: u.school_ids ?? [],
                       }}
                       schools={schools}

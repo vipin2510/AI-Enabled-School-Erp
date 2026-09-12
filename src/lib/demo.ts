@@ -58,6 +58,7 @@ export function makeDemoProfile(demoSchoolId: string): DemoProfile {
     full_name: "Demo Admin",
     role: "admin",
     department: null,
+    departments: [],
     school_ids: [demoSchoolId],
     group_id: DEMO_GROUP_ID,
     is_active: true,

@@ -34,7 +34,12 @@ export type Profile = {
   phone: string | null;
   full_name: string | null;
   role: Role;
+  // Primary department (= departments[0]) — kept for existing reads/PDFs/displays.
   department: Department | null;
+  // Every department this account may open/switch between. Admin/manager span
+  // all departments so this is empty for them; a staff account carries one OR
+  // MORE assigned departments here.
+  departments: Department[];
   school_ids: SchoolId[];
   group_id: GroupId;
   is_active: boolean;
@@ -57,18 +62,28 @@ async function loadProfileById(userId: string): Promise<Profile | null> {
     const { data } = await anon
       .from("profiles")
       .select(
-        "id, email, phone, full_name, role, department, school_ids, group_id, is_active",
+        "id, email, phone, full_name, role, department, departments, school_ids, group_id, is_active",
       )
       .eq("id", userId)
       .single();
     if (!data) return null;
-    const row = data as Omit<Profile, "school_ids" | "group_id"> & {
+    const row = data as Omit<Profile, "departments" | "school_ids" | "group_id"> & {
+      departments: Department[] | null;
       school_ids: SchoolId[] | null;
       group_id: GroupId | null;
     };
     if (!row.is_active) return null;
+    // Fall back to the singular `department` if the array is empty (a row that
+    // predates the departments column and hasn't been re-saved yet).
+    const departments =
+      row.departments && row.departments.length > 0
+        ? row.departments
+        : row.department
+          ? [row.department]
+          : [];
     return {
       ...row,
+      departments,
       school_ids: row.school_ids ?? [],
       group_id: row.group_id ?? DEFAULT_GROUP_ID,
     } as Profile;
@@ -129,19 +144,19 @@ export async function requireDepartment(
 ): Promise<Profile> {
   const profile = await requireProfile();
   if (profile.role === "admin" || profile.role === "manager") return profile;
-  if (profile.department === department) return profile;
+  if (profile.departments.includes(department)) return profile;
   redirect("/");
 }
 
-// The department the user is currently working in. Staff are pinned to their
-// own department; admin/manager fall back to the cookie, then to "fees".
+// The department the user is currently working in. Everyone falls back to the
+// cookie (validated against what they're allowed to see) then to their first
+// allowed department. A staff account with a single department has an `allowed`
+// list of length one, so the cookie can never move them off it; a staff account
+// with two departments can switch between them just like a leader can.
 export async function getCurrentDepartment(
   profile: Profile,
 ): Promise<Department> {
-  const allowed = allowedDepartments(profile.role, profile.department);
-  if (profile.role === "staff") {
-    return profile.department ?? allowed[0] ?? "fees";
-  }
+  const allowed = allowedDepartments(profile.role, profile.departments);
   const cookieStore = await cookies();
   const fromCookie = cookieStore.get(COOKIE_DEPARTMENT)?.value;
   if (isDepartment(fromCookie) && allowed.includes(fromCookie)) {

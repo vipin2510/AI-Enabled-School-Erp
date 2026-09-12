@@ -52,7 +52,10 @@ export default function Topbar({
   const { setOpen } = useShellNav();
   const deptFormRef = useRef<HTMLFormElement>(null);
   const schoolFormRef = useRef<HTMLFormElement>(null);
-  const canSwitchDept = role !== "staff" && allowed.length > 1;
+  // Staff stay pinned to one school, but a staffer assigned two departments can
+  // switch between them — so the department switcher is gated purely on how many
+  // departments the account is allowed, not on the role.
+  const canSwitchDept = allowed.length > 1;
   const canSwitchSchool = role !== "staff" && allowedSchools.length > 1;
 
   // Label each unit by whatever distinguishes it: the town when towns differ
