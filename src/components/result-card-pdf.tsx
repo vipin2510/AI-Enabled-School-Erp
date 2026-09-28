@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
 });
 
 function fmt(v: number | string | null | undefined): string {
-  if (v === null || v === undefined || v === "") return "";
+  if (v === null || v === undefined || v === "") return "-";
   if (typeof v === "string") return v;
   return Number.isInteger(v) ? String(v) : v.toFixed(2);
 }
@@ -195,7 +195,7 @@ export function ResultCardPdf({ data }: { data: MarksheetData; logoDataUrl?: str
             const cells = [
               fmt(s.utMax), fmt(s.utMin),
               fmt(s.ut[0]), fmt(s.ut[1]), fmt(s.ut[2]), fmt(s.ut[3]), fmt(s.utTotal),
-              fmt(s.terminalMax), "",
+              fmt(s.terminalMax), "-",
               fmt(s.terminal[0]), fmt(s.terminal[1]), fmt(s.terminal[2]),
               fmt(s.agg.ut), fmt(s.agg.iII), fmt(s.agg.iii), fmt(s.agg.total),
             ];
@@ -251,7 +251,7 @@ function GenericRowView({ row }: { row: GenericRow }) {
       <Cell flex={F.ut} style={cellStyle}>{fmt(ut[3])}</Cell>
       <Cell flex={F.utTotal} style={cellStyle}>{fmt(row.utTotal)}</Cell>
       <Cell flex={F.tMax} style={cellStyle}>{fmt(row.tMaxCell)}</Cell>
-      <Cell flex={F.tMin} style={cellStyle}>{""}</Cell>
+      <Cell flex={F.tMin} style={cellStyle}>{"-"}</Cell>
       <Cell flex={F.t} style={cellStyle}>{fmt(terminal[0])}</Cell>
       <Cell flex={F.t} style={cellStyle}>{fmt(terminal[1])}</Cell>
       <Cell flex={F.t} style={cellStyle}>{fmt(terminal[2])}</Cell>

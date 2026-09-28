@@ -6,6 +6,7 @@ import {
   extraKey,
   aggregateForSubject,
   computeResult,
+  hasAnyMark,
   type ExamKey,
   type MarksMap,
   type ExtrasMap,
@@ -35,6 +36,9 @@ export type BuildArgs = {
 export function buildMarksheet(args: BuildArgs): MarksheetData {
   const result = computeResult(args.subjects, args.marks);
   const n = args.subjects.length;
+  // No marks entered yet → leave the student-level summary rows blank ("-")
+  // rather than printing a computed 0% / lowest grade / fail for an ungraded student.
+  const graded = hasAnyMark(args.marks);
 
   const subjectRows: SubjectRow[] = result.subjects.map((s) => {
     const ut = UT_KEYS.map((k) => s.obtained[k]);
@@ -79,7 +83,7 @@ export function buildMarksheet(args: BuildArgs): MarksheetData {
     label: "PERCENTAGE",
     ut: UT_KEYS.map((_, i) => (n ? (utColSums[i] / (UT_MAX * n)) * 100 : 0)),
     terminal: TERMINAL_KEYS.map((_, i) => (n ? (tColSums[i] / (TERMINAL_MAX * n)) * 100 : 0)),
-    agg: ["", "", "", result.percent],
+    agg: ["", "", "", graded ? result.percent : ""],
   });
 
   const extraRow = (key: string): GenericRow => {
@@ -98,9 +102,9 @@ export function buildMarksheet(args: BuildArgs): MarksheetData {
   rows.push(extraRow("hin_handwriting"));
 
   const passed = result.percent >= 33;
-  rows.push({ label: "GRADE", agg: ["", "", "", result.grade] });
+  rows.push({ label: "GRADE", agg: ["", "", "", graded ? result.grade : ""] });
   rows.push({ label: "RANK", agg: ["", "", "", args.rank ? String(args.rank) : "-"] });
-  rows.push({ label: "RESULT(P/S/F)", agg: ["", "", "", passed ? "P" : "F"] });
+  rows.push({ label: "RESULT(P/S/F)", agg: ["", "", "", graded ? (passed ? "P" : "F") : ""] });
   rows.push({
     label: "HIGHEST MARKS IN CLASS",
     agg: ["", "", "", args.highestPercent.toFixed(2)],

@@ -93,6 +93,13 @@ export { currentAcademicYear } from "@/lib/academic-year";
 // A marks lookup keyed "subjectId:exam" → obtained marks (number) or null.
 export type MarksMap = Record<string, number | null>;
 
+// A student is "graded" once any mark has been entered for them. Used to keep
+// un-entered students out of class ranking and to blank their summary rows on
+// the marksheet, rather than showing a fabricated 0% / lowest-grade / fail.
+export function hasAnyMark(marks: MarksMap): boolean {
+  return Object.values(marks).some((v) => v !== null && v !== undefined);
+}
+
 export function markKey(subjectId: string, exam: string): string {
   return `${subjectId}:${exam}`;
 }

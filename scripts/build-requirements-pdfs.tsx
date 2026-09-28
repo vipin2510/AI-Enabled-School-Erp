@@ -1,3 +1,10 @@
+/*
+ * These two rules are DOM-React concerns that don't apply to this
+ * @react-pdf document script: entity escaping is an HTML notion (react-pdf
+ * <Text> renders the literal string), and the three page elements below are
+ * rendered one-by-one via renderToFile, never as a React child list.
+ */
+/* eslint-disable react/no-unescaped-entities, react/jsx-key */
 /**
  * Renders the three school onboarding PDFs from the markdown sources in
  * requirements/ to printable A4 documents using @react-pdf/renderer (the same

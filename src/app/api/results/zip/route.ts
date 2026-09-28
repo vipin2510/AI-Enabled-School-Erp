@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
-import { currentAcademicYear, computeResult } from "@/lib/results";
+import { currentAcademicYear, computeResult, hasAnyMark } from "@/lib/results";
 import {
   loadClassSection,
   loadMarksByStudent,
@@ -56,11 +56,14 @@ export async function GET(req: Request) {
   const marksByStudent = await loadMarksByStudent(studentIds, academicYear, schoolId);
   const extrasByStudent = await loadExtrasByStudent(studentIds, academicYear, schoolId);
 
-  // Class ranking + highest aggregate, computed once over everyone.
+  // Class ranking + highest aggregate, over graded students only. A student
+  // with no marks entered isn't ranked (and their card shows "-" for rank),
+  // so they never appear as a fabricated last-place / failed result.
+  const gradedStudents = students.filter((s) => hasAnyMark(marksByStudent[s.id] ?? {}));
   const percentById = new Map(
-    students.map((s) => [s.id, computeResult(subjects, marksByStudent[s.id] ?? {}).percent])
+    gradedStudents.map((s) => [s.id, computeResult(subjects, marksByStudent[s.id] ?? {}).percent])
   );
-  const ranked = [...students].sort(
+  const ranked = [...gradedStudents].sort(
     (a, b) => (percentById.get(b.id) ?? 0) - (percentById.get(a.id) ?? 0)
   );
   const rankById = new Map(ranked.map((s, i) => [s.id, i + 1]));
