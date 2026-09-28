@@ -46,6 +46,7 @@ body {
 @media (max-width: 767px) {
   table.rtable,
   table.rtable tbody,
+  table.rtable tfoot,
   table.rtable tr,
   table.rtable td {
     /* Block flow so rows stack; auto width (not 100%) so the row's own margin

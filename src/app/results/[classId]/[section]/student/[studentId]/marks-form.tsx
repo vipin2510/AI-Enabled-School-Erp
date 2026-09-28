@@ -84,7 +84,7 @@ export default function StudentMarksForm({
     <form action={formAction}>
       {subjects.length > 0 && (
       <div className="card overflow-x-auto p-0">
-        <table className="w-full text-sm">
+        <table className="rtable w-full text-sm">
           <thead className="bg-stone-50 text-xs uppercase tracking-wide text-stone-500">
             <tr>
               <th className="px-4 py-3 text-left font-medium">Subject</th>
@@ -107,7 +107,7 @@ export default function StudentMarksForm({
                   {EXAMS.map((e) => {
                     const key = markKey(s.id, e.key);
                     return (
-                      <td key={e.key} className="px-2 py-2 text-center">
+                      <td key={e.key} className="px-2 py-2 text-center" data-label={`${e.short} /${e.max}`}>
                         <input
                           type="number"
                           name={`m_${s.id}_${e.key}`}
@@ -123,10 +123,10 @@ export default function StudentMarksForm({
                       </td>
                     );
                   })}
-                  <td className="px-3 py-2 text-right tabular-nums text-stone-700">
+                  <td className="px-3 py-2 text-right tabular-nums text-stone-700" data-label="Total">
                     {stat.max ? `${stat.total}/${stat.max}` : "—"}
                   </td>
-                  <td className="px-3 py-2 text-center">
+                  <td className="px-3 py-2 text-center" data-label="Grade">
                     {stat.max ? (
                       <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-700">
                         {gradeFor(stat.percent)}
@@ -143,14 +143,14 @@ export default function StudentMarksForm({
             <tr className="border-t border-stone-200 bg-stone-50 font-semibold">
               <td className="px-4 py-3 text-stone-700">Grand Total</td>
               {EXAMS.map((e) => (
-                <td key={e.key} className="px-2 py-3 text-center tabular-nums text-stone-700">
+                <td key={e.key} className="px-2 py-3 text-center tabular-nums text-stone-700" data-label={e.short}>
                   {columnTotals[e.key] ?? 0}
                 </td>
               ))}
-              <td className="px-3 py-3 text-right tabular-nums text-stone-900">
+              <td className="px-3 py-3 text-right tabular-nums text-stone-900" data-label="Total">
                 {grandTotal}/{grandMax}
               </td>
-              <td className="px-3 py-3 text-center text-stone-900">
+              <td className="px-3 py-3 text-center text-stone-900" data-label="%">
                 {grandMax ? `${grandPercent.toFixed(1)}%` : "—"}
               </td>
             </tr>
@@ -196,7 +196,7 @@ export default function StudentMarksForm({
             attendance days — entered per exam, shown below the subjects on the marksheet.
           </p>
         </div>
-        <table className="mt-3 w-full text-sm">
+        <table className="rtable mt-3 w-full text-sm">
           <thead className="bg-stone-50 text-xs uppercase tracking-wide text-stone-500">
             <tr>
               <th className="px-4 py-3 text-left font-medium">Item</th>
@@ -217,7 +217,7 @@ export default function StudentMarksForm({
                   const cls =
                     "w-16 rounded-md border border-stone-300 bg-white px-2 py-1 text-center text-sm outline-none focus:border-stone-900 focus:ring-1 focus:ring-stone-900";
                   return (
-                    <td key={e.key} className="px-2 py-2 text-center">
+                    <td key={e.key} className="px-2 py-2 text-center" data-label={e.short}>
                       {f.kind === "grade" ? (
                         <select
                           name={`x_${f.key}_${e.key}`}
