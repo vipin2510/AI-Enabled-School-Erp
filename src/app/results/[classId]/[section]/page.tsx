@@ -75,7 +75,7 @@ export default async function ClassSectionResultsPage({
       )}
 
       <div className="card mt-6 overflow-hidden p-0">
-        <table className="w-full text-sm">
+        <table className="rtable w-full text-sm">
           <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
             <tr>
               <th className="px-4 py-3 font-medium">#</th>
@@ -97,7 +97,7 @@ export default async function ClassSectionResultsPage({
               return (
                 <tr key={s.id} className="border-t border-stone-100 hover:bg-stone-50/60">
                   <td className="px-4 py-3 text-stone-400">{i + 1}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" data-label="Student">
                     <Link
                       href={`/results/${classId}/${encodeURIComponent(section)}/student/${s.id}`}
                       className="font-medium text-stone-900 hover:text-accent hover:underline"
@@ -108,17 +108,17 @@ export default async function ClassSectionResultsPage({
                       <span className="ml-2 text-xs text-stone-400">{s.admission_no}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-stone-600">{s.father_name ?? "—"}</td>
-                  <td className="px-4 py-3 text-stone-600">
+                  <td className="px-4 py-3 text-stone-600" data-label="Father">{s.father_name ?? "—"}</td>
+                  <td className="px-4 py-3 text-stone-600" data-label="Entered">
                     {entered}/{cellsPerStudent}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
+                  <td className="px-4 py-3 text-right tabular-nums" data-label="Total">
                     {hasAny ? `${result.total}/${result.max}` : "—"}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
+                  <td className="px-4 py-3 text-right tabular-nums" data-label="%">
                     {hasAny ? `${result.percent.toFixed(1)}%` : "—"}
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-4 py-3 text-center" data-label="Grade">
                     {hasAny ? (
                       <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-700">
                         {gradeFor(result.percent)}
@@ -127,7 +127,7 @@ export default async function ClassSectionResultsPage({
                       "—"
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right" data-label="Action">
                     <Link
                       href={`/results/${classId}/${encodeURIComponent(section)}/student/${s.id}`}
                       className="text-accent hover:underline"

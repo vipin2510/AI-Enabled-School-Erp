@@ -134,7 +134,7 @@ export default async function FeesDashboard() {
           </Link>
         </div>
         <div className="card p-0 overflow-hidden">
-          <table className="w-full text-sm">
+          <table className="rtable w-full text-sm">
             <thead className="bg-stone-50 text-stone-500 text-left">
               <tr>
                 <th className="px-4 py-2 font-medium">Receipt #</th>
@@ -153,10 +153,10 @@ export default async function FeesDashboard() {
               )}
               {recent.map((r, i) => (
                 <tr key={r.receipt_no ?? i} className="border-t border-stone-100">
-                  <td className="px-4 py-2 font-mono text-xs">{r.receipt_no}</td>
-                  <td className="px-4 py-2">{r.students?.full_name ?? "—"}</td>
-                  <td className="px-4 py-2 text-stone-500">{formatDate(r.issued_at)}</td>
-                  <td className="px-4 py-2 text-right font-medium">{inr(r.total)}</td>
+                  <td className="px-4 py-2 font-mono text-xs" data-label="Receipt #">{r.receipt_no}</td>
+                  <td className="px-4 py-2" data-label="Student">{r.students?.full_name ?? "—"}</td>
+                  <td className="px-4 py-2 text-stone-500" data-label="Date">{formatDate(r.issued_at)}</td>
+                  <td className="px-4 py-2 text-right font-medium" data-label="Amount">{inr(r.total)}</td>
                 </tr>
               ))}
             </tbody>

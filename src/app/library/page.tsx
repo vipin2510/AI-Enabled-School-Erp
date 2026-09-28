@@ -45,7 +45,7 @@ export default async function LibraryPage() {
         <div className="px-5 py-3 text-sm font-semibold text-stone-800">
           Currently issued ({openLoans.length})
         </div>
-        <table className="w-full text-sm">
+        <table className="rtable w-full text-sm">
           <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
             <tr>
               <th className="px-5 py-2 font-medium">Book</th>
@@ -59,11 +59,11 @@ export default async function LibraryPage() {
               const overdue = l.due_date && l.due_date < today;
               return (
                 <tr key={l.id} className="border-t border-stone-100">
-                  <td className="px-5 py-2">
+                  <td className="px-5 py-2" data-label="Book">
                     <div className="font-medium">{l.books?.title ?? "—"}</div>
                     <div className="font-mono text-xs text-stone-400">{l.books?.code}</div>
                   </td>
-                  <td className="px-3 py-2 text-stone-700">
+                  <td className="px-3 py-2 text-stone-700" data-label="Student">
                     {l.students?.full_name ?? "—"}
                     {l.students?.classes?.display_name ? (
                       <span className="text-xs text-stone-400">
@@ -72,8 +72,8 @@ export default async function LibraryPage() {
                       </span>
                     ) : null}
                   </td>
-                  <td className="px-3 py-2 text-stone-600">{formatDate(l.issued_at)}</td>
-                  <td className={"px-3 py-2 " + (overdue ? "font-medium text-red-600" : "text-stone-600")}>
+                  <td className="px-3 py-2 text-stone-600" data-label="Issued">{formatDate(l.issued_at)}</td>
+                  <td className={"px-3 py-2 " + (overdue ? "font-medium text-red-600" : "text-stone-600")} data-label="Due">
                     {l.due_date ?? "—"}
                     {overdue ? " · overdue" : ""}
                   </td>

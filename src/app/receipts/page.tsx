@@ -183,7 +183,7 @@ export default async function ReceiptsPage({
       </form>
 
       <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="rtable w-full text-sm">
           <thead className="bg-stone-50 text-stone-500 text-left">
             <tr>
               <th className="px-4 py-2 font-medium">Receipt #</th>
@@ -203,17 +203,17 @@ export default async function ReceiptsPage({
             {isMonthView
               ? monthRows.map((r, i) => (
                   <tr key={`${r.invoice_id}-${i}`} className="border-t border-stone-100">
-                    <td className="px-4 py-2 font-mono text-xs">{r.receipt_no}</td>
-                    <td className="px-4 py-2">{r.student_name}</td>
-                    <td className="px-4 py-2">{r.class_name}</td>
-                    <td className="px-4 py-2">{monthName(monthNum)}</td>
-                    <td className="px-4 py-2 text-stone-500">{formatDate(r.issued_at)}</td>
-                    <td className="px-4 py-2 capitalize">{r.payment_mode ?? "—"}</td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 font-mono text-xs" data-label="Receipt #">{r.receipt_no}</td>
+                    <td className="px-4 py-2" data-label="Student">{r.student_name}</td>
+                    <td className="px-4 py-2" data-label="Class">{r.class_name}</td>
+                    <td className="px-4 py-2" data-label="Month">{monthName(monthNum)}</td>
+                    <td className="px-4 py-2 text-stone-500" data-label="Date">{formatDate(r.issued_at)}</td>
+                    <td className="px-4 py-2 capitalize" data-label="Mode">{r.payment_mode ?? "—"}</td>
+                    <td className="px-4 py-2" data-label="Status">
                       <StatusBadge status={r.payment_status} />
                     </td>
-                    <td className="px-4 py-2 text-right font-medium">{inr(r.amount)}</td>
-                    <td className="px-4 py-2 text-right">
+                    <td className="px-4 py-2 text-right font-medium" data-label="Month Fee">{inr(r.amount)}</td>
+                    <td className="px-4 py-2 text-right" data-label="Action">
                       <Link
                         href={`/receipts/${r.invoice_id}`}
                         className="text-stone-900 hover:underline"
@@ -225,16 +225,16 @@ export default async function ReceiptsPage({
                 ))
               : rows.map((r) => (
                   <tr key={r.id} className="border-t border-stone-100">
-                    <td className="px-4 py-2 font-mono text-xs">{r.receipt_no}</td>
-                    <td className="px-4 py-2">{r.students?.full_name ?? "—"}</td>
-                    <td className="px-4 py-2">{r.students?.classes?.display_name ?? "—"}</td>
-                    <td className="px-4 py-2 text-stone-500">{formatDate(r.issued_at)}</td>
-                    <td className="px-4 py-2 capitalize">{r.payment_mode ?? "—"}</td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 font-mono text-xs" data-label="Receipt #">{r.receipt_no}</td>
+                    <td className="px-4 py-2" data-label="Student">{r.students?.full_name ?? "—"}</td>
+                    <td className="px-4 py-2" data-label="Class">{r.students?.classes?.display_name ?? "—"}</td>
+                    <td className="px-4 py-2 text-stone-500" data-label="Date">{formatDate(r.issued_at)}</td>
+                    <td className="px-4 py-2 capitalize" data-label="Mode">{r.payment_mode ?? "—"}</td>
+                    <td className="px-4 py-2" data-label="Status">
                       <StatusBadge status={r.payment_status} />
                     </td>
-                    <td className="px-4 py-2 text-right font-medium">{inr(r.total)}</td>
-                    <td className="px-4 py-2 text-right">
+                    <td className="px-4 py-2 text-right font-medium" data-label="Total">{inr(r.total)}</td>
+                    <td className="px-4 py-2 text-right" data-label="Action">
                       <Link href={`/receipts/${r.id}`} className="text-stone-900 hover:underline">
                         Open →
                       </Link>

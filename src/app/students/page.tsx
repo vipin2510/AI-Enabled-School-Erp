@@ -65,7 +65,7 @@ export default async function StudentsList({
       </form>
 
       <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="rtable w-full text-sm">
           <thead className="bg-stone-50 text-stone-500 text-left">
             <tr>
               <th className="px-4 py-2 font-medium">Name</th>
@@ -80,14 +80,14 @@ export default async function StudentsList({
               const klass = (s as unknown as { classes: { display_name?: string } | null }).classes;
               return (
                 <tr key={s.id} className="border-t border-stone-100">
-                  <td className="px-4 py-2 font-medium">{s.full_name}</td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 font-medium" data-label="Name">{s.full_name}</td>
+                  <td className="px-4 py-2" data-label="Class">
                     {klass?.display_name ?? "—"}
                     {s.section ? ` · ${s.section}` : ""}
                   </td>
-                  <td className="px-4 py-2 text-stone-600">{s.father_name ?? "—"}</td>
-                  <td className="px-4 py-2 text-stone-600">{s.contact_number ?? "—"}</td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 text-stone-600" data-label="Father">{s.father_name ?? "—"}</td>
+                  <td className="px-4 py-2 text-stone-600" data-label="Contact">{s.contact_number ?? "—"}</td>
+                  <td className="px-4 py-2 text-right" data-label="Action">
                     <Link
                       href={`/fees/collect/${s.id}`}
                       className="text-stone-900 hover:underline"
