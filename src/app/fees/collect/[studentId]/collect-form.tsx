@@ -529,7 +529,7 @@ export default function CollectForm({
   };
 
   return (
-    <div className="grid lg:grid-cols-[1fr_360px] gap-6">
+    <div className="grid gap-6 md:grid-cols-[1fr_320px] lg:grid-cols-[1fr_360px]">
       <div className="space-y-6">
         {studentCategory === "rte" && (
           <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm">

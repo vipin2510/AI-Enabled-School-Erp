@@ -197,7 +197,7 @@ export default function StructuresEditor({ structures }: { structures: Structure
       <section>
         <h2 className="text-lg font-medium mb-3">School Fees</h2>
         <div className="card p-0 overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="rtable w-full text-sm">
             <thead className="bg-stone-50 text-stone-500 text-left">
               <tr>
                 <th className="px-4 py-2 font-medium">Class</th>
@@ -220,22 +220,22 @@ export default function StructuresEditor({ structures }: { structures: Structure
                   <td className="px-4 py-2 font-medium whitespace-nowrap">
                     {s.classes?.display_name}
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 text-right" data-label="Reg.">
                     <Cell sid={s.id} field="registration" value={comp(s, "registration")?.amount ?? 0} />
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 text-right" data-label="New Adm.">
                     <Cell sid={s.id} field="admission_one_time" value={comp(s, "admission_one_time")?.amount ?? 0} />
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 text-right" data-label="Activities & Dev.">
                     <Cell sid={s.id} field="yearly" value={comp(s, "yearly")?.amount ?? 0} />
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 text-right" data-label="Monthly">
                     <Cell sid={s.id} field="monthly" value={monthlyComps(s)[0]?.amount ?? 0} />
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 text-right" data-label="Caution">
                     <Cell sid={s.id} field="caution" value={comp(s, "caution")?.amount ?? 0} />
                   </td>
-                  <td className="px-4 py-2 text-right font-semibold whitespace-nowrap">
+                  <td className="px-4 py-2 text-right font-semibold whitespace-nowrap" data-label="Annual Total">
                     {inr(schoolTotal(s))}
                   </td>
                 </tr>
@@ -248,7 +248,7 @@ export default function StructuresEditor({ structures }: { structures: Structure
       <section>
         <h2 className="text-lg font-medium mb-3">Hostel Fees</h2>
         <div className="card p-0 overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="rtable w-full text-sm">
             <thead className="bg-stone-50 text-stone-500 text-left">
               <tr>
                 <th className="px-4 py-2 font-medium">Group</th>
@@ -266,19 +266,19 @@ export default function StructuresEditor({ structures }: { structures: Structure
               {hostel.map((s) => (
                 <tr key={s.id} className="border-t border-stone-100">
                   <td className="px-4 py-2 font-medium whitespace-nowrap">{s.group_label}</td>
-                  <td className="px-4 py-2 capitalize">{s.student_kind}</td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 capitalize" data-label="Kind">{s.student_kind}</td>
+                  <td className="px-4 py-2 text-right" data-label="Reg.">
                     <Cell sid={s.id} field="registration" value={comp(s, "registration")?.amount ?? 0} />
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 text-right" data-label="Caution">
                     <Cell sid={s.id} field="caution" value={comp(s, "caution")?.amount ?? 0} />
                   </td>
                   {[1, 2, 3, 4].map((n) => (
-                    <td key={n} className="px-4 py-2 text-right">
+                    <td key={n} className="px-4 py-2 text-right" data-label={`${n}${["st", "nd", "rd", "th"][n - 1]} Inst.`}>
                       <Cell sid={s.id} field={`inst${n}`} value={comp(s, "instalment", n)?.amount ?? 0} />
                     </td>
                   ))}
-                  <td className="px-4 py-2 text-right font-semibold whitespace-nowrap">
+                  <td className="px-4 py-2 text-right font-semibold whitespace-nowrap" data-label="Total">
                     {inr(hostelTotal(s))}
                   </td>
                 </tr>

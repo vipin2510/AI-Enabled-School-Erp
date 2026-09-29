@@ -53,6 +53,10 @@ body {
        doesn't push it wider than the viewport and cause horizontal scroll. */
     display: block;
   }
+  table.rtable {
+    /* Override any `min-w-[…]` set for the desktop scroll layout. */
+    min-width: 0;
+  }
   table.rtable thead {
     display: none;
   }
@@ -69,6 +73,9 @@ body {
   table.rtable td[data-label] {
     position: relative;
     padding: 8px 0 8px 42%;
+    /* Only a top divider between stacked cells — cancel any per-cell box border
+       (e.g. the timetable grid) so rows read as a list, not nested boxes. */
+    border: 0;
     border-top: 1px solid var(--muted);
     min-height: 1.5em;
     word-break: break-word;

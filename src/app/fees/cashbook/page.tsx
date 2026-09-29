@@ -92,7 +92,7 @@ export default async function CashbookPage({
       <section className="mt-6">
         <h2 className="mb-2 text-sm font-semibold text-stone-800">Collections by mode</h2>
         <div className="card overflow-hidden p-0">
-          <table className="w-full text-sm">
+          <table className="rtable w-full text-sm">
             <thead className="bg-stone-50 text-left text-stone-500">
               <tr><th className="px-4 py-2 font-medium">Mode</th><th className="px-4 py-2 font-medium text-right"># Receipts</th><th className="px-4 py-2 font-medium text-right">Amount</th></tr>
             </thead>
@@ -100,9 +100,9 @@ export default async function CashbookPage({
               {data.collections.byMode.length === 0 && <tr><td colSpan={3} className="px-4 py-5 text-center text-stone-500">No collections on this day.</td></tr>}
               {data.collections.byMode.map((v) => (
                 <tr key={v.mode} className="border-t border-stone-100">
-                  <td className="px-4 py-2">{MODE_LABEL[v.mode] ?? v.mode}</td>
-                  <td className="px-4 py-2 text-right">{v.count}</td>
-                  <td className="px-4 py-2 text-right font-medium">{inr(v.amount)}</td>
+                  <td className="px-4 py-2 font-medium">{MODE_LABEL[v.mode] ?? v.mode}</td>
+                  <td className="px-4 py-2 text-right" data-label="# Receipts">{v.count}</td>
+                  <td className="px-4 py-2 text-right font-medium" data-label="Amount">{inr(v.amount)}</td>
                 </tr>
               ))}
             </tbody>
@@ -114,7 +114,7 @@ export default async function CashbookPage({
       <section className="mt-6">
         <h2 className="mb-2 text-sm font-semibold text-stone-800">Receipts today ({data.collections.list.length})</h2>
         <div className="card overflow-hidden p-0">
-          <table className="w-full text-sm">
+          <table className="rtable w-full text-sm">
             <thead className="bg-stone-50 text-left text-stone-500">
               <tr><th className="px-4 py-2 font-medium">Receipt #</th><th className="px-4 py-2 font-medium">Student</th><th className="px-4 py-2 font-medium">Mode</th><th className="px-4 py-2 font-medium text-right">Amount</th></tr>
             </thead>
@@ -123,9 +123,9 @@ export default async function CashbookPage({
               {data.collections.list.map((c, i) => (
                 <tr key={c.receipt_no ?? i} className="border-t border-stone-100">
                   <td className="px-4 py-2 font-mono text-xs">{c.receipt_no}</td>
-                  <td className="px-4 py-2">{c.student_name ?? "—"}</td>
-                  <td className="px-4 py-2">{MODE_LABEL[c.payment_mode ?? ""] ?? c.payment_mode}</td>
-                  <td className="px-4 py-2 text-right font-medium">{inr(c.amount_paid)}</td>
+                  <td className="px-4 py-2" data-label="Student">{c.student_name ?? "—"}</td>
+                  <td className="px-4 py-2" data-label="Mode">{MODE_LABEL[c.payment_mode ?? ""] ?? c.payment_mode}</td>
+                  <td className="px-4 py-2 text-right font-medium" data-label="Amount">{inr(c.amount_paid)}</td>
                 </tr>
               ))}
             </tbody>
@@ -139,15 +139,15 @@ export default async function CashbookPage({
           <h2 className="mb-2 text-sm font-semibold text-stone-800">Bank deposits today ({inr(data.deposits.total)})</h2>
           <div className="card mb-3 p-5"><DepositForm day={day} /></div>
           <div className="card overflow-hidden p-0">
-            <table className="w-full text-sm">
+            <table className="rtable w-full text-sm">
               <thead className="bg-stone-50 text-left text-stone-500"><tr><th className="px-4 py-2 font-medium">Bank</th><th className="px-4 py-2 font-medium">Receipt #</th><th className="px-4 py-2 font-medium text-right">Amount</th></tr></thead>
               <tbody>
                 {data.deposits.list.length === 0 && <tr><td colSpan={3} className="px-4 py-5 text-center text-stone-500">No deposits.</td></tr>}
                 {data.deposits.list.map((d, i) => (
                   <tr key={i} className="border-t border-stone-100">
-                    <td className="px-4 py-2">{d.bank_name ?? "—"}</td>
-                    <td className="px-4 py-2 font-mono text-xs">{d.deposit_receipt_no ?? d.reference ?? "—"}</td>
-                    <td className="px-4 py-2 text-right font-medium">{inr(d.amount)}</td>
+                    <td className="px-4 py-2 font-medium">{d.bank_name ?? "—"}</td>
+                    <td className="px-4 py-2 font-mono text-xs" data-label="Receipt #">{d.deposit_receipt_no ?? d.reference ?? "—"}</td>
+                    <td className="px-4 py-2 text-right font-medium" data-label="Amount">{inr(d.amount)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -210,7 +210,7 @@ export default function TimetableBuilder({
       </datalist>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="rtable w-full border-collapse text-sm">
           <thead>
             <tr>
               <th className="border border-stone-200 bg-stone-50 px-2 py-1.5 text-left font-medium">Day</th>
@@ -231,14 +231,14 @@ export default function TimetableBuilder({
                   // Beyond this day's period count (Saturday P6–P8).
                   if (p > periodsForDay(d.n)) {
                     return (
-                      <td key={p} className="border border-stone-200 bg-stone-100 px-2 py-1.5 text-center text-stone-300">
+                      <td key={p} className="border border-stone-200 bg-stone-100 px-2 py-1.5 text-center text-stone-300" data-label={`P${p}`}>
                         —
                       </td>
                     );
                   }
                   const c = cells[keyOf(d.n, p)] ?? { subject_name: "", teacher_id: "" };
                   return (
-                    <td key={p} className="border border-stone-200 px-1.5 py-1.5 align-top">
+                    <td key={p} className="border border-stone-200 px-1.5 py-1.5 align-top" data-label={`P${p}`}>
                       <input
                         list={datalistId}
                         value={c.subject_name}
