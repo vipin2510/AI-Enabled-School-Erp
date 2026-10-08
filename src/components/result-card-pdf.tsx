@@ -15,7 +15,9 @@ export type SubjectRow = {
   ut: (number | null)[]; // [ut1, ut2, ut3, ut4]
   utTotal: number | null;
   terminal: (number | null)[]; // [t1, t2, t3]
-  agg: { ut: number; iII: number; iii: number; total: number };
+  // Cells may be null on a part-term card (e.g. the half-yearly pack blanks the
+  // annual aggregate, which only means something once all terminals are in).
+  agg: { ut: number | null; iII: number | null; iii: number | null; total: number | null };
 };
 
 // A row in the block below the subjects. Any cell may be null/blank. `maxCell`

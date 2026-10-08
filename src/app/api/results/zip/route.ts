@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
-import { currentAcademicYear, computeResult, hasAnyMark } from "@/lib/results";
+import { currentAcademicYear, computeResult, hasAnyMark, examsForTerm } from "@/lib/results";
 import {
   loadClassSection,
   loadMarksByStudent,
@@ -31,6 +31,7 @@ export async function GET(req: Request) {
   const classId = url.searchParams.get("classId") ?? "";
   const section = url.searchParams.get("section") ?? "";
   const singleStudentId = url.searchParams.get("studentId");
+  const term = url.searchParams.get("term"); // "1" = half-yearly pack, else overall
   if (!classId || !section) {
     return NextResponse.json({ error: "Missing classId or section" }, { status: 400 });
   }
@@ -59,9 +60,10 @@ export async function GET(req: Request) {
   // Class ranking + highest aggregate, over graded students only. A student
   // with no marks entered isn't ranked (and their card shows "-" for rank),
   // so they never appear as a fabricated last-place / failed result.
+  const termExams = examsForTerm(term);
   const gradedStudents = students.filter((s) => hasAnyMark(marksByStudent[s.id] ?? {}));
   const percentById = new Map(
-    gradedStudents.map((s) => [s.id, computeResult(subjects, marksByStudent[s.id] ?? {}).percent])
+    gradedStudents.map((s) => [s.id, computeResult(subjects, marksByStudent[s.id] ?? {}, termExams).percent])
   );
   const ranked = [...gradedStudents].sort(
     (a, b) => (percentById.get(b.id) ?? 0) - (percentById.get(a.id) ?? 0)
@@ -83,9 +85,13 @@ export async function GET(req: Request) {
       extras: extrasByStudent[s.id] ?? {},
       rank: rankById.get(s.id) ?? null,
       highestPercent,
+      term,
     });
     return renderToBuffer(ResultCardPdf({ data }) as never);
   };
+
+  // Suffix so a term pack never overwrites / is mistaken for the overall card.
+  const termTag = term === "1" ? "term1-" : "";
 
   // Single-student mode: render ONLY that student's card. Previously this
   // rendered every card in the section just to return one — a huge, needless
@@ -96,11 +102,14 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Student not in this section" }, { status: 404 });
     }
     const buf = await renderCard(student);
-    const filename = `result-${safe(student.full_name)}-${academicYear}.pdf`;
+    const filename = `result-${termTag}${safe(student.full_name)}-${academicYear}.pdf`;
     return new NextResponse(buf as unknown as BodyInit, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${filename}"`,
+        // Never cache: cards are regenerated live, and a stale browser/CDN copy
+        // from before a format change would keep showing the old layout.
+        "Cache-Control": "no-store, max-age=0, must-revalidate",
       },
     });
   }
@@ -130,11 +139,12 @@ export async function GET(req: Request) {
   }
 
   const zip = createZip(entries);
-  const filename = `result-cards-${safe(klass.display_name)}-${safe(section)}-${academicYear}.zip`;
+  const filename = `result-cards-${termTag}${safe(klass.display_name)}-${safe(section)}-${academicYear}.zip`;
   return new NextResponse(zip as unknown as BodyInit, {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "no-store, max-age=0, must-revalidate",
     },
   });
 }
