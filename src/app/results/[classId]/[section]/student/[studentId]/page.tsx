@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { currentAcademicYear, markKey, extraKey, type MarksMap, type ExtrasMap } from "@/lib/results";
+import { currentAcademicYear, markKey, extraKey, extraFieldsForClass, type MarksMap, type ExtrasMap } from "@/lib/results";
 import { saveStudentMarks } from "@/app/results/actions";
 import StudentMarksForm from "./marks-form";
 import { DownloadButton } from "@/components/ui/download-button";
@@ -133,6 +133,7 @@ export default async function StudentMarksPage({
           initial={marksMap}
           initialGrades={gradeMap}
           initialExtras={extrasMap}
+          extraFields={extraFieldsForClass(klass?.display_name ?? "")}
           backHref={backHref}
         />
       )}

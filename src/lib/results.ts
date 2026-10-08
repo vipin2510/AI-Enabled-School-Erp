@@ -201,6 +201,7 @@ export const EXTRA_FIELDS: ExtraField[] = [
   { key: "hin_dictation", label: "Hindi Dictation", kind: "marks", max: 5 },
   { key: "hin_handwriting", label: "Hindi Hand Writing", kind: "marks", max: 5 },
   { key: "moral_science", label: "Moral Science", kind: "grade" },
+  { key: "general_knowledge", label: "General Knowledge", kind: "grade" },
   { key: "drawing", label: "Drawing", kind: "grade" },
   { key: "supw", label: "SUPW", kind: "grade" },
   { key: "working_days", label: "No of Working Days", kind: "count" },
@@ -219,4 +220,47 @@ export function extraByKey(key: string): ExtraField | undefined {
 export type ExtrasMap = Record<string, string>;
 export function extraKey(field: string, exam: string): string {
   return `${field}:${exam}`;
+}
+
+// Extract the numeric class (1–12) from a class's display name, or null for
+// pre-primary / anything unrecognised. Handles "6th", "CLASS - VIII",
+// "11th (Sci)", and bare roman or arabic numerals.
+export function classNumberFor(displayName: string): number | null {
+  const n = displayName.toLowerCase();
+  if (/(play\s*group|nursery|k\.?\s*g)/.test(n)) return null; // Nursery / L.K.G. / U.K.G.
+  const arabic = n.match(/\b(\d{1,2})(?:st|nd|rd|th)?\b/);
+  if (arabic) {
+    const v = parseInt(arabic[1], 10);
+    if (v >= 1 && v <= 12) return v;
+  }
+  // Isolate a roman numeral: drop the words around it, pad with spaces so the
+  // \s…\s guards work at the ends. Longer numerals are tested before prefixes.
+  const m = ` ${n.replace(/class|maths?|com|sci|[()\-.]/g, " ")} `;
+  const roman: [RegExp, number][] = [
+    [/\sxii\s/, 12], [/\sxi\s/, 11], [/\six\s/, 9], [/\sviii\s/, 8], [/\svii\s/, 7],
+    [/\svi\s/, 6], [/\siv\s/, 4], [/\siii\s/, 3], [/\sii\s/, 2], [/\sx\s/, 10],
+    [/\sv\s/, 5], [/\si\s/, 1],
+  ];
+  for (const [re, v] of roman) if (re.test(m)) return v;
+  return null;
+}
+
+// Which extra (non-scholastic) rows appear below the subjects for a class, and
+// in what order — the single source of truth shared by the printed marksheet
+// and the marks-entry form. Classes 6+ drop dictation/handwriting and drawing;
+// 6–8 add General Knowledge; 9–12 keep only Moral Science + SUPW + attendance.
+export function extraFieldsForClass(displayName: string): ExtraField[] {
+  const f = (k: string) => EXTRA_FIELDS.find((x) => x.key === k)!;
+  const lvl = classNumberFor(displayName);
+  if (lvl !== null && lvl >= 9) {
+    return [f("moral_science"), f("supw"), f("working_days"), f("days_present")];
+  }
+  if (lvl !== null && lvl >= 6) {
+    return [f("moral_science"), f("general_knowledge"), f("supw"), f("working_days"), f("days_present")];
+  }
+  // Pre-primary + classes 1–5: the full original set.
+  return [
+    f("eng_dictation"), f("eng_handwriting"), f("hin_dictation"), f("hin_handwriting"),
+    f("moral_science"), f("drawing"), f("supw"), f("working_days"), f("days_present"),
+  ];
 }

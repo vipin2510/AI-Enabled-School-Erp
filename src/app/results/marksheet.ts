@@ -4,6 +4,7 @@ import {
   examByKey,
   examsForTerm,
   extraByKey,
+  extraFieldsForClass,
   extraKey,
   aggregateForSubject,
   computeResult,
@@ -113,10 +114,12 @@ export function buildMarksheet(args: BuildArgs): MarksheetData {
     };
   };
 
-  rows.push(extraRow("eng_dictation"));
-  rows.push(extraRow("eng_handwriting"));
-  rows.push(extraRow("hin_dictation"));
-  rows.push(extraRow("hin_handwriting"));
+  // Which extra rows this class gets (band-specific — e.g. 6–8 drop
+  // dictation/handwriting and add General Knowledge; 9–12 keep only Moral
+  // Science + SUPW + attendance). Marks-kind extras sit above RANK; the
+  // grade/count extras below HIGHEST MARKS, mirroring the printed sheet.
+  const extraFields = extraFieldsForClass(args.className);
+  extraFields.filter((f) => f.kind === "marks").forEach((f) => rows.push(extraRow(f.key)));
 
   rows.push({ label: "RANK", agg: ["", "", "", args.rank ? String(args.rank) : "-"] });
   rows.push({
@@ -124,11 +127,7 @@ export function buildMarksheet(args: BuildArgs): MarksheetData {
     agg: ["", "", "", args.highestPercent.toFixed(2)],
   });
 
-  rows.push(extraRow("moral_science"));
-  rows.push(extraRow("drawing"));
-  rows.push(extraRow("supw"));
-  rows.push(extraRow("working_days"));
-  rows.push(extraRow("days_present"));
+  extraFields.filter((f) => f.kind !== "marks").forEach((f) => rows.push(extraRow(f.key)));
 
   return {
     schoolName: args.schoolName,

@@ -5,12 +5,12 @@ import { useActionState, useMemo, useState } from "react";
 import {
   EXAMS,
   CO_CURRICULAR_GRADES,
-  EXTRA_FIELDS,
   markKey,
   extraKey,
   gradeFor,
   type MarksMap,
   type ExtrasMap,
+  type ExtraField,
 } from "@/lib/results";
 import type { SaveState } from "@/app/results/actions";
 
@@ -23,6 +23,7 @@ type Props = {
   initial: MarksMap;
   initialGrades: Record<string, string>;
   initialExtras: ExtrasMap;
+  extraFields: ExtraField[];
   backHref: string;
 };
 
@@ -33,6 +34,7 @@ export default function StudentMarksForm({
   initial,
   initialGrades,
   initialExtras,
+  extraFields,
   backHref,
 }: Props) {
   const [state, formAction, pending] = useActionState<SaveState, FormData>(action, undefined);
@@ -192,8 +194,8 @@ export default function StudentMarksForm({
         <div className="px-4 pt-4">
           <h2 className="text-sm font-semibold text-stone-800">Extra assessments</h2>
           <p className="mt-1 text-xs text-stone-500">
-            Dictation / handwriting marks, moral-science / drawing / SUPW grades, and
-            attendance days — entered per exam, shown below the subjects on the marksheet.
+            Graded or numeric extras (and attendance days), entered per exam and shown
+            below the subjects on the marksheet. The set varies by class.
           </p>
         </div>
         <table className="rtable mt-3 w-full text-sm">
@@ -206,7 +208,7 @@ export default function StudentMarksForm({
             </tr>
           </thead>
           <tbody>
-            {EXTRA_FIELDS.map((f) => (
+            {extraFields.map((f) => (
               <tr key={f.key} className="border-t border-stone-100">
                 <td className="px-4 py-2 font-medium text-stone-800">
                   {f.label}
