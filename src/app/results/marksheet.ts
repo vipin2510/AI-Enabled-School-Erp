@@ -32,7 +32,7 @@ export type BuildArgs = {
 
 // Assemble the full marksheet for one student: numeric subject rows plus the
 // stack of generic rows below (grand total, percentage, dictation/handwriting,
-// grade/rank/result/highest, moral-science/drawing/SUPW, attendance days).
+// rank/highest, moral-science/drawing/SUPW, attendance days).
 export function buildMarksheet(args: BuildArgs): MarksheetData {
   const result = computeResult(args.subjects, args.marks);
   const n = args.subjects.length;
@@ -101,10 +101,7 @@ export function buildMarksheet(args: BuildArgs): MarksheetData {
   rows.push(extraRow("hin_dictation"));
   rows.push(extraRow("hin_handwriting"));
 
-  const passed = result.percent >= 33;
-  rows.push({ label: "GRADE", agg: ["", "", "", graded ? result.grade : ""] });
   rows.push({ label: "RANK", agg: ["", "", "", args.rank ? String(args.rank) : "-"] });
-  rows.push({ label: "RESULT(P/S/F)", agg: ["", "", "", graded ? (passed ? "P" : "F") : ""] });
   rows.push({
     label: "HIGHEST MARKS IN CLASS",
     agg: ["", "", "", args.highestPercent.toFixed(2)],

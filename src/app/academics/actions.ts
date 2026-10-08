@@ -232,7 +232,66 @@ export async function addSubject(formData: FormData) {
   if (!class_id || !name) return;
 
   const supabase = await createClient();
-  await supabase.from("subjects").insert({ class_id, name, category, school_id: schoolId });
+  // New subjects sort to the end of their class so they don't jump to the top
+  // (sort_order 0) ahead of the existing, already-ordered list.
+  const { data: last } = await supabase
+    .from("subjects")
+    .select("sort_order")
+    .eq("school_id", schoolId)
+    .eq("class_id", class_id)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const sort_order = (last?.sort_order ?? -1) + 1;
+  await supabase.from("subjects").insert({ class_id, name, category, school_id: schoolId, sort_order });
+  await bustTag(tagFor.subjects(schoolId));
+  revalidatePath("/academics/subjects");
+}
+
+// Move a subject one place up or down within its class + category group. The
+// Subjects card and the Results cards list subjects in (sort_order, name)
+// order, so this is how the school pins the per-class order to match the
+// printed marksheet. Reindexes the group to 0..n-1 on every move so the order
+// stays distinct and contiguous.
+export async function moveSubject(formData: FormData) {
+  const profile = await requireDepartment("academics");
+  const schoolId = await getCurrentSchoolId(profile);
+  const id = String(formData.get("id") ?? "");
+  const direction = String(formData.get("direction") ?? "");
+  if (!id || (direction !== "up" && direction !== "down")) return;
+
+  const supabase = await createClient();
+  const { data: subject } = await supabase
+    .from("subjects")
+    .select("class_id, category")
+    .eq("school_id", schoolId)
+    .eq("id", id)
+    .maybeSingle();
+  if (!subject) return;
+
+  const catOf = (c: string | null) => (c === "co_curricular" ? "co_curricular" : "scholastic");
+  const category = catOf(subject.category);
+
+  const { data: rows } = await supabase
+    .from("subjects")
+    .select("id, category, sort_order, name")
+    .eq("school_id", schoolId)
+    .eq("class_id", subject.class_id)
+    .order("sort_order")
+    .order("name");
+  const group = (rows ?? []).filter((s) => catOf(s.category) === category);
+
+  const idx = group.findIndex((s) => s.id === id);
+  if (idx < 0) return;
+  const target = direction === "up" ? idx - 1 : idx + 1;
+  if (target < 0 || target >= group.length) return;
+  [group[idx], group[target]] = [group[target], group[idx]];
+
+  await Promise.all(
+    group.map((s, i) =>
+      supabase.from("subjects").update({ sort_order: i }).eq("school_id", schoolId).eq("id", s.id)
+    )
+  );
   await bustTag(tagFor.subjects(schoolId));
   revalidatePath("/academics/subjects");
 }

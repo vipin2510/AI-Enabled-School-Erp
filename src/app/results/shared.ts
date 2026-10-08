@@ -18,7 +18,7 @@ export async function loadClassSection(classId: string, section: string, schoolI
   const supabase = await createClient();
   const [{ data: klass }, { data: subjectRows }, { data: students }] = await Promise.all([
     supabase.from("classes").select("id, display_name").eq("school_id", schoolId).eq("id", classId).single(),
-    supabase.from("subjects").select("id, name, category").eq("school_id", schoolId).eq("class_id", classId).order("name"),
+    supabase.from("subjects").select("id, name, category").eq("school_id", schoolId).eq("class_id", classId).order("sort_order").order("name"),
     supabase
       .from("students")
       .select("id, full_name, admission_no, father_name")

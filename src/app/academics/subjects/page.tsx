@@ -1,6 +1,6 @@
 import { requireDepartment, getCurrentSchoolId } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { addSubject, removeSubject } from "../actions";
+import { addSubject, removeSubject, moveSubject } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +21,7 @@ export default async function SubjectsPage() {
       .from("subjects")
       .select("id, class_id, name, category")
       .eq("school_id", schoolId)
+      .order("sort_order")
       .order("name"),
   ]);
 
@@ -35,8 +36,9 @@ export default async function SubjectsPage() {
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Subjects</h1>
         <p className="text-stone-500 text-sm">
-          Add or remove the subjects offered in each class. Scholastic subjects are
-          marked numerically; co-curricular subjects get a single A–E grade.
+          Add or remove the subjects offered in each class, and use the ▲▼ arrows to
+          set the order they appear on marks screens and report cards. Scholastic
+          subjects are marked numerically; co-curricular subjects get a single A–E grade.
         </p>
       </header>
 
@@ -115,16 +117,42 @@ function SubjectGroup({
       </div>
       <div className="flex flex-wrap gap-2">
         {list.length === 0 && <span className="text-sm text-stone-400">{emptyText}</span>}
-        {list.map((s) => (
+        {list.map((s, i) => (
           <span
             key={s.id}
             className={
-              "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm " +
+              "inline-flex items-center gap-1.5 rounded-full border py-1 pl-2 pr-3 text-sm " +
               (accent
                 ? "border-amber-200 bg-amber-50 text-amber-900"
                 : "border-stone-200 bg-stone-50")
             }
           >
+            <span className="flex items-center">
+              <form action={moveSubject}>
+                <input type="hidden" name="id" value={s.id} />
+                <input type="hidden" name="direction" value="up" />
+                <button
+                  className="px-0.5 text-stone-400 enabled:hover:text-stone-900 disabled:opacity-30"
+                  disabled={i === 0}
+                  aria-label={`Move ${s.name} up`}
+                  title="Move up"
+                >
+                  ▲
+                </button>
+              </form>
+              <form action={moveSubject}>
+                <input type="hidden" name="id" value={s.id} />
+                <input type="hidden" name="direction" value="down" />
+                <button
+                  className="px-0.5 text-stone-400 enabled:hover:text-stone-900 disabled:opacity-30"
+                  disabled={i === list.length - 1}
+                  aria-label={`Move ${s.name} down`}
+                  title="Move down"
+                >
+                  ▼
+                </button>
+              </form>
+            </span>
             {s.name}
             <form action={removeSubject}>
               <input type="hidden" name="id" value={s.id} />

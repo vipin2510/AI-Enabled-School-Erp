@@ -220,7 +220,6 @@ export function ResultCardPdf({ data }: { data: MarksheetData; logoDataUrl?: str
         {/* Signatures */}
         <View style={styles.sigRow}>
           <Text style={styles.sig}>Signature of Class Teacher</Text>
-          <Text style={styles.sig}>Signature of Examination Incharge</Text>
           <Text style={styles.sig}>Signature of Principal</Text>
         </View>
       </Page>

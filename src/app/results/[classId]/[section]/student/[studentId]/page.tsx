@@ -37,7 +37,7 @@ export default async function StudentMarksPage({
         .eq("school_id", schoolId)
         .eq("id", studentId)
         .single(),
-      supabase.from("subjects").select("id, name, category").eq("school_id", schoolId).eq("class_id", classId).order("name"),
+      supabase.from("subjects").select("id, name, category").eq("school_id", schoolId).eq("class_id", classId).order("sort_order").order("name"),
       supabase.from("classes").select("display_name").eq("school_id", schoolId).eq("id", classId).single(),
       supabase
         .from("marks")
